@@ -1,8 +1,13 @@
 import { useLocalSearchParams } from "expo-router";
 import { Radio } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
-import { useFanExploreBandDetailQuery } from "@/hooks/api/fan/useFanExplore";
+import {
+  useFanExploreBandDetailQuery,
+  useFollowExploreBand,
+  useUnfollowExploreBand,
+} from "@/hooks/api/fan/useFanExplore";
+import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
@@ -16,8 +21,26 @@ export function FanBandProfileScreen() {
   const params = useLocalSearchParams<{ bandId?: string }>();
   const bandId = Number(params.bandId);
   const query = useFanExploreBandDetailQuery(Number.isFinite(bandId) ? bandId : 0);
+  const followMutation = useFollowExploreBand();
+  const unfollowMutation = useUnfollowExploreBand();
   const band = query.data ? mapExploreBand(query.data) : null;
   const isLive = query.data?.isLive ?? query.data?.live ?? false;
+  const isFollowPending = followMutation.isPending || unfollowMutation.isPending;
+
+  const toggleFollow = async () => {
+    if (!band?.bandId) return;
+
+    try {
+      if (band.isFollowing) {
+        await unfollowMutation.mutateAsync(band.bandId);
+        return;
+      }
+
+      await followMutation.mutateAsync(band.bandId);
+    } catch {
+      Alert.alert("밴드 팔로우", "팔로우 상태를 변경하지 못했어요.");
+    }
+  };
 
   return (
     <Screen contentStyle={styles.container}>
@@ -43,6 +66,13 @@ export function FanBandProfileScreen() {
               {band.isFollowing ? <Badge label="팔로잉" tone="pink" /> : null}
               {isLive ? <Badge label="라이브 중" tone="yellow" /> : null}
             </View>
+            <AppButton
+              label={band.isFollowing ? "팔로잉 해제" : "팔로우"}
+              variant={band.isFollowing ? "secondary" : "primary"}
+              loading={isFollowPending}
+              disabled={band.bandId == null}
+              onPress={() => void toggleFollow()}
+            />
           </AppCard>
 
           <AppCard style={styles.section}>

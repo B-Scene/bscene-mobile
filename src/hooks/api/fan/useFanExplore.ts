@@ -1,9 +1,12 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  followExploreBand,
   getFanExploreBandDetail,
   getRecommendedExploreBands,
+  unfollowExploreBand,
 } from "@/api/fan/explore";
+import { followedBandsKeys } from "@/hooks/api/user/useFollowedBands";
 import type { FanExploreRecommendationParams } from "@/types/fan/explore";
 
 export const fanExploreKeys = {
@@ -37,5 +40,35 @@ export const useFanExploreBandDetailQuery = (bandId: number) => {
     queryFn: () => getFanExploreBandDetail(bandId),
     enabled: bandId > 0,
     staleTime: 1000 * 30,
+  });
+};
+
+export const useFollowExploreBand = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: followExploreBand,
+    onSuccess: (_data, bandId) => {
+      queryClient.invalidateQueries({ queryKey: fanExploreKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: fanExploreKeys.bandDetail(bandId),
+      });
+      queryClient.invalidateQueries({ queryKey: followedBandsKeys.all });
+    },
+  });
+};
+
+export const useUnfollowExploreBand = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: unfollowExploreBand,
+    onSuccess: (_data, bandId) => {
+      queryClient.invalidateQueries({ queryKey: fanExploreKeys.all });
+      queryClient.invalidateQueries({
+        queryKey: fanExploreKeys.bandDetail(bandId),
+      });
+      queryClient.invalidateQueries({ queryKey: followedBandsKeys.all });
+    },
   });
 };

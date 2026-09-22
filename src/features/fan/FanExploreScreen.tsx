@@ -1,7 +1,11 @@
 import { router } from "expo-router";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 
-import { useRecommendedExploreBandsInfiniteQuery } from "@/hooks/api/fan/useFanExplore";
+import {
+  useFollowExploreBand,
+  useRecommendedExploreBandsInfiniteQuery,
+  useUnfollowExploreBand,
+} from "@/hooks/api/fan/useFanExplore";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -72,6 +76,25 @@ export function FanExploreScreen() {
 }
 
 function BandRow({ item }: { item: ExploreBandItem }) {
+  const followMutation = useFollowExploreBand();
+  const unfollowMutation = useUnfollowExploreBand();
+  const isFollowPending = followMutation.isPending || unfollowMutation.isPending;
+
+  const toggleFollow = async () => {
+    if (item.bandId == null) return;
+
+    try {
+      if (item.isFollowing) {
+        await unfollowMutation.mutateAsync(item.bandId);
+        return;
+      }
+
+      await followMutation.mutateAsync(item.bandId);
+    } catch {
+      Alert.alert("밴드 팔로우", "팔로우 상태를 변경하지 못했어요.");
+    }
+  };
+
   return (
     <AppCard style={styles.card}>
       <Avatar imageUrl={item.imageUrl} label={item.name} size={54} />
@@ -92,17 +115,28 @@ function BandRow({ item }: { item: ExploreBandItem }) {
           {item.isFollowing ? <Badge label="팔로잉" tone="pink" /> : null}
         </View>
       </View>
-      <AppButton
-        label="보기"
-        variant="ghost"
-        disabled={item.bandId == null}
-        onPress={() => {
-          if (item.bandId == null) return;
-          router.push(
-            `/fan/bands/${item.bandId}` as Parameters<typeof router.push>[0],
-          );
-        }}
-      />
+      <View style={styles.actions}>
+        <AppButton
+          label={item.isFollowing ? "팔로잉" : "팔로우"}
+          variant={item.isFollowing ? "secondary" : "ghost"}
+          loading={isFollowPending}
+          disabled={item.bandId == null}
+          style={styles.compactButton}
+          onPress={() => void toggleFollow()}
+        />
+        <AppButton
+          label="보기"
+          variant="ghost"
+          disabled={item.bandId == null}
+          style={styles.compactButton}
+          onPress={() => {
+            if (item.bandId == null) return;
+            router.push(
+              `/fan/bands/${item.bandId}` as Parameters<typeof router.push>[0],
+            );
+          }}
+        />
+      </View>
     </AppCard>
   );
 }
@@ -156,6 +190,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.xs,
+  },
+  actions: {
+    alignItems: "flex-end",
+    gap: spacing.xs,
+  },
+  compactButton: {
+    minHeight: 38,
+    paddingHorizontal: spacing.md,
   },
   footerText: {
     color: colors.neutral600,

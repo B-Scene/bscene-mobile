@@ -1,4 +1,5 @@
 import { AxiosError } from "axios";
+import type { AxiosResponse } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
@@ -24,6 +25,24 @@ const assertSuccess = <T>({
       statusText: data.message,
       headers: {},
     });
+  }
+
+  return data.result;
+};
+
+const assertMutationSuccess = <T>(
+  response: AxiosResponse<FanExploreApiResponse<T>>,
+) => {
+  const { data } = response;
+
+  if (!data.isSuccess) {
+    throw new AxiosError(
+      data.message,
+      data.code,
+      response.config,
+      response.request,
+      response,
+    );
   }
 
   return data.result;
@@ -146,4 +165,20 @@ export const getFanExploreBandDetail = async (bandId: number) => {
   >(`/bands/${bandId}/detail`);
 
   return normalizeBandDetail(assertSuccess(response));
+};
+
+export const followExploreBand = async (bandId: number) => {
+  const response = await axiosInstance.post<FanExploreApiResponse<null>>(
+    `/bands/${bandId}/follow`,
+  );
+
+  return assertMutationSuccess(response);
+};
+
+export const unfollowExploreBand = async (bandId: number) => {
+  const response = await axiosInstance.delete<FanExploreApiResponse<null>>(
+    `/bands/${bandId}/follow`,
+  );
+
+  return assertMutationSuccess(response);
 };
