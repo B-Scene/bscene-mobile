@@ -5,6 +5,7 @@ import type {
   FanApiResponse,
   FanHomeConcert,
   FanHomeResponse,
+  FanPerformanceDetailResponse,
   NormalizedUpcomingPerformancesResponse,
   UpcomingPerformancesParams,
   UpcomingPerformancesResponse,
@@ -24,6 +25,14 @@ export const getFanHome = async () => {
       response,
     );
   }
+
+  return data.result;
+};
+
+export const getFanPerformanceDetail = async (performanceId: number) => {
+  const { data } = await axiosInstance.get<
+    FanApiResponse<FanPerformanceDetailResponse>
+  >(`/performances/${performanceId}/detail`);
 
   return data.result;
 };

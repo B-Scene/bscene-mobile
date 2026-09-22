@@ -8,7 +8,8 @@
 - Phase 3 Onboarding: 1차 플로우 및 API 저장 기반 완료, 약관/권한 상세 구현 필요
 - Phase 4 공통 UI / Navigation: 1차 기반 완료
 - Phase 5 팬 홈: 1차 API 연동 완료
-- 전체 기준 대략 25%
+- Phase 6 공연 목록/상세: 1차 API 연동 완료
+- 전체 기준 대략 28%
 
 ## 완료된 작업
 
@@ -31,16 +32,19 @@
 - `.env.example`을 추가해 Expo public env 키를 문서화했다.
 - 팬 홈 `/fan/home`에 `/home`, `/performances/upcoming` API를 연결했다.
 - 팬 홈의 팔로우 밴드 소식, 추천 밴드, 다가오는 공연 섹션에 Loading/Error/Empty 상태를 구현했다.
+- 팬 공연 목록 `/fan/home/concerts`와 공연 상세 `/fan/home/concerts/[concertId]`를 추가했다.
+- 공연 목록은 `/performances/upcoming`, 공연 상세는 `/performances/{performanceId}/detail` API를 사용한다.
+- 공연 상세에서 공연 정보, 소개, 캐스팅, 예매 링크 열기를 구현했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈 1차 API 화면을 구현한 상태. 다음은 공연 목록/상세 또는 팬 탐색 API 연동이다.
+- 팬 홈과 공연 목록/상세 1차 API 화면을 구현한 상태. 다음은 팬 탐색 및 밴드 프로필 API 연동이다.
 
 ## 다음에 해야 할 작업
 
-1. 공연 목록/상세 API를 모바일 화면에 연결한다.
-2. 팬 탐색 및 밴드 프로필 API를 모바일 화면에 연결한다.
+1. 팬 탐색 및 밴드 프로필 API를 모바일 화면에 연결한다.
+2. 공연 관심/알림 mutation을 공연 목록/상세에 연결한다.
 3. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
 4. 알림 권한을 Expo Notifications로 전환한다.
 
@@ -69,6 +73,7 @@
 - `src/stores/useOAuthSignupStore.ts`
 - `src/features/navigation/*`
 - `src/features/fan/*`
+- `src/features/fan/concertMappers.ts`
 - `src/api/fan/home.ts`
 - `src/hooks/api/fan/useFanHome.ts`
 - `src/types/fan/home.ts`
@@ -122,6 +127,7 @@
 - 실제 값은 `.env` 등에 두고 commit하지 않는다. repository에는 `.env.example`만 포함한다.
 - Auth와 Onboarding endpoint/request/response type은 웹과 동일하게 유지했다.
 - Fan Home endpoint는 웹과 동일하게 `/home`, `/performances/upcoming`을 사용한다.
+- 공연 상세 endpoint는 웹과 동일하게 `/performances/{performanceId}/detail`을 사용한다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
 ## 인증 관련 결정사항
@@ -141,6 +147,8 @@
 - `/oauth/callback`: OAuth callback exchange
 - `/home`: 임시 authenticated home shell
 - `/fan/home`: 팬 홈 탭
+- `/fan/home/concerts`: 팬 공연 목록
+- `/fan/home/concerts/[concertId]`: 팬 공연 상세
 - `/fan/explore`: 팬 탐색 탭
 - `/fan/live`: 팬 라이브 탭
 - `/fan/my`: 팬 마이 탭
@@ -169,6 +177,7 @@
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
 - Push notification permission과 band actual home API 화면은 아직 구현 전이다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
+- 공연 목록/상세는 조회 중심으로 완료했다. 관심 공연/알림/공유 mutation은 아직 웹 parity 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
@@ -192,6 +201,9 @@
 - Bottom Navigation tab 이동
 - Fan/Band mode route group 이동
 - 팬 홈 `/home`, `/performances/upcoming` 실제 API 응답 렌더링
+- 공연 목록 `/performances/upcoming` pagination
+- 공연 상세 `/performances/{performanceId}/detail` 실제 API 응답 렌더링
+- 공연 상세 예매 링크 `Linking.openURL`
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -200,9 +212,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `48d535e`
-- 이번 팬 홈 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `3f7be9b`
+- 이번 공연 목록/상세 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-웹 공연 목록/상세 구현과 `src/api/fan/home.ts`의 performance 관련 API를 참고해 모바일 공연 목록 및 상세 화면을 구현한다.
+웹 `src/api/fan/explore.ts`, `src/pages/fan/explore/*`를 참고해 팬 탐색과 밴드 프로필 API 화면을 구현한다.

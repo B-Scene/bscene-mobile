@@ -1,6 +1,10 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
-import { getFanHome, getUpcomingPerformances } from "@/api/fan/home";
+import {
+  getFanHome,
+  getFanPerformanceDetail,
+  getUpcomingPerformances,
+} from "@/api/fan/home";
 import type { UpcomingPerformanceSort } from "@/types/fan/home";
 
 export const fanHomeKeys = {
@@ -8,6 +12,8 @@ export const fanHomeKeys = {
   main: () => [...fanHomeKeys.all, "main"] as const,
   upcomingPerformances: (sort: UpcomingPerformanceSort, size: number) =>
     [...fanHomeKeys.all, "upcomingPerformances", sort, size] as const,
+  performanceDetail: (performanceId: number) =>
+    [...fanHomeKeys.all, "performanceDetail", performanceId] as const,
 };
 
 export const useFanHomeQuery = () => {
@@ -37,6 +43,15 @@ export const useUpcomingPerformancesInfiniteQuery = (
       return lastPage.nextPage ?? pages.length;
     },
     enabled,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanPerformanceDetailQuery = (performanceId: number) => {
+  return useQuery({
+    queryKey: fanHomeKeys.performanceDetail(performanceId),
+    queryFn: () => getFanPerformanceDetail(performanceId),
+    enabled: performanceId > 0,
     staleTime: 1000 * 30,
   });
 };

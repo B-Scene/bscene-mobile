@@ -95,6 +95,77 @@ export interface FanHomeConcert {
   isInterested?: boolean;
 }
 
+export type PerformanceParticipationStatus = "SCHEDULED" | "COMPLETED";
+
+export interface FanPerformanceCastingBand {
+  band?: FanPerformanceCastingBand;
+  profile?: FanPerformanceCastingBand;
+  bandProfile?: FanPerformanceCastingBand;
+  bandInfo?: FanPerformanceCastingBand;
+  bandId?: number | string;
+  targetBandId?: number | string;
+  id?: number | string;
+  bandName?: string;
+  name?: string;
+  profileImageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+  bandImageUrl?: string | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  genre?: string | null;
+  bandGenre?: string | null;
+  region?: string | null;
+  bandRegion?: string | null;
+  description?: string | null;
+  bandDescription?: string | null;
+  introduction?: string | null;
+}
+
+export interface FanPerformanceDetailResponse {
+  performanceId: number;
+  performanceTitle?: string;
+  performanceName?: string;
+  concertTitle?: string;
+  concertName?: string;
+  showTitle?: string;
+  showName?: string;
+  name?: string;
+  title?: string;
+  genre?: string | null;
+  region?: string | null;
+  location?: string | null;
+  venue?: string | null;
+  performanceDate?: string | null;
+  performanceTime?: string | null;
+  startAt?: string | null;
+  startedAt?: string | null;
+  startDateTime?: string | null;
+  startDate?: string | null;
+  startTime?: string | null;
+  time?: string | null;
+  ticketPrice?: string | number | null;
+  price?: string | number | null;
+  ageRating?: string | null;
+  ticketLink?: string | null;
+  introduction?: string | null;
+  description?: string | null;
+  content?: string | null;
+  tags?: string[];
+  posterImageUrl?: string | null;
+  performanceImageUrl?: string | null;
+  posterUrl?: string | null;
+  imageUrl?: string | null;
+  mainImageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  imageUrls?: string[] | string;
+  isInterested?: boolean;
+  interestCount?: number;
+  notificationEnabled?: boolean;
+  isAlarmSet?: boolean;
+  participationStatus?: PerformanceParticipationStatus | null;
+  casting?: FanPerformanceCastingBand[];
+}
+
 export interface FanHomeResponse {
   hasFollowingBands?: boolean;
   hasUnreadNotification?: boolean;
