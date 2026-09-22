@@ -5,9 +5,11 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/shared/components/Screen";
 import { colors, spacing } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { getHomePathForMode, useModeStore } from "@/stores/useModeStore";
 
 export function SplashScreen() {
   const { restoreSession, status, user } = useAuthStore();
+  const mode = useModeStore((state) => state.mode);
 
   useEffect(() => {
     void restoreSession();
@@ -25,9 +27,13 @@ export function SplashScreen() {
         return;
       }
 
-      router.replace("/home");
+      router.replace(
+        getHomePathForMode(user?.currentMode ?? mode) as Parameters<
+          typeof router.replace
+        >[0],
+      );
     }
-  }, [status, user]);
+  }, [mode, status, user]);
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>

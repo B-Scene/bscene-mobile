@@ -6,7 +6,8 @@
 - Phase 1 공통 환경: 진행 중
 - Phase 2 인증: 로그인, 일반 회원가입, OAuth callback/API 연동 기반 완료
 - Phase 3 Onboarding: 1차 플로우 및 API 저장 기반 완료, 약관/권한 상세 구현 필요
-- 전체 기준 대략 18%
+- Phase 4 공통 UI / Navigation: 1차 기반 완료
+- 전체 기준 대략 22%
 
 ## 완료된 작업
 
@@ -22,17 +23,22 @@
 - 회원가입 비밀번호 검증, 휴대폰 인증번호 발송/검증, 생년월일/성별 입력, `/auth/signup` 제출을 구현했다.
 - OAuth provider URL 실행, `/oauth/callback` code exchange, 신규 소셜 유저 signup token handoff, `/auth/oauth/signup` 제출을 구현했다.
 - Onboarding agreement, mode, fan nickname, genre, region, notification permission, complete route를 추가했다.
+- 공통 모바일 UI 컴포넌트 `AppHeader`, `AppCard`, `AppState`, `Avatar`, `Badge`를 추가했다.
+- 팬/밴드 모드용 Expo Router route group과 Bottom Navigation을 추가했다.
+- 웹 BottomNav 구조를 모바일에 반영했다. 팬: 홈/탐색/라이브/마이, 밴드: 내 밴드/세션/라이브/마이.
+- `/home` 임시 화면은 현재 모드에 따라 `/fan/home` 또는 `/band/home`으로 redirect하도록 변경했다.
+- `.env.example`을 추가해 Expo public env 키를 문서화했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 인증 및 온보딩을 실제 모바일 UX로 확장하는 단계. 로그인/회원가입/OAuth 기반은 완료했고 약관 상세/알림 권한이 남아 있다.
+- 공통 UI와 모드별 Bottom Navigation 1차 기반을 만든 상태. 다음은 팬 홈 API 실제 연동이다.
 
 ## 다음에 해야 할 작업
 
-1. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
-2. 알림 권한을 Expo Notifications로 전환한다.
-3. Bottom Navigation과 팬/밴드 홈 route group을 만든다.
+1. 팬 홈 API(`/home`, `/performances/upcoming`, 팔로우 밴드 소식)를 모바일 화면에 연결한다.
+2. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+3. 알림 권한을 Expo Notifications로 전환한다.
 4. 실제 OAuth provider URL과 deep link redirect 설정으로 카카오/구글 로그인을 기기에서 QA한다.
 
 ## 변경한 주요 파일
@@ -45,6 +51,8 @@
 - `src/features/auth/SignupScreen.tsx`
 - `src/features/auth/OAuthCallbackScreen.tsx`
 - `src/app/home.tsx`
+- `src/app/fan/*`
+- `src/app/band/*`
 - `src/app/onboarding/*`
 - `src/api/axiosInstance.ts`
 - `src/api/auth/auth.ts`
@@ -53,8 +61,12 @@
 - `src/hooks/api/onboarding/useOnboarding.ts`
 - `src/providers/AppProviders.tsx`
 - `src/stores/useAuthStore.ts`
+- `src/stores/useModeStore.ts`
 - `src/stores/useOnboardingDraftStore.ts`
 - `src/stores/useOAuthSignupStore.ts`
+- `src/features/navigation/*`
+- `src/features/fan/*`
+- `src/features/band/*`
 - `src/shared/components/*`
 - `src/shared/constants/*`
 - `src/shared/utils/secureTokenStorage.ts`
@@ -65,6 +77,7 @@
 - `package.json`
 - `package-lock.json`
 - `app.json`
+- `.env.example`
 
 ## 설치한 패키지
 
@@ -74,6 +87,8 @@
 - `expo-secure-store`
 - `eslint`
 - `eslint-config-expo`
+- `lucide-react-native`
+- `react-native-svg`
 
 ## Architecture 결정사항
 
@@ -82,6 +97,7 @@
 - 인증 토큰은 `localStorage` 대신 `expo-secure-store`를 사용한다.
 - API client는 웹과 동일하게 401 발생 시 access token 재발급 후 원 요청을 재시도한다.
 - 모바일 초기 화면은 Splash에서 SecureStore token 존재 여부를 확인한 뒤 login/home/onboarding으로 분기한다.
+- 모드별 메인 navigation은 `/fan/*`, `/band/*` route group 아래에서 `ModeTabLayout`과 `BottomNavigation`으로 처리한다.
 
 ## 기존 Web과 Mobile의 차이
 
@@ -91,11 +107,13 @@
 - Push, 파일 업로드, live media는 아직 모바일 네이티브 대응 전이다.
 - OAuth는 WebBrowser로 provider URL을 열고 Expo Router callback에서 `code`를 교환한다.
 - 회원가입 휴대폰 인증 타이머는 React Native state/effect lint rule에 맞춰 `timeLeft` 기반으로 만료 상태를 표현한다.
+- Bottom Navigation은 `lucide-react-native` 아이콘을 사용한다.
 
 ## API 관련 결정사항
 
 - `EXPO_PUBLIC_API_BASE_URL` 환경 변수를 mobile API baseURL로 사용한다.
 - `EXPO_PUBLIC_KAKAO_OAUTH_URL`, `EXPO_PUBLIC_GOOGLE_OAUTH_URL` 환경 변수를 OAuth 시작 URL로 사용한다.
+- 실제 값은 `.env` 등에 두고 commit하지 않는다. repository에는 `.env.example`만 포함한다.
 - Auth와 Onboarding endpoint/request/response type은 웹과 동일하게 유지했다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
@@ -115,6 +133,14 @@
 - `/signup`: Signup
 - `/oauth/callback`: OAuth callback exchange
 - `/home`: 임시 authenticated home shell
+- `/fan/home`: 팬 홈 탭
+- `/fan/explore`: 팬 탐색 탭
+- `/fan/live`: 팬 라이브 탭
+- `/fan/my`: 팬 마이 탭
+- `/band/home`: 밴드 홈 탭
+- `/band/session`: 밴드 세션 탭
+- `/band/live`: 밴드 라이브 탭
+- `/band/my`: 밴드 마이 탭
 - `/onboarding/agreement`
 - `/onboarding/mode`
 - `/onboarding/fan-nickname`
@@ -134,7 +160,8 @@
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
-- Push notification permission, bottom navigation, fan/band actual home은 아직 구현 전이다.
+- Push notification permission과 fan/band actual home API 화면은 아직 구현 전이다.
+- Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
 ## 알려진 버그
@@ -154,6 +181,8 @@
 - Onboarding nickname 중복 확인
 - Onboarding save
 - Android/iOS Safe Area 및 Keyboard Avoiding
+- Bottom Navigation tab 이동
+- Fan/Band mode route group 이동
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -162,9 +191,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `1eeae8c`
-- 이번 OAuth 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `f540ac7`
+- 이번 공통 UI/Navigation 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-웹 `agreementData.ts`를 모바일에 옮겨 약관 선택/상세 보기 UX를 구현하고, 회원가입/온보딩 저장 payload의 term agreement 처리를 점검한다.
+팬 홈 API와 웹 `FanHomePage`의 데이터 매핑을 모바일로 이전해 `/fan/home`을 실제 데이터 화면으로 구현한다.

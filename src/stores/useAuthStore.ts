@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { setUnauthorizedHandler } from "@/api/axiosInstance";
 import { secureTokenStorage } from "@/shared/utils/secureTokenStorage";
+import { useModeStore } from "@/stores/useModeStore";
 import type { AuthUser, LoginResponse } from "@/types/auth/auth";
 
 type AuthStatus = "idle" | "loading" | "authenticated" | "guest";
@@ -33,6 +34,7 @@ export const useAuthStore = create<AuthState>((set) => {
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
       });
+      useModeStore.getState().setModeFromUserMode(session.user.currentMode);
       set({ status: "authenticated", user: session.user });
     },
 

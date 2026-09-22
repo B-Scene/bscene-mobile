@@ -10,6 +10,7 @@ import { Screen } from "@/shared/components/Screen";
 import { config } from "@/shared/constants/config";
 import { colors, spacing } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { getHomePathForMode } from "@/stores/useModeStore";
 
 export function LoginScreen() {
   const [loginId, setLoginId] = useState("");
@@ -25,9 +26,10 @@ export function LoginScreen() {
       {
         onSuccess: async (session) => {
           await setSession(session);
-          router.replace(
-            session.user.onboardingCompleted ? "/home" : "/onboarding/agreement",
-          );
+          const nextPath = session.user.onboardingCompleted
+            ? getHomePathForMode(session.user.currentMode)
+            : "/onboarding/agreement";
+          router.replace(nextPath as Parameters<typeof router.replace>[0]);
         },
         onError: () => {
           Alert.alert("로그인 실패", "아이디와 비밀번호를 확인해 주세요.");

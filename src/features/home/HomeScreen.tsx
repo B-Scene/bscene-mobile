@@ -1,13 +1,24 @@
 import { router } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/shared/components/AppButton";
 import { Screen } from "@/shared/components/Screen";
 import { colors, spacing } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { getHomePathForMode, useModeStore } from "@/stores/useModeStore";
 
 export function HomeScreen() {
   const { clearSession, user } = useAuthStore();
+  const mode = useModeStore((state) => state.mode);
+
+  useEffect(() => {
+    router.replace(
+      getHomePathForMode(user?.currentMode ?? mode) as Parameters<
+        typeof router.replace
+      >[0],
+    );
+  }, [mode, user?.currentMode]);
 
   const handleLogout = async () => {
     await clearSession();
@@ -18,11 +29,12 @@ export function HomeScreen() {
     <Screen contentStyle={styles.container}>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>{user?.currentMode ?? "B:Scene"}</Text>
-        <Text style={styles.title}>모바일 홈 기반 준비 완료</Text>
+        <Text style={styles.title}>홈으로 이동 중</Text>
         <Text style={styles.description}>
-          다음 단계에서 웹의 팬 홈, 밴드 홈, Bottom Navigation을 실제 데이터 화면으로 세분화합니다.
+          선택된 모드에 맞는 B:Scene 모바일 홈으로 연결하고 있습니다.
         </Text>
       </View>
+      <ActivityIndicator color={colors.primary500} />
       <AppButton label="로그아웃" variant="secondary" onPress={handleLogout} />
     </Screen>
   );

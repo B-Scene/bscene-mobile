@@ -6,6 +6,7 @@ import { useOAuthExchange } from "@/hooks/api/auth/useAuth";
 import { Screen } from "@/shared/components/Screen";
 import { colors, spacing } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { getHomePathForMode } from "@/stores/useModeStore";
 import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
 
 export function OAuthCallbackScreen() {
@@ -39,9 +40,10 @@ export function OAuthCallbackScreen() {
 
         if (data.token) {
           await setSession(data.token);
-          router.replace(
-            data.token.user.onboardingCompleted ? "/home" : "/onboarding/agreement",
-          );
+          const nextPath = data.token.user.onboardingCompleted
+            ? getHomePathForMode(data.token.user.currentMode)
+            : "/onboarding/agreement";
+          router.replace(nextPath as Parameters<typeof router.replace>[0]);
           return;
         }
 
