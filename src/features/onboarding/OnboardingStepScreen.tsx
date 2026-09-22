@@ -20,11 +20,13 @@ import {
   useRegions,
   useSaveOnboarding,
 } from "@/hooks/api/onboarding/useOnboarding";
+import { useRegisterPushToken } from "@/hooks/api/notification/useNotification";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppTextInput } from "@/shared/components/AppTextInput";
 import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
 import { colors, radius, spacing } from "@/shared/constants/theme";
+import { requestExpoPushToken } from "@/shared/utils/expoNotifications";
 import { useOnboardingDraftStore } from "@/stores/useOnboardingDraftStore";
 import type { ModeCode } from "@/types/onboarding/onboarding";
 
@@ -66,6 +68,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
     useState<AgreementKey>("service");
   const checkNicknameMutation = useCheckFanNickname();
   const saveOnboardingMutation = useSaveOnboarding();
+  const registerPushTokenMutation = useRegisterPushToken();
   const genresQuery = useGenres();
   const regionsQuery = useRegions();
 
@@ -370,21 +373,70 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   }
 
   if (step === "notification-permission") {
+    const requestNotificationPermission = async () => {
+      try {
+        const result = await requestExpoPushToken();
+
+        if (result.status === "unavailable") {
+          Alert.alert(
+            "실제 기기에서 설정할 수 있어요",
+            "푸시 알림은 iOS 또는 Android 실제 기기에서 사용할 수 있어요.",
+          );
+          router.push("/onboarding/complete");
+          return;
+        }
+
+        if (result.status === "denied") {
+          Alert.alert(
+            "알림 권한이 꺼져 있어요",
+            "마이페이지에서 언제든 다시 설정할 수 있어요.",
+          );
+          router.push("/onboarding/complete");
+          return;
+        }
+
+        if (!result.token) {
+          Alert.alert("알림 설정 실패", "푸시 토큰을 발급받지 못했어요.");
+          return;
+        }
+
+        await registerPushTokenMutation.mutateAsync({
+          token: result.token,
+          platform: "WEB",
+        });
+        router.push("/onboarding/complete");
+      } catch {
+        Alert.alert(
+          "알림 설정 실패",
+          "알림 권한 또는 토큰 등록 중 문제가 발생했어요. 나중에 다시 설정할 수 있어요.",
+        );
+      }
+    };
+
     return (
       <OnboardingFrame
         title="알림을 받아볼까요?"
-        description="공연 알림, 라이브 시작, 세션 지원 상태를 놓치지 않도록 Expo 알림 권한을 연결할 예정입니다."
+        description="공연 알림, 라이브 시작, 세션 지원 상태를 놓치지 않도록 앱 푸시 알림을 설정할 수 있어요."
         footer={
-          <AppButton
-            label="완료 화면으로"
-            onPress={() => router.push("/onboarding/complete")}
-          />
+          <View style={styles.footerActions}>
+            <AppButton
+              label="알림 허용하고 계속"
+              loading={registerPushTokenMutation.isPending}
+              onPress={() => void requestNotificationPermission()}
+            />
+            <AppButton
+              label="나중에 할게요"
+              variant="ghost"
+              disabled={registerPushTokenMutation.isPending}
+              onPress={() => router.push("/onboarding/complete")}
+            />
+          </View>
         }
       >
         <View style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>모바일 권한 처리 예정</Text>
+          <Text style={styles.noticeTitle}>앱 푸시 알림</Text>
           <Text style={styles.noticeDescription}>
-            웹의 PushNotificationBridge와 알림 설정 API를 Expo Notifications 기반으로 전환합니다.
+            기기 권한을 허용하면 Expo push token을 발급받아 B:Scene 알림 토큰 API에 등록합니다.
           </Text>
         </View>
       </OnboardingFrame>
@@ -506,6 +558,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: "auto",
+  },
+  footerActions: {
+    gap: spacing.sm,
   },
   cardRow: {
     gap: spacing.lg,

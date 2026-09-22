@@ -14,7 +14,8 @@
 - Phase 9 팬 마이페이지: 1차 API 연동 완료
 - Phase 10 Onboarding 약관 데이터: 웹 기준 반영 완료
 - Phase 11 팬 마이페이지 세부 목록: 1차 API 연동 완료
-- 전체 기준 대략 37%
+- Phase 12 Expo Notifications 알림 권한: 1차 연동 완료
+- 전체 기준 대략 38%
 
 ## 완료된 작업
 
@@ -49,17 +50,19 @@
 - 웹 `agreementData`를 모바일에 반영하고 Onboarding 약관 화면에 필수/선택 동의와 상세 열람 UI를 연결했다.
 - 팬 마이페이지 세부 목록 `/fan/my/followed-bands`, `/fan/my/interested-concerts`, `/fan/my/attended-concerts`를 추가했다.
 - 팔로우한 밴드 `/users/me/follows`, 관심 공연 `/users/me/performance/interest`, 공연 참여 기록 `/users/me/performance/history` API를 모바일 목록에 연결했다.
+- Expo Notifications 기반 알림 권한 요청, Android notification channel 설정, Expo push token 발급 유틸을 추가했다.
+- Onboarding 알림 권한 화면에서 Expo push token을 `/notifications/tokens` API에 등록하도록 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록, Onboarding 약관 데이터 반영을 구현한 상태. 다음은 알림 권한 Expo Notifications 전환 또는 밴드 홈 API 화면이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청을 구현한 상태. 다음은 밴드 홈 API 화면 또는 팬 탐색 팔로우/언팔로우 mutation이다.
 
 ## 다음에 해야 할 작업
 
-1. 알림 권한을 Expo Notifications로 전환한다.
-2. 밴드 홈 API 화면을 모바일에 연결한다.
-3. 팬 탐색 팔로우/언팔로우 mutation을 연결한다.
+1. 밴드 홈 API 화면을 모바일에 연결한다.
+2. 팬 탐색 팔로우/언팔로우 mutation을 연결한다.
+3. 알림 설정 화면과 notification settings API를 연결한다.
 
 ## 변경한 주요 파일
 
@@ -100,7 +103,11 @@
 - `src/features/band/*`
 - `src/shared/components/*`
 - `src/shared/constants/*`
+- `src/shared/utils/expoNotifications.ts`
 - `src/shared/utils/secureTokenStorage.ts`
+- `src/api/notification.ts`
+- `src/hooks/api/notification/*`
+- `src/types/notification.ts`
 - `src/shared/utils/formatTime.ts`
 - `src/types/auth/auth.ts`
 - `src/types/onboarding/onboarding.ts`
@@ -153,6 +160,7 @@
 - 밴드 프로필 endpoint는 웹과 동일하게 `/bands/{bandId}/detail`을 사용한다.
 - 팬 마이페이지 endpoint는 웹과 동일하게 `/users/me`, `/users/me/information`을 사용한다.
 - 팬 마이페이지 세부 목록 endpoint는 웹과 동일하게 `/users/me/follows`, `/users/me/performance/interest`, `/users/me/performance/history`를 사용한다.
+- 푸시 토큰 등록 endpoint는 웹과 동일하게 `/notifications/tokens`를 사용한다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
 ## 인증 관련 결정사항
@@ -204,7 +212,8 @@
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
-- Push notification permission과 band actual home API 화면은 아직 구현 전이다.
+- Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
+- Band actual home API 화면은 아직 구현 전이다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
 - 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
 - 팬 탐색/밴드 프로필은 조회 중심으로 완료했다. 팔로우/언팔로우 mutation, 검색/필터/콘텐츠 상세는 아직 웹 parity 전이다.
@@ -229,6 +238,7 @@
 - Onboarding nickname 중복 확인
 - Onboarding save
 - Onboarding 약관 필수/선택 동의 및 상세 열람
+- Onboarding 알림 권한 요청, Expo push token 발급, `/notifications/tokens` 등록
 - Android/iOS Safe Area 및 Keyboard Avoiding
 - Bottom Navigation tab 이동
 - Fan/Band mode route group 이동
@@ -251,9 +261,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `fa5878f`
-- 이번 팬 마이페이지 세부 목록 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `e317aa2`
+- 이번 Expo Notifications 알림 권한 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-알림 권한을 Expo Notifications로 전환한다.
+밴드 홈 API 화면을 모바일에 연결한다.
