@@ -4,9 +4,9 @@
 
 - Phase 0 모바일 기본 Architecture / Dependency / Folder Structure: 완료
 - Phase 1 공통 환경: 진행 중
-- Phase 2 인증: 로그인 및 일반 회원가입 API 연동 완료, OAuth 상세 구현 필요
+- Phase 2 인증: 로그인, 일반 회원가입, OAuth callback/API 연동 기반 완료
 - Phase 3 Onboarding: 1차 플로우 및 API 저장 기반 완료, 약관/권한 상세 구현 필요
-- 전체 기준 대략 15%
+- 전체 기준 대략 18%
 
 ## 완료된 작업
 
@@ -20,19 +20,20 @@
 - Splash, Login, Signup, Home shell 화면을 추가했다.
 - Signup placeholder를 실제 모바일 회원가입 화면으로 교체했다.
 - 회원가입 비밀번호 검증, 휴대폰 인증번호 발송/검증, 생년월일/성별 입력, `/auth/signup` 제출을 구현했다.
+- OAuth provider URL 실행, `/oauth/callback` code exchange, 신규 소셜 유저 signup token handoff, `/auth/oauth/signup` 제출을 구현했다.
 - Onboarding agreement, mode, fan nickname, genre, region, notification permission, complete route를 추가했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 인증 및 온보딩을 실제 모바일 UX로 확장하는 단계. 일반 회원가입은 완료했고 OAuth/약관 상세/알림 권한이 남아 있다.
+- 인증 및 온보딩을 실제 모바일 UX로 확장하는 단계. 로그인/회원가입/OAuth 기반은 완료했고 약관 상세/알림 권한이 남아 있다.
 
 ## 다음에 해야 할 작업
 
-1. OAuth URL/deep link 흐름을 Expo WebBrowser/Linking 기반으로 연결한다.
-2. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
-3. 알림 권한을 Expo Notifications로 전환한다.
-4. Bottom Navigation과 팬/밴드 홈 route group을 만든다.
+1. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+2. 알림 권한을 Expo Notifications로 전환한다.
+3. Bottom Navigation과 팬/밴드 홈 route group을 만든다.
+4. 실제 OAuth provider URL과 deep link redirect 설정으로 카카오/구글 로그인을 기기에서 QA한다.
 
 ## 변경한 주요 파일
 
@@ -40,7 +41,9 @@
 - `src/app/index.tsx`
 - `src/app/login.tsx`
 - `src/app/signup.tsx`
+- `src/app/oauth/callback.tsx`
 - `src/features/auth/SignupScreen.tsx`
+- `src/features/auth/OAuthCallbackScreen.tsx`
 - `src/app/home.tsx`
 - `src/app/onboarding/*`
 - `src/api/axiosInstance.ts`
@@ -51,6 +54,7 @@
 - `src/providers/AppProviders.tsx`
 - `src/stores/useAuthStore.ts`
 - `src/stores/useOnboardingDraftStore.ts`
+- `src/stores/useOAuthSignupStore.ts`
 - `src/shared/components/*`
 - `src/shared/constants/*`
 - `src/shared/utils/secureTokenStorage.ts`
@@ -84,12 +88,14 @@
 - React Router `createBrowserRouter`를 Expo Router Stack route로 전환했다.
 - DOM/CSS/Tailwind 대신 React Native `View`, `Text`, `Pressable`, `TextInput`, `StyleSheet`를 사용한다.
 - `localStorage` token persistence를 SecureStore로 전환했다.
-- 현재 OAuth, Push, 파일 업로드, live media는 아직 모바일 네이티브 대응 전이다.
+- Push, 파일 업로드, live media는 아직 모바일 네이티브 대응 전이다.
+- OAuth는 WebBrowser로 provider URL을 열고 Expo Router callback에서 `code`를 교환한다.
 - 회원가입 휴대폰 인증 타이머는 React Native state/effect lint rule에 맞춰 `timeLeft` 기반으로 만료 상태를 표현한다.
 
 ## API 관련 결정사항
 
 - `EXPO_PUBLIC_API_BASE_URL` 환경 변수를 mobile API baseURL로 사용한다.
+- `EXPO_PUBLIC_KAKAO_OAUTH_URL`, `EXPO_PUBLIC_GOOGLE_OAUTH_URL` 환경 변수를 OAuth 시작 URL로 사용한다.
 - Auth와 Onboarding endpoint/request/response type은 웹과 동일하게 유지했다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
@@ -97,6 +103,8 @@
 
 - 로그인 성공 시 access/refresh token을 SecureStore에 저장한다.
 - 일반 회원가입 성공 시 웹과 동일하게 로그인 화면으로 이동한다.
+- OAuth 기존 유저는 exchange 결과 token을 SecureStore에 저장한다.
+- OAuth 신규 유저는 signup token/social email을 Zustand store에 임시 보관하고 `/signup`에서 소셜 회원가입으로 이어간다.
 - 401 reissue 실패 또는 refresh token 부재 시 session을 guest 상태로 비운다.
 - 현재 restore 단계는 token 존재 여부만 확인한다. 다음 작업에서 `/users/me` 또는 onboarding status 조회 기반으로 user hydrate를 보강해야 한다.
 
@@ -105,6 +113,7 @@
 - `/`: Splash
 - `/login`: Login
 - `/signup`: Signup
+- `/oauth/callback`: OAuth callback exchange
 - `/home`: 임시 authenticated home shell
 - `/onboarding/agreement`
 - `/onboarding/mode`
@@ -125,8 +134,8 @@
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
-- OAuth signup token/social email 저장소를 아직 모바일 방식으로 연결하지 않았다.
-- OAuth, push notification permission, bottom navigation, fan/band actual home은 아직 구현 전이다.
+- Push notification permission, bottom navigation, fan/band actual home은 아직 구현 전이다.
+- OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
 ## 알려진 버그
 
@@ -138,6 +147,9 @@
 - 실제 API base URL 설정 후 로그인 성공/실패
 - 일반 회원가입 성공/실패
 - 휴대폰 인증번호 발송/검증
+- OAuth provider URL 열기
+- OAuth callback code exchange
+- OAuth 신규 유저 signup token handoff 및 소셜 회원가입
 - 401 access token reissue
 - Onboarding nickname 중복 확인
 - Onboarding save
@@ -150,9 +162,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `98fea1b`
-- 이번 회원가입 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `1eeae8c`
+- 이번 OAuth 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-OAuth URL/deep link 흐름을 Expo WebBrowser/Linking 기반으로 연결하고, 소셜 회원가입 token handoff 저장 방식을 결정해 구현한다.
+웹 `agreementData.ts`를 모바일에 옮겨 약관 선택/상세 보기 UX를 구현하고, 회원가입/온보딩 저장 payload의 term agreement 처리를 점검한다.

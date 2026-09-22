@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
@@ -6,6 +7,7 @@ import { useLogin } from "@/hooks/api/auth/useAuth";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppTextInput } from "@/shared/components/AppTextInput";
 import { Screen } from "@/shared/components/Screen";
+import { config } from "@/shared/constants/config";
 import { colors, spacing } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
 
@@ -32,6 +34,21 @@ export function LoginScreen() {
         },
       },
     );
+  };
+
+  const openOAuth = async (provider: "kakao" | "google") => {
+    const url =
+      provider === "kakao" ? config.kakaoOAuthUrl : config.googleOAuthUrl;
+
+    if (!url) {
+      Alert.alert(
+        "OAuth 설정 필요",
+        `${provider === "kakao" ? "카카오" : "구글"} 로그인 URL 환경 변수가 필요합니다.`,
+      );
+      return;
+    }
+
+    await WebBrowser.openBrowserAsync(url);
   };
 
   return (
@@ -70,14 +87,24 @@ export function LoginScreen() {
       </View>
 
       <View style={styles.footer}>
+        <View style={styles.oauthGroup}>
+          <AppButton
+            label="카카오로 계속"
+            variant="secondary"
+            onPress={() => void openOAuth("kakao")}
+          />
+          <AppButton
+            label="구글로 계속"
+            variant="secondary"
+            onPress={() => void openOAuth("google")}
+          />
+        </View>
         <AppButton
           label="회원가입"
           variant="secondary"
           onPress={() => router.push("/signup")}
         />
-        <Text style={styles.oauthNotice}>
-          OAuth 로그인은 웹 구현의 `/auth/oauth/exchange` contract를 기준으로 다음 체크포인트에서 연결합니다.
-        </Text>
+        <Text style={styles.oauthNotice}>OAuth callback: /oauth/callback?code=...</Text>
       </View>
     </Screen>
   );
@@ -111,6 +138,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: spacing.md,
+  },
+  oauthGroup: {
+    gap: spacing.sm,
   },
   oauthNotice: {
     color: colors.neutral500,

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import {
+  useOAuthSignup,
   useSendPhoneVerification,
   useSignup,
   useVerifyPhone,
@@ -13,6 +14,8 @@ import { AppTextInput } from "@/shared/components/AppTextInput";
 import { Screen } from "@/shared/components/Screen";
 import { colors, spacing } from "@/shared/constants/theme";
 import { formatTime } from "@/shared/utils/formatTime";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
 
 type SignupForm = {
   email: string;
@@ -63,6 +66,11 @@ export function SignupScreen() {
   const sendCodeMutation = useSendPhoneVerification();
   const verifyPhoneMutation = useVerifyPhone();
   const signupMutation = useSignup();
+  const oauthSignupMutation = useOAuthSignup();
+  const setSession = useAuthStore((state) => state.setSession);
+  const { signupToken, socialEmail, clearOAuthSignup } = useOAuthSignupStore();
+  const isSocialSignup = Boolean(signupToken);
+  const displayEmail = isSocialSignup ? (socialEmail ?? "") : form.email;
 
   useEffect(() => {
     if (!isCodeSent || isPhoneVerified) return;
@@ -87,9 +95,8 @@ export function SignupScreen() {
 
   const isFormValid = useMemo(() => {
     return Boolean(
-      form.email.trim() &&
-        isPasswordValid &&
-        isPasswordSame &&
+        displayEmail.trim() &&
+        (isSocialSignup || (isPasswordValid && isPasswordSame)) &&
         form.name.trim() &&
         form.phone &&
         isPhoneVerified &&
@@ -98,10 +105,11 @@ export function SignupScreen() {
     );
   }, [
     form.birth,
-    form.email,
+    displayEmail,
     form.gender,
     form.name,
     form.phone,
+    isSocialSignup,
     isPasswordSame,
     isPasswordValid,
     isPhoneVerified,
@@ -185,7 +193,46 @@ export function SignupScreen() {
   };
 
   const handleSignup = () => {
-    if (!isFormValid || signupMutation.isPending) return;
+    if (
+      !isFormValid ||
+      signupMutation.isPending ||
+      oauthSignupMutation.isPending
+    ) {
+      return;
+    }
+
+    if (isSocialSignup) {
+      if (!signupToken) return;
+
+      oauthSignupMutation.mutate(
+        {
+          signupToken,
+          name: form.name.trim(),
+          birthDatePrefix: form.birth,
+          genderCode: form.gender,
+          phone: form.phone,
+          terms: [
+            { termId: 1, agreed: true },
+            { termId: 2, agreed: true },
+          ],
+        },
+        {
+          onSuccess: async (session) => {
+            await setSession(session);
+            clearOAuthSignup();
+            router.replace("/onboarding/agreement");
+          },
+          onError: (error) => {
+            Alert.alert(
+              "소셜 회원가입 실패",
+              getApiErrorMessage(error, "소셜 회원가입에 실패했습니다."),
+            );
+          },
+        },
+      );
+
+      return;
+    }
 
     signupMutation.mutate(
       {
@@ -223,7 +270,9 @@ export function SignupScreen() {
   return (
     <Screen contentStyle={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>회원가입</Text>
+        <Text style={styles.title}>
+          {isSocialSignup ? "소셜 회원가입" : "회원가입"}
+        </Text>
         <Text style={styles.description}>
           B:Scene 계정으로 팬과 밴드 활동을 모두 시작할 수 있습니다.
         </Text>
@@ -233,38 +282,43 @@ export function SignupScreen() {
         <AppTextInput
           label="아이디(이메일)"
           placeholder="로그인에 사용할 이메일을 입력해주세요"
-          value={form.email}
+          value={displayEmail}
           keyboardType="email-address"
           textContentType="emailAddress"
+          editable={!isSocialSignup}
           onChangeText={(value) => handleChange("email", value)}
         />
 
-        <View style={styles.fieldGroup}>
-          <AppTextInput
-            label="비밀번호"
-            placeholder="비밀번호를 입력해주세요"
-            value={form.password}
-            secureTextEntry
-            textContentType="newPassword"
-            onChangeText={(value) => handleChange("password", value)}
-          />
-          <ValidationText
-            active={isPasswordValid}
-            text="영문/숫자/특수문자 포함 8~20자"
-          />
-        </View>
+        {!isSocialSignup ? (
+          <>
+            <View style={styles.fieldGroup}>
+              <AppTextInput
+                label="비밀번호"
+                placeholder="비밀번호를 입력해주세요"
+                value={form.password}
+                secureTextEntry
+                textContentType="newPassword"
+                onChangeText={(value) => handleChange("password", value)}
+              />
+              <ValidationText
+                active={isPasswordValid}
+                text="영문/숫자/특수문자 포함 8~20자"
+              />
+            </View>
 
-        <View style={styles.fieldGroup}>
-          <AppTextInput
-            label="비밀번호 확인"
-            placeholder="비밀번호를 한번 더 입력해주세요"
-            value={form.passwordConfirm}
-            secureTextEntry
-            textContentType="newPassword"
-            onChangeText={(value) => handleChange("passwordConfirm", value)}
-          />
-          <ValidationText active={isPasswordSame} text="비밀번호가 일치합니다." />
-        </View>
+            <View style={styles.fieldGroup}>
+              <AppTextInput
+                label="비밀번호 확인"
+                placeholder="비밀번호를 한번 더 입력해주세요"
+                value={form.passwordConfirm}
+                secureTextEntry
+                textContentType="newPassword"
+                onChangeText={(value) => handleChange("passwordConfirm", value)}
+              />
+              <ValidationText active={isPasswordSame} text="비밀번호가 일치합니다." />
+            </View>
+          </>
+        ) : null}
 
         <AppTextInput
           label="이름"
@@ -319,7 +373,7 @@ export function SignupScreen() {
         <AppButton
           label="가입완료"
           disabled={!isFormValid}
-          loading={signupMutation.isPending}
+          loading={signupMutation.isPending || oauthSignupMutation.isPending}
           onPress={handleSignup}
         />
         <AppButton
