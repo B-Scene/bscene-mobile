@@ -1,7 +1,19 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
+import {
+  AGREEMENT_DETAILS,
+  AGREEMENTS,
+  type AgreementKey,
+} from "@/features/onboarding/agreementData";
 import {
   useCheckFanNickname,
   useGenres,
@@ -47,7 +59,11 @@ const fallbackRegions = [
 
 export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   const draft = useOnboardingDraftStore();
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [acceptedAgreements, setAcceptedAgreements] = useState<
+    Partial<Record<AgreementKey, boolean>>
+  >({});
+  const [selectedAgreementKey, setSelectedAgreementKey] =
+    useState<AgreementKey>("service");
   const checkNicknameMutation = useCheckFanNickname();
   const saveOnboardingMutation = useSaveOnboarding();
   const genresQuery = useGenres();
@@ -55,6 +71,12 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
 
   const genreOptions = genresQuery.data?.length ? genresQuery.data : fallbackGenres;
   const regionOptions = regionsQuery.data?.length ? regionsQuery.data : fallbackRegions;
+  const requiredAgreementAccepted = AGREEMENTS.every(
+    (agreement) => !agreement.required || acceptedAgreements[agreement.key],
+  );
+  const allAgreementsAccepted = AGREEMENTS.every(
+    (agreement) => acceptedAgreements[agreement.key],
+  );
 
   const nicknameError = useMemo(() => {
     if (draft.fanNickname.trim().length === 0) return undefined;
@@ -92,23 +114,119 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   };
 
   if (step === "agreement") {
+    const toggleAgreement = (key: AgreementKey) => {
+      setAcceptedAgreements((current) => ({
+        ...current,
+        [key]: !current[key],
+      }));
+    };
+    const toggleAllAgreements = () => {
+      const nextValue = !allAgreementsAccepted;
+      setAcceptedAgreements(
+        AGREEMENTS.reduce<Partial<Record<AgreementKey, boolean>>>(
+          (next, agreement) => ({
+            ...next,
+            [agreement.key]: nextValue,
+          }),
+          {},
+        ),
+      );
+    };
+    const selectedAgreement = AGREEMENT_DETAILS[selectedAgreementKey];
+
     return (
       <OnboardingFrame
         title="B:Scene 이용을 시작할게요"
-        description="서비스 이용약관과 개인정보 처리방침 동의 흐름은 웹의 약관 데이터를 기준으로 모바일 체크 UI에 연결합니다."
+        description="필수 약관에 동의하면 B:Scene 모바일 온보딩을 계속 진행할 수 있어요."
         footer={
           <AppButton
             label="동의하고 계속"
-            disabled={!termsAccepted}
+            disabled={!requiredAgreementAccepted}
             onPress={() => router.push("/onboarding/mode")}
           />
         }
       >
-        <Chip
-          label={termsAccepted ? "필수 약관 동의 완료" : "필수 약관에 동의합니다"}
-          selected={termsAccepted}
-          onPress={() => setTermsAccepted((current) => !current)}
-        />
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: allAgreementsAccepted }}
+          style={({ pressed }) => [
+            styles.agreementAll,
+            allAgreementsAccepted && styles.selectedAgreementRow,
+            pressed && styles.pressed,
+          ]}
+          onPress={toggleAllAgreements}
+        >
+          <Text
+            style={[
+              styles.agreementAllText,
+              allAgreementsAccepted && styles.selectedText,
+            ]}
+          >
+            전체 동의
+          </Text>
+          <Text style={styles.agreementMeta}>선택 항목 포함</Text>
+        </Pressable>
+
+        <View style={styles.agreementList}>
+          {AGREEMENTS.map((agreement) => {
+            const selected = Boolean(acceptedAgreements[agreement.key]);
+            const detailSelected = selectedAgreementKey === agreement.key;
+
+            return (
+              <View key={agreement.key} style={styles.agreementItem}>
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected }}
+                  style={({ pressed }) => [
+                    styles.agreementRow,
+                    selected && styles.selectedAgreementRow,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => toggleAgreement(agreement.key)}
+                >
+                  <View style={styles.agreementText}>
+                    <Text
+                      style={[
+                        styles.agreementLabel,
+                        selected && styles.selectedText,
+                      ]}
+                    >
+                      {agreement.label}
+                    </Text>
+                    <Text style={styles.agreementMeta}>
+                      {agreement.required ? "필수" : "선택"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    hitSlop={10}
+                    onPress={() => setSelectedAgreementKey(agreement.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.detailLink,
+                        detailSelected && styles.selectedText,
+                      ]}
+                    >
+                      보기
+                    </Text>
+                  </Pressable>
+                </Pressable>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={styles.agreementDetail}>
+          <Text style={styles.agreementDetailTitle}>
+            {selectedAgreement.title}
+          </Text>
+          <ScrollView nestedScrollEnabled>
+            <Text style={styles.agreementDetailContent}>
+              {selectedAgreement.content}
+            </Text>
+          </ScrollView>
+        </View>
       </OnboardingFrame>
     );
   }
@@ -421,6 +539,83 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.md,
+  },
+  agreementAll: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.neutral300,
+    backgroundColor: colors.neutral100,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  agreementAllText: {
+    color: colors.neutral900,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  agreementList: {
+    gap: spacing.sm,
+  },
+  agreementItem: {
+    gap: spacing.xs,
+  },
+  agreementRow: {
+    minHeight: 58,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.neutral300,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  selectedAgreementRow: {
+    borderColor: colors.primary500,
+    backgroundColor: colors.primary50,
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+  agreementText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  agreementLabel: {
+    color: colors.neutral800,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 21,
+  },
+  agreementMeta: {
+    color: colors.neutral600,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  detailLink: {
+    color: colors.primary600,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  agreementDetail: {
+    maxHeight: 260,
+    borderRadius: radius.lg,
+    backgroundColor: colors.neutral100,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  agreementDetailTitle: {
+    color: colors.neutral900,
+    fontSize: 16,
+    fontWeight: "900",
+    lineHeight: 22,
+  },
+  agreementDetailContent: {
+    color: colors.neutral700,
+    fontSize: 12,
+    lineHeight: 18,
   },
   noticeCard: {
     borderRadius: radius.lg,

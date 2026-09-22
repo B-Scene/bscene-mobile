@@ -12,7 +12,8 @@
 - Phase 7 팬 탐색 / 밴드 프로필: 1차 API 연동 완료
 - Phase 8 공연 관심/알림 mutation: 1차 연동 완료
 - Phase 9 팬 마이페이지: 1차 API 연동 완료
-- 전체 기준 대략 34%
+- Phase 10 Onboarding 약관 데이터: 웹 기준 반영 완료
+- 전체 기준 대략 35%
 
 ## 완료된 작업
 
@@ -44,17 +45,18 @@
 - 공연 상세에 공연 알림 설정/해제 mutation을 연결했다.
 - 팬 마이페이지 `/fan/my`에 `/users/me`, `/users/me/information` API를 연결했다.
 - 팬 마이페이지 프로필 요약, 팔로잉/관심 공연/참여 공연 카운트, 메뉴 섹션, 로그아웃 액션을 구현했다.
+- 웹 `agreementData`를 모바일에 반영하고 Onboarding 약관 화면에 필수/선택 동의와 상세 열람 UI를 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지 1차 연동을 구현한 상태. 다음은 Onboarding 약관 데이터 반영 또는 팬 마이페이지 세부 목록 화면이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지 1차 연동, Onboarding 약관 데이터 반영을 구현한 상태. 다음은 팬 마이페이지 세부 목록 화면 또는 알림 권한 Expo Notifications 전환이다.
 
 ## 다음에 해야 할 작업
 
-1. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
-2. 팬 마이페이지 세부 목록 화면(팔로우한 밴드, 관심 공연, 공연 참여 기록)을 API에 연결한다.
-3. 알림 권한을 Expo Notifications로 전환한다.
+1. 팬 마이페이지 세부 목록 화면(팔로우한 밴드, 관심 공연, 공연 참여 기록)을 API에 연결한다.
+2. 알림 권한을 Expo Notifications로 전환한다.
+3. 밴드 홈 API 화면을 모바일에 연결한다.
 
 ## 변경한 주요 파일
 
@@ -65,6 +67,7 @@
 - `src/app/oauth/callback.tsx`
 - `src/features/auth/SignupScreen.tsx`
 - `src/features/auth/OAuthCallbackScreen.tsx`
+- `src/features/onboarding/agreementData.ts`
 - `src/app/home.tsx`
 - `src/app/fan/*`
 - `src/app/band/*`
@@ -205,7 +208,7 @@
 ## 알려진 버그
 
 - 앱 재실행 후 SecureStore token만 있고 user hydrate가 안 된 경우 `/home`으로 이동하지만 user 기반 mode UI는 표시되지 않는다.
-- Onboarding 약관은 아직 실제 웹 약관 데이터와 완전히 연결되지 않았다.
+- Onboarding 약관은 웹 약관 데이터를 반영했지만, 약관 동의 결과를 별도 API에 저장하는 contract는 아직 확인되지 않았다.
 
 ## 테스트가 필요한 부분
 
@@ -218,6 +221,7 @@
 - 401 access token reissue
 - Onboarding nickname 중복 확인
 - Onboarding save
+- Onboarding 약관 필수/선택 동의 및 상세 열람
 - Android/iOS Safe Area 및 Keyboard Avoiding
 - Bottom Navigation tab 이동
 - Fan/Band mode route group 이동
@@ -239,9 +243,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `4a012be`
-- 이번 팬 마이페이지 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `add44b9`
+- 이번 Onboarding 약관 데이터 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+팬 마이페이지 세부 목록 화면(팔로우한 밴드, 관심 공연, 공연 참여 기록)을 API에 연결한다.
