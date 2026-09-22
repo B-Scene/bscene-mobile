@@ -116,15 +116,28 @@ export function FanMyScreen() {
 
           <MenuSection
             title="탐색 활동"
-            items={["팔로우한 밴드", "관심 공연 목록", "공연 참여 기록"]}
+            items={[
+              {
+                label: "팔로우한 밴드",
+                href: "/fan/my/followed-bands",
+              },
+              {
+                label: "관심 공연 목록",
+                href: "/fan/my/interested-concerts",
+              },
+              {
+                label: "공연 참여 기록",
+                href: "/fan/my/attended-concerts",
+              },
+            ]}
           />
           <MenuSection
             title="알림"
-            items={["공연 알림 설정", "라이브 알림 설정"]}
+            items={[{ label: "공연 알림 설정" }, { label: "라이브 알림 설정" }]}
           />
           <MenuSection
             title="계정"
-            items={["내 정보 수정"]}
+            items={[{ label: "내 정보 수정" }]}
             footerLabel="로그아웃"
             onFooterPress={logout}
           />
@@ -150,7 +163,7 @@ function MenuSection({
   onFooterPress,
 }: {
   title: string;
-  items: string[];
+  items: { label: string; href?: string }[];
   footerLabel?: string;
   onFooterPress?: () => void;
 }) {
@@ -158,10 +171,22 @@ function MenuSection({
     <AppCard style={styles.menuSection}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {items.map((item) => (
-        <View key={item} style={styles.menuRow}>
-          <Text style={styles.menuLabel}>{item}</Text>
-          <Text style={styles.menuStatus}>준비 중</Text>
-        </View>
+        <Pressable
+          key={item.label}
+          accessibilityRole={item.href ? "button" : "text"}
+          disabled={!item.href}
+          style={({ pressed }) => [
+            styles.menuRow,
+            pressed && item.href && styles.pressed,
+          ]}
+          onPress={() => {
+            if (!item.href) return;
+            router.push(item.href as Parameters<typeof router.push>[0]);
+          }}
+        >
+          <Text style={styles.menuLabel}>{item.label}</Text>
+          <Text style={styles.menuStatus}>{item.href ? "보기" : "준비 중"}</Text>
+        </Pressable>
       ))}
       {footerLabel ? (
         <Pressable
