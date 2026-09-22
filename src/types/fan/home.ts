@@ -93,6 +93,8 @@ export interface FanHomeConcert {
   dDay?: number | null;
   status?: string | null;
   isInterested?: boolean;
+  interested?: boolean;
+  interestCount?: number;
 }
 
 export type PerformanceParticipationStatus = "SCHEDULED" | "COMPLETED";
@@ -159,9 +161,12 @@ export interface FanPerformanceDetailResponse {
   thumbnailUrl?: string | null;
   imageUrls?: string[] | string;
   isInterested?: boolean;
+  interested?: boolean;
   interestCount?: number;
   notificationEnabled?: boolean;
+  alarmSet?: boolean;
   isAlarmSet?: boolean;
+  alarmEnabled?: boolean;
   participationStatus?: PerformanceParticipationStatus | null;
   casting?: FanPerformanceCastingBand[];
 }

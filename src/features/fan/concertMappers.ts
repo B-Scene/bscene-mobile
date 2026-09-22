@@ -6,10 +6,13 @@ import type {
 
 export type ConcertListItem = {
   id: string;
+  performanceId: number | null;
   title: string;
   location: string;
   dateTime: string;
   status: string;
+  isInterested: boolean;
+  interestCount: number;
 };
 
 export const firstString = (
@@ -116,13 +119,19 @@ export const mapPerformanceToConcert = (
   index: number,
 ): ConcertListItem => {
   const date = getConcertDate(concert);
+  const performanceId = Number(
+    concert.performanceId ?? concert.concertId ?? concert.id,
+  );
 
   return {
     id: String(concert.performanceId ?? concert.concertId ?? concert.id ?? index),
+    performanceId: Number.isFinite(performanceId) ? performanceId : null,
     title: getConcertTitle(concert),
     location: getConcertLocation(concert),
     dateTime: formatDateTime(date),
     status: concert.status ?? formatDday(concert, date),
+    isInterested: concert.isInterested ?? concert.interested ?? false,
+    interestCount: concert.interestCount ?? 0,
   };
 };
 

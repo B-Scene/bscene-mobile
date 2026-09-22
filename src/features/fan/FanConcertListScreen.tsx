@@ -1,7 +1,14 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 
-import { useUpcomingPerformancesInfiniteQuery } from "@/hooks/api/fan/useFanHome";
+import {
+  invalidatePerformanceInterestQueries,
+  useAddPerformanceInterest,
+  useDeletePerformanceInterest,
+  useUpcomingPerformancesInfiniteQuery,
+} from "@/hooks/api/fan/useFanHome";
+import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -67,6 +74,35 @@ export function FanConcertListScreen() {
 }
 
 function ConcertRow({ item }: { item: ConcertListItem }) {
+  const queryClient = useQueryClient();
+  const addInterestMutation = useAddPerformanceInterest();
+  const deleteInterestMutation = useDeletePerformanceInterest();
+  const isInterestPending =
+    addInterestMutation.isPending || deleteInterestMutation.isPending;
+
+  const toggleInterest = async () => {
+    if (item.performanceId == null) return;
+
+    if (item.isInterested) {
+      try {
+        await deleteInterestMutation.mutateAsync(item.performanceId);
+      } catch {
+        Alert.alert("관심 공연", "관심 공연 해제에 실패했어요.");
+      }
+      return;
+    }
+
+    try {
+      await addInterestMutation.mutateAsync(item.performanceId);
+    } catch (error) {
+      if (isAlreadyInterestedPerformanceError(error)) {
+        await invalidatePerformanceInterestQueries(queryClient, item.performanceId);
+        return;
+      }
+      Alert.alert("관심 공연", "관심 공연 등록에 실패했어요.");
+    }
+  };
+
   return (
     <AppCard style={styles.card}>
       <View style={styles.cardText}>
@@ -80,6 +116,14 @@ function ConcertRow({ item }: { item: ConcertListItem }) {
       </View>
       <View style={styles.cardAction}>
         <Badge label={item.status} tone="pink" />
+        <AppButton
+          label={item.isInterested ? "관심 해제" : "관심"}
+          variant={item.isInterested ? "secondary" : "ghost"}
+          loading={isInterestPending}
+          disabled={item.performanceId == null}
+          style={styles.compactButton}
+          onPress={() => void toggleInterest()}
+        />
         <AppButton
           label="상세"
           variant="ghost"
@@ -126,6 +170,10 @@ const styles = StyleSheet.create({
   cardAction: {
     alignItems: "flex-end",
     gap: spacing.sm,
+  },
+  compactButton: {
+    minHeight: 38,
+    paddingHorizontal: spacing.md,
   },
   footerText: {
     color: colors.neutral600,

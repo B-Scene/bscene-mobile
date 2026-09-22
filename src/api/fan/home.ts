@@ -1,4 +1,5 @@
 import { AxiosError } from "axios";
+import type { AxiosResponse } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
@@ -117,4 +118,72 @@ export const getUpcomingPerformances = async ({
       totalCount,
     }),
   };
+};
+
+const unwrapFanMutationResult = <T>(
+  response: AxiosResponse<FanApiResponse<T>>,
+) => {
+  const { data } = response;
+
+  if (!data.isSuccess) {
+    throw new AxiosError(
+      data.message,
+      data.code,
+      response.config,
+      response.request,
+      response,
+    );
+  }
+
+  return data.result;
+};
+
+export const setPerformanceAlarm = async (performanceId: number) => {
+  const response = await axiosInstance.post<FanApiResponse<null>>(
+    `/performances/${performanceId}/alarm`,
+  );
+
+  return unwrapFanMutationResult(response);
+};
+
+export const deletePerformanceAlarm = async (performanceId: number) => {
+  const response = await axiosInstance.delete<FanApiResponse<null>>(
+    `/performances/${performanceId}/alarm`,
+  );
+
+  return unwrapFanMutationResult(response);
+};
+
+export const addPerformanceInterest = async (performanceId: number) => {
+  const response = await axiosInstance.post<FanApiResponse<null>>(
+    `/performances/${performanceId}/interest`,
+  );
+
+  return unwrapFanMutationResult(response);
+};
+
+export const deletePerformanceInterest = async (performanceId: number) => {
+  const response = await axiosInstance.delete<FanApiResponse<null>>(
+    `/performances/${performanceId}/interest`,
+  );
+
+  return unwrapFanMutationResult(response);
+};
+
+export const isAlreadyInterestedPerformanceError = (error: unknown) => {
+  const axiosError = error as AxiosError<FanApiResponse<unknown>>;
+
+  return (
+    axiosError.response?.status === 409 &&
+    axiosError.response.data?.code === "SHOW409_2"
+  );
+};
+
+export const isAlreadySetPerformanceAlarmError = (error: unknown) => {
+  const axiosError = error as AxiosError<FanApiResponse<unknown>>;
+
+  return (
+    axiosError.response?.status === 409 &&
+    axiosError.response.data?.code === "SHOW409_1"
+  );
 };

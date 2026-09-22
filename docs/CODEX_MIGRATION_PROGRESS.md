@@ -10,7 +10,8 @@
 - Phase 5 팬 홈: 1차 API 연동 완료
 - Phase 6 공연 목록/상세: 1차 API 연동 완료
 - Phase 7 팬 탐색 / 밴드 프로필: 1차 API 연동 완료
-- 전체 기준 대략 31%
+- Phase 8 공연 관심/알림 mutation: 1차 연동 완료
+- 전체 기준 대략 32%
 
 ## 완료된 작업
 
@@ -38,18 +39,19 @@
 - 공연 상세에서 공연 정보, 소개, 캐스팅, 예매 링크 열기를 구현했다.
 - 팬 탐색 `/fan/explore`에 추천 밴드 API `/bands/recommendations`를 연결했다.
 - 밴드 프로필 `/fan/bands/[bandId]`에 `/bands/{bandId}/detail` API를 연결했다.
+- 공연 목록/상세에 관심 공연 등록/해제 mutation을 연결했다.
+- 공연 상세에 공연 알림 설정/해제 mutation을 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필 1차 API 화면을 구현한 상태. 다음은 팬 마이페이지 또는 공연 관심/알림 mutation 연동이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation 1차 연동을 구현한 상태. 다음은 팬 마이페이지 API 연동이다.
 
 ## 다음에 해야 할 작업
 
-1. 공연 관심/알림 mutation을 공연 목록/상세에 연결한다.
-2. 팬 마이페이지 API를 모바일 화면에 연결한다.
-3. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
-4. 알림 권한을 Expo Notifications로 전환한다.
+1. 팬 마이페이지 API를 모바일 화면에 연결한다.
+2. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+3. 알림 권한을 Expo Notifications로 전환한다.
 
 ## 변경한 주요 파일
 
@@ -134,6 +136,7 @@
 - Auth와 Onboarding endpoint/request/response type은 웹과 동일하게 유지했다.
 - Fan Home endpoint는 웹과 동일하게 `/home`, `/performances/upcoming`을 사용한다.
 - 공연 상세 endpoint는 웹과 동일하게 `/performances/{performanceId}/detail`을 사용한다.
+- 공연 관심/알림 mutation endpoint는 웹과 동일하게 `/performances/{performanceId}/interest`, `/performances/{performanceId}/alarm`을 사용한다.
 - 팬 탐색 추천 밴드 endpoint는 웹과 동일하게 `/bands/recommendations`를 사용한다.
 - 밴드 프로필 endpoint는 웹과 동일하게 `/bands/{bandId}/detail`을 사용한다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
@@ -186,7 +189,7 @@
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
 - Push notification permission과 band actual home API 화면은 아직 구현 전이다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
-- 공연 목록/상세는 조회 중심으로 완료했다. 관심 공연/알림/공유 mutation은 아직 웹 parity 전이다.
+- 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
 - 팬 탐색/밴드 프로필은 조회 중심으로 완료했다. 팔로우/언팔로우 mutation, 검색/필터/콘텐츠 상세는 아직 웹 parity 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
@@ -213,6 +216,8 @@
 - 팬 홈 `/home`, `/performances/upcoming` 실제 API 응답 렌더링
 - 공연 목록 `/performances/upcoming` pagination
 - 공연 상세 `/performances/{performanceId}/detail` 실제 API 응답 렌더링
+- 공연 관심 등록/해제 `/performances/{performanceId}/interest` 실제 API 상태 동기화
+- 공연 알림 설정/해제 `/performances/{performanceId}/alarm` 실제 API 상태 동기화
 - 공연 상세 예매 링크 `Linking.openURL`
 - 팬 탐색 `/bands/recommendations` 실제 API 응답 렌더링
 - 밴드 프로필 `/bands/{bandId}/detail` 실제 API 응답 렌더링
@@ -224,9 +229,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `bfafd6c`
-- 이번 팬 탐색/밴드 프로필 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `3ba4ecc`
+- 이번 공연 관심/알림 mutation 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-공연 관심/알림 mutation 또는 팬 마이페이지 API 중 하나를 다음 기능 단위로 구현한다.
+팬 마이페이지 API를 모바일 화면에 연결한다.

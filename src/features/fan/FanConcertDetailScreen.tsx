@@ -1,7 +1,19 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, StyleSheet, Text, View } from "react-native";
 
-import { useFanPerformanceDetailQuery } from "@/hooks/api/fan/useFanHome";
+import {
+  invalidatePerformanceInterestQueries,
+  useAddPerformanceInterest,
+  useDeletePerformanceAlarm,
+  useDeletePerformanceInterest,
+  useFanPerformanceDetailQuery,
+  useSetPerformanceAlarm,
+} from "@/hooks/api/fan/useFanHome";
+import {
+  isAlreadyInterestedPerformanceError,
+  isAlreadySetPerformanceAlarmError,
+} from "@/api/fan/home";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -30,9 +42,14 @@ const AGE_RATING_LABELS: Record<string, string> = {
 export function FanConcertDetailScreen() {
   const params = useLocalSearchParams<{ concertId?: string }>();
   const performanceId = Number(params.concertId);
+  const queryClient = useQueryClient();
   const query = useFanPerformanceDetailQuery(
     Number.isFinite(performanceId) ? performanceId : 0,
   );
+  const addInterestMutation = useAddPerformanceInterest();
+  const deleteInterestMutation = useDeletePerformanceInterest();
+  const setAlarmMutation = useSetPerformanceAlarm();
+  const deleteAlarmMutation = useDeletePerformanceAlarm();
   const detail = query.data;
   const date = getConcertDate(detail ?? {});
   const title = getConcertTitle(detail);
@@ -52,10 +69,68 @@ export function FanConcertDetailScreen() {
     AGE_RATING_LABELS[String(detail?.ageRating ?? "")] ??
     detail?.ageRating ??
     "관람 연령 미정";
+  const isInterested = detail?.isInterested ?? detail?.interested ?? false;
+  const interestCount = detail?.interestCount ?? 0;
+  const isAlarmSet =
+    detail?.notificationEnabled ??
+    detail?.alarmSet ??
+    detail?.isAlarmSet ??
+    detail?.alarmEnabled ??
+    false;
+  const isInterestPending =
+    addInterestMutation.isPending || deleteInterestMutation.isPending;
+  const isAlarmPending =
+    setAlarmMutation.isPending || deleteAlarmMutation.isPending;
 
   const openTicket = async () => {
     if (!detail?.ticketLink) return;
     await Linking.openURL(detail.ticketLink);
+  };
+
+  const toggleInterest = async () => {
+    if (!Number.isFinite(performanceId) || performanceId <= 0) return;
+
+    if (isInterested) {
+      try {
+        await deleteInterestMutation.mutateAsync(performanceId);
+      } catch {
+        Alert.alert("관심 공연", "관심 공연 해제에 실패했어요.");
+      }
+      return;
+    }
+
+    try {
+      await addInterestMutation.mutateAsync(performanceId);
+    } catch (error) {
+      if (isAlreadyInterestedPerformanceError(error)) {
+        await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        return;
+      }
+      Alert.alert("관심 공연", "관심 공연 등록에 실패했어요.");
+    }
+  };
+
+  const toggleAlarm = async () => {
+    if (!Number.isFinite(performanceId) || performanceId <= 0) return;
+
+    if (isAlarmSet) {
+      try {
+        await deleteAlarmMutation.mutateAsync(performanceId);
+      } catch {
+        Alert.alert("공연 알림", "공연 알림 해제에 실패했어요.");
+      }
+      return;
+    }
+
+    try {
+      await setAlarmMutation.mutateAsync(performanceId);
+    } catch (error) {
+      if (isAlreadySetPerformanceAlarmError(error)) {
+        await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        return;
+      }
+      Alert.alert("공연 알림", "공연 알림 설정에 실패했어요.");
+    }
   };
 
   return (
@@ -80,6 +155,26 @@ export function FanConcertDetailScreen() {
             <Badge label={formatDday(detail, date)} tone="pink" />
             <Text style={styles.title}>{title}</Text>
             {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+            <View style={styles.actionRow}>
+              <AppButton
+                label={
+                  isInterested
+                    ? `관심 해제 · ${interestCount.toLocaleString()}`
+                    : `관심 · ${interestCount.toLocaleString()}`
+                }
+                variant={isInterested ? "secondary" : "ghost"}
+                loading={isInterestPending}
+                style={styles.actionButton}
+                onPress={() => void toggleInterest()}
+              />
+              <AppButton
+                label={isAlarmSet ? "알림 해제" : "알림 받기"}
+                variant={isAlarmSet ? "secondary" : "ghost"}
+                loading={isAlarmPending}
+                style={styles.actionButton}
+                onPress={() => void toggleAlarm()}
+              />
+            </View>
           </AppCard>
 
           <AppCard style={styles.infoCard}>
@@ -184,6 +279,15 @@ const styles = StyleSheet.create({
     color: colors.neutral600,
     fontSize: 13,
     lineHeight: 19,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
   },
   infoCard: {
     gap: spacing.md,
