@@ -11,7 +11,8 @@
 - Phase 6 공연 목록/상세: 1차 API 연동 완료
 - Phase 7 팬 탐색 / 밴드 프로필: 1차 API 연동 완료
 - Phase 8 공연 관심/알림 mutation: 1차 연동 완료
-- 전체 기준 대략 32%
+- Phase 9 팬 마이페이지: 1차 API 연동 완료
+- 전체 기준 대략 34%
 
 ## 완료된 작업
 
@@ -41,16 +42,18 @@
 - 밴드 프로필 `/fan/bands/[bandId]`에 `/bands/{bandId}/detail` API를 연결했다.
 - 공연 목록/상세에 관심 공연 등록/해제 mutation을 연결했다.
 - 공연 상세에 공연 알림 설정/해제 mutation을 연결했다.
+- 팬 마이페이지 `/fan/my`에 `/users/me`, `/users/me/information` API를 연결했다.
+- 팬 마이페이지 프로필 요약, 팔로잉/관심 공연/참여 공연 카운트, 메뉴 섹션, 로그아웃 액션을 구현했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation 1차 연동을 구현한 상태. 다음은 팬 마이페이지 API 연동이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지 1차 연동을 구현한 상태. 다음은 Onboarding 약관 데이터 반영 또는 팬 마이페이지 세부 목록 화면이다.
 
 ## 다음에 해야 할 작업
 
-1. 팬 마이페이지 API를 모바일 화면에 연결한다.
-2. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+1. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+2. 팬 마이페이지 세부 목록 화면(팔로우한 밴드, 관심 공연, 공연 참여 기록)을 API에 연결한다.
 3. 알림 권한을 Expo Notifications로 전환한다.
 
 ## 변경한 주요 파일
@@ -81,10 +84,13 @@
 - `src/features/fan/concertMappers.ts`
 - `src/api/fan/home.ts`
 - `src/api/fan/explore.ts`
+- `src/api/user/*`
 - `src/hooks/api/fan/useFanHome.ts`
 - `src/hooks/api/fan/useFanExplore.ts`
+- `src/hooks/api/user/*`
 - `src/types/fan/home.ts`
 - `src/types/fan/explore.ts`
+- `src/types/user/*`
 - `src/features/band/*`
 - `src/shared/components/*`
 - `src/shared/constants/*`
@@ -139,6 +145,7 @@
 - 공연 관심/알림 mutation endpoint는 웹과 동일하게 `/performances/{performanceId}/interest`, `/performances/{performanceId}/alarm`을 사용한다.
 - 팬 탐색 추천 밴드 endpoint는 웹과 동일하게 `/bands/recommendations`를 사용한다.
 - 밴드 프로필 endpoint는 웹과 동일하게 `/bands/{bandId}/detail`을 사용한다.
+- 팬 마이페이지 endpoint는 웹과 동일하게 `/users/me`, `/users/me/information`을 사용한다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
 ## 인증 관련 결정사항
@@ -191,6 +198,7 @@
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
 - 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
 - 팬 탐색/밴드 프로필은 조회 중심으로 완료했다. 팔로우/언팔로우 mutation, 검색/필터/콘텐츠 상세는 아직 웹 parity 전이다.
+- 팬 마이페이지는 프로필 요약과 카운트 조회 중심으로 완료했다. 세부 목록/수정/알림 설정 화면은 아직 웹 parity 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
@@ -221,6 +229,8 @@
 - 공연 상세 예매 링크 `Linking.openURL`
 - 팬 탐색 `/bands/recommendations` 실제 API 응답 렌더링
 - 밴드 프로필 `/bands/{bandId}/detail` 실제 API 응답 렌더링
+- 팬 마이페이지 `/users/me`, `/users/me/information` 실제 API 응답 렌더링
+- 팬 마이페이지 로그아웃 후 `/login` 이동
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -229,9 +239,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `3ba4ecc`
-- 이번 공연 관심/알림 mutation 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `4a012be`
+- 이번 팬 마이페이지 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-팬 마이페이지 API를 모바일 화면에 연결한다.
+Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
