@@ -4,9 +4,9 @@
 
 - Phase 0 모바일 기본 Architecture / Dependency / Folder Structure: 완료
 - Phase 1 공통 환경: 진행 중
-- Phase 2 인증: 로그인 API 연동 기반 완료, 회원가입/OAuth 상세 구현 필요
+- Phase 2 인증: 로그인 및 일반 회원가입 API 연동 완료, OAuth 상세 구현 필요
 - Phase 3 Onboarding: 1차 플로우 및 API 저장 기반 완료, 약관/권한 상세 구현 필요
-- 전체 기준 대략 12%
+- 전체 기준 대략 15%
 
 ## 완료된 작업
 
@@ -17,19 +17,21 @@
 - Auth API, Auth type, Onboarding API, Onboarding type, TanStack Query hooks를 모바일 프로젝트에 이전했다.
 - Zustand 기반 auth session store와 onboarding draft store를 추가했다.
 - 공통 theme token, Screen, Button, TextInput, Chip 컴포넌트를 추가했다.
-- Splash, Login, Signup placeholder, Home shell 화면을 추가했다.
+- Splash, Login, Signup, Home shell 화면을 추가했다.
+- Signup placeholder를 실제 모바일 회원가입 화면으로 교체했다.
+- 회원가입 비밀번호 검증, 휴대폰 인증번호 발송/검증, 생년월일/성별 입력, `/auth/signup` 제출을 구현했다.
 - Onboarding agreement, mode, fan nickname, genre, region, notification permission, complete route를 추가했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 인증 및 온보딩을 실제 모바일 UX로 확장하는 단계.
+- 인증 및 온보딩을 실제 모바일 UX로 확장하는 단계. 일반 회원가입은 완료했고 OAuth/약관 상세/알림 권한이 남아 있다.
 
 ## 다음에 해야 할 작업
 
-1. 웹 `SignupPage`, `SignupPhoneVerification`, `agreementData`를 참고해 모바일 회원가입 전체 입력/검증/휴대폰 인증을 구현한다.
-2. OAuth URL/deep link 흐름을 Expo WebBrowser/Linking 기반으로 연결한다.
-3. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영하고 알림 권한을 Expo Notifications로 전환한다.
+1. OAuth URL/deep link 흐름을 Expo WebBrowser/Linking 기반으로 연결한다.
+2. Onboarding 약관 데이터를 실제 웹 agreement data 기준으로 반영한다.
+3. 알림 권한을 Expo Notifications로 전환한다.
 4. Bottom Navigation과 팬/밴드 홈 route group을 만든다.
 
 ## 변경한 주요 파일
@@ -38,6 +40,7 @@
 - `src/app/index.tsx`
 - `src/app/login.tsx`
 - `src/app/signup.tsx`
+- `src/features/auth/SignupScreen.tsx`
 - `src/app/home.tsx`
 - `src/app/onboarding/*`
 - `src/api/axiosInstance.ts`
@@ -51,6 +54,7 @@
 - `src/shared/components/*`
 - `src/shared/constants/*`
 - `src/shared/utils/secureTokenStorage.ts`
+- `src/shared/utils/formatTime.ts`
 - `src/types/auth/auth.ts`
 - `src/types/onboarding/onboarding.ts`
 - `eslint.config.js`
@@ -81,6 +85,7 @@
 - DOM/CSS/Tailwind 대신 React Native `View`, `Text`, `Pressable`, `TextInput`, `StyleSheet`를 사용한다.
 - `localStorage` token persistence를 SecureStore로 전환했다.
 - 현재 OAuth, Push, 파일 업로드, live media는 아직 모바일 네이티브 대응 전이다.
+- 회원가입 휴대폰 인증 타이머는 React Native state/effect lint rule에 맞춰 `timeLeft` 기반으로 만료 상태를 표현한다.
 
 ## API 관련 결정사항
 
@@ -91,6 +96,7 @@
 ## 인증 관련 결정사항
 
 - 로그인 성공 시 access/refresh token을 SecureStore에 저장한다.
+- 일반 회원가입 성공 시 웹과 동일하게 로그인 화면으로 이동한다.
 - 401 reissue 실패 또는 refresh token 부재 시 session을 guest 상태로 비운다.
 - 현재 restore 단계는 token 존재 여부만 확인한다. 다음 작업에서 `/users/me` 또는 onboarding status 조회 기반으로 user hydrate를 보강해야 한다.
 
@@ -98,7 +104,7 @@
 
 - `/`: Splash
 - `/login`: Login
-- `/signup`: Signup placeholder
+- `/signup`: Signup
 - `/home`: 임시 authenticated home shell
 - `/onboarding/agreement`
 - `/onboarding/mode`
@@ -119,7 +125,8 @@
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
-- Signup 상세, OAuth, push notification permission, bottom navigation, fan/band actual home은 아직 구현 전이다.
+- OAuth signup token/social email 저장소를 아직 모바일 방식으로 연결하지 않았다.
+- OAuth, push notification permission, bottom navigation, fan/band actual home은 아직 구현 전이다.
 
 ## 알려진 버그
 
@@ -129,6 +136,8 @@
 ## 테스트가 필요한 부분
 
 - 실제 API base URL 설정 후 로그인 성공/실패
+- 일반 회원가입 성공/실패
+- 휴대폰 인증번호 발송/검증
 - 401 access token reissue
 - Onboarding nickname 중복 확인
 - Onboarding save
@@ -141,9 +150,9 @@
 
 ## 마지막 Commit Hash
 
-- 커밋 전: `b8fde88`
-- 이번 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `98fea1b`
+- 이번 회원가입 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-웹 `src/pages/onboarding/SignupPage.tsx`, `src/features/onboarding/SignupPhoneVerification.tsx`, `src/features/onboarding/agreementData.ts`를 참고해 모바일 회원가입 상세 화면을 구현하고 검증한 뒤 commit한다.
+OAuth URL/deep link 흐름을 Expo WebBrowser/Linking 기반으로 연결하고, 소셜 회원가입 token handoff 저장 방식을 결정해 구현한다.
