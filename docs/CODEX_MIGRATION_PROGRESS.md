@@ -15,7 +15,8 @@
 - Phase 10 Onboarding 약관 데이터: 웹 기준 반영 완료
 - Phase 11 팬 마이페이지 세부 목록: 1차 API 연동 완료
 - Phase 12 Expo Notifications 알림 권한: 1차 연동 완료
-- 전체 기준 대략 38%
+- Phase 13 밴드 홈: 마이 요약 API 1차 연동 완료
+- 전체 기준 대략 39%
 
 ## 완료된 작업
 
@@ -52,16 +53,18 @@
 - 팔로우한 밴드 `/users/me/follows`, 관심 공연 `/users/me/performance/interest`, 공연 참여 기록 `/users/me/performance/history` API를 모바일 목록에 연결했다.
 - Expo Notifications 기반 알림 권한 요청, Android notification channel 설정, Expo push token 발급 유틸을 추가했다.
 - Onboarding 알림 권한 화면에서 Expo push token을 `/notifications/tokens` API에 등록하도록 연결했다.
+- 밴드 홈 `/band/home`에 `/users/me` 밴드 마이 요약 API를 연결했다.
+- 밴드 홈에 밴드명, 닉네임, 파트, 팔로워/지원자/공연 카운트와 No Band 상태를 구현했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청을 구현한 상태. 다음은 밴드 홈 API 화면 또는 팬 탐색 팔로우/언팔로우 mutation이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 요약 API를 구현한 상태. 다음은 팬 탐색 팔로우/언팔로우 mutation 또는 밴드 홈 세부 API 확장이다.
 
 ## 다음에 해야 할 작업
 
-1. 밴드 홈 API 화면을 모바일에 연결한다.
-2. 팬 탐색 팔로우/언팔로우 mutation을 연결한다.
+1. 팬 탐색 팔로우/언팔로우 mutation을 연결한다.
+2. 밴드 홈 세부 API(밴드 프로필, 콘텐츠, 공연, 음원 링크)를 확장 연결한다.
 3. 알림 설정 화면과 notification settings API를 연결한다.
 
 ## 변경한 주요 파일
@@ -161,6 +164,7 @@
 - 팬 마이페이지 endpoint는 웹과 동일하게 `/users/me`, `/users/me/information`을 사용한다.
 - 팬 마이페이지 세부 목록 endpoint는 웹과 동일하게 `/users/me/follows`, `/users/me/performance/interest`, `/users/me/performance/history`를 사용한다.
 - 푸시 토큰 등록 endpoint는 웹과 동일하게 `/notifications/tokens`를 사용한다.
+- 밴드 홈 요약 endpoint는 웹 Band MyPage와 동일하게 `/users/me`를 사용한다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
 ## 인증 관련 결정사항
@@ -213,7 +217,7 @@
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
 - Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
-- Band actual home API 화면은 아직 구현 전이다.
+- Band home은 `/users/me` 요약 API까지 연결했다. 밴드 프로필 상세, 콘텐츠, 공연, 음원 링크 목록은 아직 웹 parity 전이다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
 - 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
 - 팬 탐색/밴드 프로필은 조회 중심으로 완료했다. 팔로우/언팔로우 mutation, 검색/필터/콘텐츠 상세는 아직 웹 parity 전이다.
@@ -253,6 +257,7 @@
 - 팬 마이페이지 `/users/me`, `/users/me/information` 실제 API 응답 렌더링
 - 팬 마이페이지 로그아웃 후 `/login` 이동
 - 팬 마이페이지 세부 목록 pagination 및 상세 이동
+- 밴드 홈 `/users/me` 실제 API 응답 렌더링
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -261,9 +266,9 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `e317aa2`
-- 이번 Expo Notifications 알림 권한 체크포인트 커밋 후 갱신 필요
+- 최근 완료 커밋: `04be840`
+- 이번 밴드 홈 요약 API 체크포인트 커밋 후 갱신 필요
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-밴드 홈 API 화면을 모바일에 연결한다.
+팬 탐색 팔로우/언팔로우 mutation을 연결한다.
