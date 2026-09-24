@@ -133,7 +133,10 @@ export function FanMyScreen() {
           />
           <MenuSection
             title="알림"
-            items={[{ label: "공연 알림 설정" }, { label: "라이브 알림 설정" }]}
+            items={[
+              { label: "공연 알림 설정", href: "/fan/my/concert-alert" },
+              { label: "라이브 알림 설정", href: "/fan/my/live-alert" },
+            ]}
           />
           <MenuSection
             title="계정"
