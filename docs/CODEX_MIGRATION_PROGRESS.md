@@ -19,7 +19,8 @@
 - Phase 14 팬 탐색 팔로우/언팔로우: 1차 mutation 연동 완료
 - Phase 15 밴드 홈 세부 API: 1차 조회 연동 완료
 - Phase 16 팬 알림 설정: 1차 API 연동 완료
-- 전체 기준 대략 43%
+- Phase 17 팬 탐색 검색/필터: 밴드 검색 1차 API 연동 완료
+- 전체 기준 대략 44%
 
 ## 완료된 작업
 
@@ -64,16 +65,18 @@
 - 밴드 홈에 콘텐츠/일정/음원 탭과 각 탭의 Loading/Error/Empty 상태를 구현했다.
 - 팬 마이페이지에 `/fan/my/concert-alert`, `/fan/my/live-alert` 알림 설정 화면을 추가했다.
 - 알림 설정 조회 `/users/me/notification-settings?mode=FAN`와 설정 변경 `/users/me/notification-settings/{settingType}` API를 연결했다.
+- 팬 탐색 화면에 밴드 검색어 입력, 인기순/최신순 정렬, 장르/지역 필터를 추가했다.
+- 팬 탐색 밴드 검색 API `/explore/search?type=BAND`를 연결하고 기존 팔로우/프로필 이동 동작을 검색 결과에서도 재사용했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록/알림 설정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API를 구현한 상태. 다음은 팬 탐색 검색/필터 화면 또는 밴드 홈 등록/수정/삭제 mutation이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드 검색, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록/알림 설정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API를 구현한 상태. 다음은 밴드 홈 등록/수정/삭제 mutation 또는 팬 탐색 공연/콘텐츠 검색 확장이다.
 
 ## 다음에 해야 할 작업
 
-1. 팬 탐색 검색/필터 화면을 연결한다.
-2. 밴드 홈 등록/수정/삭제 mutation과 상세 route를 연결한다.
+1. 밴드 홈 등록/수정/삭제 mutation과 상세 route를 연결한다.
+2. 팬 탐색 공연/콘텐츠 검색 결과를 확장 연결한다.
 3. 밴드 알림 설정 화면과 notification settings API를 연결한다.
 
 ## 변경한 주요 파일
@@ -172,6 +175,7 @@
 - 공연 상세 endpoint는 웹과 동일하게 `/performances/{performanceId}/detail`을 사용한다.
 - 공연 관심/알림 mutation endpoint는 웹과 동일하게 `/performances/{performanceId}/interest`, `/performances/{performanceId}/alarm`을 사용한다.
 - 팬 탐색 추천 밴드 endpoint는 웹과 동일하게 `/bands/recommendations`를 사용한다.
+- 팬 탐색 밴드 검색 endpoint는 웹과 동일하게 `/explore/search?type=BAND`를 사용한다.
 - 밴드 프로필 endpoint는 웹과 동일하게 `/bands/{bandId}/detail`을 사용한다.
 - 팬 탐색 팔로우 mutation endpoint는 웹과 동일하게 `/bands/{bandId}/follow`를 사용한다.
 - 팬 마이페이지 endpoint는 웹과 동일하게 `/users/me`, `/users/me/information`을 사용한다.
@@ -237,7 +241,7 @@
 - Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회를 연결했다. 등록/수정/삭제 mutation과 상세 route는 아직 웹 parity 전이다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
 - 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
-- 팬 탐색/밴드 프로필은 조회와 팔로우/언팔로우 mutation을 완료했다. 검색/필터/콘텐츠 상세는 아직 웹 parity 전이다.
+- 팬 탐색/밴드 프로필은 추천 밴드, 밴드 검색/필터, 팔로우/언팔로우 mutation을 완료했다. 공연/콘텐츠 검색과 콘텐츠 상세는 아직 웹 parity 전이다.
 - 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정을 완료했다. 프로필 수정 화면은 아직 웹 parity 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
@@ -270,6 +274,7 @@
 - 공연 알림 설정/해제 `/performances/{performanceId}/alarm` 실제 API 상태 동기화
 - 공연 상세 예매 링크 `Linking.openURL`
 - 팬 탐색 `/bands/recommendations` 실제 API 응답 렌더링
+- 팬 탐색 `/explore/search?type=BAND` 실제 API 응답 렌더링
 - 밴드 프로필 `/bands/{bandId}/detail` 실제 API 응답 렌더링
 - 팬 탐색 팔로우/언팔로우 `/bands/{bandId}/follow` 실제 API 상태 동기화
 - 팬 마이페이지 `/users/me`, `/users/me/information` 실제 API 응답 렌더링
@@ -290,4 +295,4 @@
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-팬 탐색 검색/필터 화면을 연결한다.
+밴드 홈 등록/수정/삭제 mutation과 상세 route를 연결한다.

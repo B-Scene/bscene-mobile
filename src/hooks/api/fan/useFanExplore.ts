@@ -4,15 +4,21 @@ import {
   followExploreBand,
   getFanExploreBandDetail,
   getRecommendedExploreBands,
+  searchFanExploreBands,
   unfollowExploreBand,
 } from "@/api/fan/explore";
 import { followedBandsKeys } from "@/hooks/api/user/useFollowedBands";
-import type { FanExploreRecommendationParams } from "@/types/fan/explore";
+import type {
+  FanExploreRecommendationParams,
+  FanExploreSearchParams,
+} from "@/types/fan/explore";
 
 export const fanExploreKeys = {
   all: ["fanExplore"] as const,
   recommendedBands: (params: FanExploreRecommendationParams) =>
     [...fanExploreKeys.all, "recommendedBands", params] as const,
+  searchBands: (params: Omit<FanExploreSearchParams, "cursor">) =>
+    [...fanExploreKeys.all, "searchBands", params] as const,
   bandDetail: (bandId: number) =>
     [...fanExploreKeys.all, "bandDetail", bandId] as const,
 };
@@ -39,6 +45,24 @@ export const useFanExploreBandDetailQuery = (bandId: number) => {
     queryKey: fanExploreKeys.bandDetail(bandId),
     queryFn: () => getFanExploreBandDetail(bandId),
     enabled: bandId > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExploreBandSearchQuery = (
+  params: Omit<FanExploreSearchParams, "cursor">,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.searchBands(params),
+    queryFn: ({ pageParam }) =>
+      searchFanExploreBands({
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
+    enabled: params.keyword.trim().length > 0,
     staleTime: 1000 * 30,
   });
 };

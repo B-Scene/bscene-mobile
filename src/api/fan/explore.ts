@@ -8,6 +8,7 @@ import type {
   FanExploreBandDetail,
   FanExplorePageResponse,
   FanExploreRecommendationParams,
+  FanExploreSearchParams,
   NormalizedFanExploreBandsResponse,
 } from "@/types/fan/explore";
 
@@ -64,6 +65,15 @@ const getItems = <T>(result: FanExplorePageResponse<T> | T[]) => {
     []
   );
 };
+
+const removeEmptyParams = (params: Record<string, unknown>) =>
+  Object.fromEntries(
+    Object.entries(params).filter(([, value]) => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === "string" && value.trim().length === 0) return false;
+      return true;
+    }),
+  );
 
 const normalizeBandDetail = (result: FanExploreBandDetail) => {
   const bandInfo =
@@ -165,6 +175,54 @@ export const getFanExploreBandDetail = async (bandId: number) => {
   >(`/bands/${bandId}/detail`);
 
   return normalizeBandDetail(assertSuccess(response));
+};
+
+export const searchFanExploreBands = async ({
+  keyword,
+  sort = "POPULAR",
+  cursor,
+  size = 20,
+  genre,
+  region,
+}: FanExploreSearchParams): Promise<NormalizedFanExploreBandsResponse> => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<FanExplorePageResponse<FanExploreBand> | FanExploreBand[]>
+  >("/explore/search", {
+    params: removeEmptyParams({
+      keyword,
+      type: "BAND",
+      sort,
+      genre,
+      region,
+      cursor,
+      size,
+    }),
+  });
+  const result = assertSuccess(response);
+
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      hasNext: false,
+      nextCursor: null,
+      page: 0,
+    };
+  }
+
+  const nextCursor =
+    typeof result.nextCursor === "number"
+      ? result.nextCursor
+      : typeof result.nextCursor === "string"
+        ? Number(result.nextCursor)
+        : null;
+
+  return {
+    ...result,
+    items: getItems(result),
+    page: result.page ?? 0,
+    hasNext: result.hasNext ?? nextCursor != null,
+    nextCursor: Number.isFinite(nextCursor) ? nextCursor : null,
+  };
 };
 
 export const followExploreBand = async (bandId: number) => {

@@ -13,6 +13,17 @@ export interface FanExploreRecommendationParams {
   withDummy?: boolean;
 }
 
+export type FanExploreSearchSort = "POPULAR" | "LATEST";
+
+export interface FanExploreSearchParams {
+  keyword: string;
+  sort?: FanExploreSearchSort;
+  cursor?: string;
+  size?: number;
+  genre?: string;
+  region?: string;
+}
+
 export interface FanExploreBand {
   band?: FanExploreBand;
   bandId?: number;
