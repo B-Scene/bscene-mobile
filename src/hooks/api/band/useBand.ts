@@ -3,9 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getBand } from "@/api/band/band";
 import { getMusicLinks } from "@/api/band/musicLink";
 import {
+  createPerformance,
   deletePerformance,
   getPerformance,
   getPerformances,
+  updatePerformance,
 } from "@/api/band/performance";
 import {
   createPost,
@@ -14,6 +16,10 @@ import {
   getPosts,
   updatePost,
 } from "@/api/band/post";
+import type {
+  CreatePerformanceRequest,
+  UpdatePerformanceRequest,
+} from "@/types/band/performance";
 import type {
   CreatePostRequest,
   UpdatePostRequest,
@@ -57,6 +63,44 @@ export const useBandPerformanceQuery = (performanceId: number | null) => {
     queryFn: () => getPerformance(performanceId ?? 0),
     enabled: Boolean(performanceId && performanceId > 0),
     staleTime: 1000 * 30,
+  });
+};
+
+export const useCreateBandPerformance = (bandId?: number | null) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CreatePerformanceRequest) =>
+      createPerformance(bandId ?? 0, body),
+    onSuccess: async () => {
+      await Promise.all([
+        bandId
+          ? queryClient.invalidateQueries({
+              queryKey: bandKeys.performances(bandId),
+            })
+          : Promise.resolve(),
+        queryClient.invalidateQueries({ queryKey: bandKeys.all }),
+      ]);
+    },
+  });
+};
+
+export const useUpdateBandPerformance = (performanceId?: number | null) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: UpdatePerformanceRequest) =>
+      updatePerformance(performanceId ?? 0, body),
+    onSuccess: async () => {
+      await Promise.all([
+        performanceId
+          ? queryClient.invalidateQueries({
+              queryKey: bandKeys.performanceDetail(performanceId),
+            })
+          : Promise.resolve(),
+        queryClient.invalidateQueries({ queryKey: bandKeys.all }),
+      ]);
+    },
   });
 };
 

@@ -88,6 +88,15 @@ export function BandPerformanceDetailScreen() {
     await Linking.openURL(performance.ticketLink);
   };
 
+  const openEdit = () => {
+    if (!performanceId) return;
+    router.push(
+      `/band/home/concerts/form?performanceId=${performanceId}` as Parameters<
+        typeof router.push
+      >[0],
+    );
+  };
+
   return (
     <Screen contentStyle={styles.container}>
       <AppHeader title="공연 상세" />
@@ -152,6 +161,7 @@ export function BandPerformanceDetailScreen() {
 
           <TagSection tags={performance.tags} />
 
+          <AppButton label="공연 수정" variant="secondary" onPress={openEdit} />
           <AppButton
             label="공연 삭제"
             variant="secondary"

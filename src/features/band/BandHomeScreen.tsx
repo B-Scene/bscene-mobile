@@ -319,6 +319,10 @@ function ScheduleSection({
 }) {
   const deletePerformanceMutation = useDeleteBandPerformance(bandId);
 
+  const openCreate = () => {
+    router.push("/band/home/concerts/form" as Parameters<typeof router.push>[0]);
+  };
+
   const openDetail = (performanceId: number) => {
     router.push(
       `/band/home/concerts/${performanceId}` as Parameters<
@@ -359,12 +363,15 @@ function ScheduleSection({
       <AppState
         title="등록된 일정이 없어요"
         description="공연 일정을 등록하면 팬들이 소식을 받아볼 수 있어요."
+        actionLabel="공연 등록"
+        onAction={openCreate}
       />
     );
   }
 
   return (
     <View style={styles.sectionList}>
+      <AppButton label="공연 등록" variant="secondary" onPress={openCreate} />
       {performances.map((performance) => (
         <AppCard key={performance.performanceId} style={styles.rowCard}>
           <Avatar
