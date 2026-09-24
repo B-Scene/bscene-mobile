@@ -20,7 +20,8 @@
 - Phase 15 밴드 홈 세부 API: 1차 조회 연동 완료
 - Phase 16 팬 알림 설정: 1차 API 연동 완료
 - Phase 17 팬 탐색 검색/필터: 밴드 검색 1차 API 연동 완료
-- 전체 기준 대략 44%
+- Phase 18 밴드 홈 상세/삭제: 콘텐츠/공연 1차 연동 완료
+- 전체 기준 대략 46%
 
 ## 완료된 작업
 
@@ -67,15 +68,18 @@
 - 알림 설정 조회 `/users/me/notification-settings?mode=FAN`와 설정 변경 `/users/me/notification-settings/{settingType}` API를 연결했다.
 - 팬 탐색 화면에 밴드 검색어 입력, 인기순/최신순 정렬, 장르/지역 필터를 추가했다.
 - 팬 탐색 밴드 검색 API `/explore/search?type=BAND`를 연결하고 기존 팔로우/프로필 이동 동작을 검색 결과에서도 재사용했다.
+- 밴드 홈 콘텐츠 상세 `/band/home/contents/[postId]`와 공연 상세 `/band/home/concerts/[performanceId]` route를 추가했다.
+- 밴드 홈 콘텐츠/공연 상세 조회 API와 삭제 mutation을 연결했다.
+- 밴드 홈 콘텐츠/일정 목록에서 상세 이동과 삭제 확인 액션을 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드 검색, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록/알림 설정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API를 구현한 상태. 다음은 밴드 홈 등록/수정/삭제 mutation 또는 팬 탐색 공연/콘텐츠 검색 확장이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드 검색, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록/알림 설정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API와 콘텐츠/공연 상세/삭제를 구현한 상태. 다음은 밴드 홈 등록/수정 mutation 또는 팬 탐색 공연/콘텐츠 검색 확장이다.
 
 ## 다음에 해야 할 작업
 
-1. 밴드 홈 등록/수정/삭제 mutation과 상세 route를 연결한다.
+1. 밴드 홈 콘텐츠/공연 등록 및 수정 mutation/form을 연결한다.
 2. 팬 탐색 공연/콘텐츠 검색 결과를 확장 연결한다.
 3. 밴드 알림 설정 화면과 notification settings API를 연결한다.
 
@@ -184,6 +188,8 @@
 - 알림 설정 endpoint는 웹과 동일하게 `/users/me/notification-settings`, `/users/me/notification-settings/{settingType}`을 사용한다.
 - 밴드 홈 요약 endpoint는 웹 Band MyPage와 동일하게 `/users/me`를 사용한다.
 - 밴드 홈 세부 조회 endpoint는 웹과 동일하게 `/users/me/profiles`, `/bands/{bandId}`, `/bands/{bandId}/posts`, `/bands/{bandId}/performances`, `/bands/{bandId}/music-links`를 사용한다.
+- 밴드 콘텐츠 상세/삭제 endpoint는 웹과 동일하게 `/posts/{postId}` GET/DELETE를 사용한다.
+- 밴드 공연 상세/삭제 endpoint는 웹과 동일하게 `/performances/{performanceId}` GET/DELETE를 사용한다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
 ## 인증 관련 결정사항
@@ -215,6 +221,8 @@
 - `/fan/my/concert-alert`: 팬 공연 알림 설정
 - `/fan/my/live-alert`: 팬 라이브 알림 설정
 - `/band/home`: 밴드 홈 탭
+- `/band/home/contents/[postId]`: 밴드 콘텐츠 상세/삭제
+- `/band/home/concerts/[performanceId]`: 밴드 공연 상세/삭제
 - `/band/session`: 밴드 세션 탭
 - `/band/live`: 밴드 라이브 탭
 - `/band/my`: 밴드 마이 탭
@@ -238,7 +246,7 @@
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
 - Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
-- Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회를 연결했다. 등록/수정/삭제 mutation과 상세 route는 아직 웹 parity 전이다.
+- Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회와 콘텐츠/공연 상세/삭제를 연결했다. 등록/수정 mutation과 form은 아직 웹 parity 전이다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
 - 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
 - 팬 탐색/밴드 프로필은 추천 밴드, 밴드 검색/필터, 팔로우/언팔로우 mutation을 완료했다. 공연/콘텐츠 검색과 콘텐츠 상세는 아직 웹 parity 전이다.
@@ -283,6 +291,8 @@
 - 팬 알림 설정 조회/변경 실제 API 상태 동기화
 - 밴드 홈 `/users/me` 실제 API 응답 렌더링
 - 밴드 홈 `/users/me/profiles`, `/bands/{bandId}`, 콘텐츠/공연/음원 링크 실제 API 응답 렌더링
+- 밴드 콘텐츠 상세 `/posts/{postId}` 실제 API 응답 렌더링 및 삭제 후 목록 갱신
+- 밴드 공연 상세 `/performances/{performanceId}` 실제 API 응답 렌더링 및 삭제 후 목록 갱신
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -291,8 +301,8 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `ae118ec`
+- 최근 완료 커밋: `67b21ab`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-밴드 홈 등록/수정/삭제 mutation과 상세 route를 연결한다.
+밴드 홈 콘텐츠/공연 등록 및 수정 mutation/form을 연결한다.
