@@ -192,6 +192,15 @@ export function BandPostDetailScreen() {
     ]);
   };
 
+  const openEdit = () => {
+    if (!postId) return;
+    router.push(
+      `/band/home/contents/form?postId=${postId}` as Parameters<
+        typeof router.push
+      >[0],
+    );
+  };
+
   return (
     <Screen contentStyle={styles.container}>
       <AppHeader title="콘텐츠 상세" />
@@ -245,6 +254,7 @@ export function BandPostDetailScreen() {
 
           <TagSection tags={post.tags} />
 
+          <AppButton label="콘텐츠 수정" variant="secondary" onPress={openEdit} />
           <AppButton
             label="콘텐츠 삭제"
             variant="secondary"

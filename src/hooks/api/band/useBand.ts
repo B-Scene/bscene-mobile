@@ -7,7 +7,17 @@ import {
   getPerformance,
   getPerformances,
 } from "@/api/band/performance";
-import { deletePost, getPost, getPosts } from "@/api/band/post";
+import {
+  createPost,
+  deletePost,
+  getPost,
+  getPosts,
+  updatePost,
+} from "@/api/band/post";
+import type {
+  CreatePostRequest,
+  UpdatePostRequest,
+} from "@/types/band/post";
 
 export const bandKeys = {
   all: ["band"] as const,
@@ -74,6 +84,38 @@ export const useBandMusicLinksQuery = (bandId: number | null) => {
     queryFn: () => getMusicLinks(bandId ?? 0),
     enabled: Boolean(bandId && bandId > 0),
     staleTime: 1000 * 30,
+  });
+};
+
+export const useCreateBandPost = (bandId?: number | null) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CreatePostRequest) => createPost(bandId ?? 0, body),
+    onSuccess: async () => {
+      await Promise.all([
+        bandId
+          ? queryClient.invalidateQueries({ queryKey: bandKeys.posts(bandId) })
+          : Promise.resolve(),
+        queryClient.invalidateQueries({ queryKey: bandKeys.all }),
+      ]);
+    },
+  });
+};
+
+export const useUpdateBandPost = (postId?: number | null) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: UpdatePostRequest) => updatePost(postId ?? 0, body),
+    onSuccess: async () => {
+      await Promise.all([
+        postId
+          ? queryClient.invalidateQueries({ queryKey: bandKeys.postDetail(postId) })
+          : Promise.resolve(),
+        queryClient.invalidateQueries({ queryKey: bandKeys.all }),
+      ]);
+    },
   });
 };
 

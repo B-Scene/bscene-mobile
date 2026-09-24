@@ -210,6 +210,10 @@ function ContentSection({
 }) {
   const deletePostMutation = useDeleteBandPost(bandId);
 
+  const openCreate = () => {
+    router.push("/band/home/contents/form" as Parameters<typeof router.push>[0]);
+  };
+
   const openDetail = (postId: number) => {
     router.push(
       `/band/home/contents/${postId}` as Parameters<typeof router.push>[0],
@@ -248,12 +252,19 @@ function ContentSection({
       <AppState
         title="등록된 콘텐츠가 없어요"
         description="콘텐츠를 등록하면 팬들이 소식을 받아볼 수 있어요."
+        actionLabel="콘텐츠 등록"
+        onAction={openCreate}
       />
     );
   }
 
   return (
     <View style={styles.sectionList}>
+      <AppButton
+        label="콘텐츠 등록"
+        variant="secondary"
+        onPress={openCreate}
+      />
       {posts.map((post) => (
         <AppCard key={post.postId} style={styles.rowCard}>
           <Avatar imageUrl={post.thumbnailUrl} label={post.title} size={48} />
