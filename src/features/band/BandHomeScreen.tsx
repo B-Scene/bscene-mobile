@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
+  useDeleteBandPerformance,
+  useDeleteBandPost,
   useBandMusicLinksQuery,
   useBandPerformancesQuery,
   useBandPostsQuery,
@@ -155,6 +158,7 @@ export function BandHomeScreen() {
 
           {activeTab === "content" ? (
             <ContentSection
+              bandId={bandId}
               posts={postsQuery.data?.posts ?? []}
               isLoading={postsQuery.isLoading}
               isError={postsQuery.isError}
@@ -164,6 +168,7 @@ export function BandHomeScreen() {
 
           {activeTab === "schedule" ? (
             <ScheduleSection
+              bandId={bandId}
               performances={performancesQuery.data?.performances ?? []}
               isLoading={performancesQuery.isLoading}
               isError={performancesQuery.isError}
@@ -191,16 +196,43 @@ export function BandHomeScreen() {
 }
 
 function ContentSection({
+  bandId,
   posts,
   isLoading,
   isError,
   onRetry,
 }: {
+  bandId: number;
   posts: PostListItem[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
 }) {
+  const deletePostMutation = useDeleteBandPost(bandId);
+
+  const openDetail = (postId: number) => {
+    router.push(
+      `/band/home/contents/${postId}` as Parameters<typeof router.push>[0],
+    );
+  };
+
+  const confirmDelete = (postId: number) => {
+    Alert.alert("콘텐츠 삭제", "등록한 콘텐츠를 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => {
+          deletePostMutation.mutate(postId, {
+            onError: () => {
+              Alert.alert("콘텐츠 삭제", "콘텐츠를 삭제하지 못했어요.");
+            },
+          });
+        },
+      },
+    ]);
+  };
+
   if (isLoading) return <AppState loading title="콘텐츠를 불러오는 중이에요" />;
   if (isError) {
     return (
@@ -236,7 +268,25 @@ function ContentSection({
               {formatRelativeCreatedAt(post.createdAt)}
             </Text>
           </View>
-          <Badge label={post.type} />
+          <View style={styles.rowActions}>
+            <Badge label={post.type} />
+            <AppButton
+              label="상세"
+              variant="ghost"
+              style={styles.compactButton}
+              onPress={() => openDetail(post.postId)}
+            />
+            <AppButton
+              label="삭제"
+              variant="secondary"
+              loading={
+                deletePostMutation.isPending &&
+                deletePostMutation.variables === post.postId
+              }
+              style={styles.compactButton}
+              onPress={() => confirmDelete(post.postId)}
+            />
+          </View>
         </AppCard>
       ))}
     </View>
@@ -244,16 +294,45 @@ function ContentSection({
 }
 
 function ScheduleSection({
+  bandId,
   performances,
   isLoading,
   isError,
   onRetry,
 }: {
+  bandId: number;
   performances: PerformanceListItem[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
 }) {
+  const deletePerformanceMutation = useDeleteBandPerformance(bandId);
+
+  const openDetail = (performanceId: number) => {
+    router.push(
+      `/band/home/concerts/${performanceId}` as Parameters<
+        typeof router.push
+      >[0],
+    );
+  };
+
+  const confirmDelete = (performanceId: number) => {
+    Alert.alert("공연 삭제", "등록한 공연 일정을 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => {
+          deletePerformanceMutation.mutate(performanceId, {
+            onError: () => {
+              Alert.alert("공연 삭제", "공연 일정을 삭제하지 못했어요.");
+            },
+          });
+        },
+      },
+    ]);
+  };
+
   if (isLoading) return <AppState loading title="공연 일정을 불러오는 중이에요" />;
   if (isError) {
     return (
@@ -291,7 +370,25 @@ function ScheduleSection({
             </Text>
             <Text style={styles.rowMeta}>{formatPerformanceDate(performance)}</Text>
           </View>
-          <Badge label="등록 완료" tone="yellow" />
+          <View style={styles.rowActions}>
+            <Badge label="등록 완료" tone="yellow" />
+            <AppButton
+              label="상세"
+              variant="ghost"
+              style={styles.compactButton}
+              onPress={() => openDetail(performance.performanceId)}
+            />
+            <AppButton
+              label="삭제"
+              variant="secondary"
+              loading={
+                deletePerformanceMutation.isPending &&
+                deletePerformanceMutation.variables === performance.performanceId
+              }
+              style={styles.compactButton}
+              onPress={() => confirmDelete(performance.performanceId)}
+            />
+          </View>
         </AppCard>
       ))}
     </View>
@@ -464,6 +561,10 @@ const styles = StyleSheet.create({
   },
   rowText: {
     flex: 1,
+    gap: spacing.xs,
+  },
+  rowActions: {
+    alignItems: "flex-end",
     gap: spacing.xs,
   },
   rowTitle: {

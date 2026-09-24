@@ -24,3 +24,17 @@ export interface PostListResponse {
   hasNext: boolean;
   nextCursor: number | null;
 }
+
+export interface PostDetailResponse {
+  postId: number;
+  bandId: number;
+  bandName: string;
+  type: PostType;
+  title: string;
+  description: string | null;
+  mediaUrls: string[];
+  thumbnailUrl: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}

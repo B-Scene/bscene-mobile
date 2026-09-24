@@ -2,6 +2,9 @@ import type { BandApiResponse } from "@/types/band/band";
 
 export type { BandApiResponse };
 
+export type PerformanceGenre = string;
+export type PerformanceAgeRating = "ALL" | "AGE_12" | "AGE_15" | "AGE_19";
+
 export interface PerformanceListItem {
   performanceId: number;
   title: string;
@@ -12,4 +15,22 @@ export interface PerformanceListItem {
 
 export interface PerformanceListResponse {
   performances: PerformanceListItem[];
+}
+
+export interface PerformanceResponse {
+  performanceId: number;
+  title: string;
+  genre: PerformanceGenre;
+  performanceDate: string;
+  startTime: string;
+  region: string;
+  venue: string;
+  description: string;
+  ticketPrice: string;
+  ticketLink: string | null;
+  posterImageUrl: string | null;
+  ageRating: PerformanceAgeRating;
+  tags: string[];
+  interestCount: number;
+  isInterested: boolean;
 }
