@@ -5,6 +5,8 @@ import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
 import {
   useFanExploreBandSearchQuery,
+  useFanExploreContentSearchQuery,
+  useFanExplorePerformanceSearchQuery,
   useFollowExploreBand,
   useRecommendedExploreBandsInfiniteQuery,
   useUnfollowExploreBand,
@@ -22,30 +24,90 @@ import { colors, spacing } from "@/shared/constants/theme";
 import type { FanExploreSearchSort } from "@/types/fan/explore";
 import {
   type ExploreBandItem,
+  type ExploreContentItem,
+  type ExplorePerformanceItem,
   mapExploreBand,
+  mapExploreContent,
+  mapExplorePerformance,
 } from "@/features/fan/fanExploreMappers";
+
+type ExploreResultType = "BAND" | "PERFORMANCE" | "POST";
+type ExploreResultItem =
+  | { kind: "BAND"; item: ExploreBandItem }
+  | { kind: "PERFORMANCE"; item: ExplorePerformanceItem }
+  | { kind: "POST"; item: ExploreContentItem };
+
+const RESULT_TYPES: { id: ExploreResultType; label: string }[] = [
+  { id: "BAND", label: "밴드" },
+  { id: "PERFORMANCE", label: "공연" },
+  { id: "POST", label: "콘텐츠" },
+];
 
 export function FanExploreScreen() {
   const [keyword, setKeyword] = useState("");
+  const [activeResultType, setActiveResultType] =
+    useState<ExploreResultType>("BAND");
   const [sort, setSort] = useState<FanExploreSearchSort>("POPULAR");
   const [genre, setGenre] = useState<string | undefined>();
   const [region, setRegion] = useState<string | undefined>();
   const genresQuery = useGenres();
   const regionsQuery = useRegions();
   const recommendedQuery = useRecommendedExploreBandsInfiniteQuery({ size: 20 });
-  const searchQuery = useFanExploreBandSearchQuery({
+  const searchParams = {
     keyword,
     sort,
     size: 20,
     genre,
     region,
-  });
+  };
+  const bandSearchQuery = useFanExploreBandSearchQuery(
+    searchParams,
+    activeResultType === "BAND",
+  );
+  const performanceSearchQuery = useFanExplorePerformanceSearchQuery(
+    searchParams,
+    activeResultType === "PERFORMANCE",
+  );
+  const contentSearchQuery = useFanExploreContentSearchQuery(
+    searchParams,
+    activeResultType === "POST",
+  );
   const isSearching = keyword.trim().length > 0;
+  const searchQuery =
+    activeResultType === "BAND"
+      ? bandSearchQuery
+      : activeResultType === "PERFORMANCE"
+        ? performanceSearchQuery
+        : contentSearchQuery;
   const query = isSearching ? searchQuery : recommendedQuery;
-  const bands =
-    query.data?.pages
-      .flatMap((page) => page.items)
-      .map(mapExploreBand) ?? [];
+  const resultItems: ExploreResultItem[] = isSearching
+    ? activeResultType === "BAND"
+      ? (bandSearchQuery.data?.pages.flatMap((page) => page.items) ?? []).map(
+          (item, index) => ({
+            kind: "BAND",
+            item: mapExploreBand(item, index),
+          }),
+        )
+      : activeResultType === "PERFORMANCE"
+        ? (
+            performanceSearchQuery.data?.pages.flatMap((page) => page.items) ??
+            []
+          ).map((item, index) => ({
+            kind: "PERFORMANCE",
+            item: mapExplorePerformance(item, index),
+          }))
+        : (contentSearchQuery.data?.pages.flatMap((page) => page.items) ?? []).map(
+            (item, index) => ({
+              kind: "POST",
+              item: mapExploreContent(item, index),
+            }),
+          )
+    : (recommendedQuery.data?.pages.flatMap((page) => page.items) ?? []).map(
+        (item, index) => ({
+          kind: "BAND",
+          item: mapExploreBand(item, index),
+        }),
+      );
   const genreOptions = useMemo(
     () => (genresQuery.data ?? []).slice(0, 6),
     [genresQuery.data],
@@ -60,11 +122,21 @@ export function FanExploreScreen() {
       <AppHeader title="탐색" showBack={false} />
       <View style={styles.searchPanel}>
         <AppTextInput
-          label="밴드 검색"
-          placeholder="밴드명이나 키워드를 입력하세요"
+          label="탐색 검색"
+          placeholder="밴드, 공연, 콘텐츠 키워드를 입력하세요"
           value={keyword}
           onChangeText={setKeyword}
         />
+        <View style={styles.filterGroup}>
+          {RESULT_TYPES.map((item) => (
+            <Chip
+              key={item.id}
+              label={item.label}
+              selected={activeResultType === item.id}
+              onPress={() => setActiveResultType(item.id)}
+            />
+          ))}
+        </View>
         <View style={styles.filterGroup}>
           <Chip
             label="인기순"
@@ -137,7 +209,7 @@ export function FanExploreScreen() {
           actionLabel="다시 시도"
           onAction={() => void query.refetch()}
         />
-      ) : bands.length === 0 ? (
+      ) : resultItems.length === 0 ? (
         <AppState
           title={isSearching ? "검색 결과가 없어요" : "추천할 밴드가 없어요"}
           description={
@@ -148,8 +220,8 @@ export function FanExploreScreen() {
         />
       ) : (
         <FlatList
-          data={bands}
-          keyExtractor={(item) => item.id}
+          data={resultItems}
+          keyExtractor={(item) => `${item.kind}-${item.item.id}`}
           contentContainerStyle={styles.listContent}
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) {
@@ -159,15 +231,19 @@ export function FanExploreScreen() {
           onEndReachedThreshold={0.35}
           ListHeaderComponent={
             <View style={styles.intro}>
-              <Text style={styles.title}>회원님을 위한 추천 밴드</Text>
+              <Text style={styles.title}>
+                {isSearching
+                  ? `${RESULT_TYPES.find((item) => item.id === activeResultType)?.label} 검색 결과`
+                  : "회원님을 위한 추천 밴드"}
+              </Text>
               <Text style={styles.description}>
                 {isSearching
-                  ? "검색어와 필터에 맞는 밴드를 보여드려요."
+                  ? "검색어와 필터에 맞는 결과를 보여드려요."
                   : "취향과 활동 정보를 기반으로 B:Scene 밴드를 추천해요."}
               </Text>
             </View>
           }
-          renderItem={({ item }) => <BandRow item={item} />}
+          renderItem={({ item }) => <ResultRow result={item} />}
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
@@ -177,6 +253,18 @@ export function FanExploreScreen() {
       )}
     </Screen>
   );
+}
+
+function ResultRow({ result }: { result: ExploreResultItem }) {
+  if (result.kind === "PERFORMANCE") {
+    return <PerformanceRow item={result.item} />;
+  }
+
+  if (result.kind === "POST") {
+    return <ContentRow item={result.item} />;
+  }
+
+  return <BandRow item={result.item} />;
 }
 
 function BandRow({ item }: { item: ExploreBandItem }) {
@@ -230,6 +318,83 @@ function BandRow({ item }: { item: ExploreBandItem }) {
         />
         <AppButton
           label="보기"
+          variant="ghost"
+          disabled={item.bandId == null}
+          style={styles.compactButton}
+          onPress={() => {
+            if (item.bandId == null) return;
+            router.push(
+              `/fan/bands/${item.bandId}` as Parameters<typeof router.push>[0],
+            );
+          }}
+        />
+      </View>
+    </AppCard>
+  );
+}
+
+function PerformanceRow({ item }: { item: ExplorePerformanceItem }) {
+  return (
+    <AppCard style={styles.card}>
+      <Avatar imageUrl={item.imageUrl} label={item.title} size={54} />
+      <View style={styles.bandInfo}>
+        <Text numberOfLines={1} style={styles.bandName}>
+          {item.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.meta}>
+          {item.meta}
+        </Text>
+        <Text style={styles.bandDescription}>{item.dateLabel}</Text>
+        <View style={styles.badges}>
+          <Badge label="공연" tone="yellow" />
+          {item.status ? <Badge label={item.status} /> : null}
+        </View>
+      </View>
+      <View style={styles.actions}>
+        <AppButton
+          label="보기"
+          variant="ghost"
+          disabled={item.performanceId == null}
+          style={styles.compactButton}
+          onPress={() => {
+            if (item.performanceId == null) return;
+            router.push(
+              `/fan/home/concerts/${item.performanceId}` as Parameters<
+                typeof router.push
+              >[0],
+            );
+          }}
+        />
+      </View>
+    </AppCard>
+  );
+}
+
+function ContentRow({ item }: { item: ExploreContentItem }) {
+  return (
+    <AppCard style={styles.card}>
+      <Avatar imageUrl={item.imageUrl} label={item.title} size={54} />
+      <View style={styles.bandInfo}>
+        <Text numberOfLines={1} style={styles.bandName}>
+          {item.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.meta}>
+          {item.meta}
+        </Text>
+        {item.description ? (
+          <Text numberOfLines={2} style={styles.bandDescription}>
+            {item.description}
+          </Text>
+        ) : null}
+        <View style={styles.badges}>
+          <Badge label="콘텐츠" tone="yellow" />
+          <Badge label={`${item.likeCount.toLocaleString()} 좋아요`} />
+          <Badge label={`${item.commentCount.toLocaleString()} 댓글`} />
+        </View>
+      </View>
+      <View style={styles.actions}>
+        <AppButton
+          label="밴드"
           variant="ghost"
           disabled={item.bandId == null}
           style={styles.compactButton}

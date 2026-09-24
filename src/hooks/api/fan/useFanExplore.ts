@@ -5,6 +5,8 @@ import {
   getFanExploreBandDetail,
   getRecommendedExploreBands,
   searchFanExploreBands,
+  searchFanExploreContents,
+  searchFanExplorePerformances,
   unfollowExploreBand,
 } from "@/api/fan/explore";
 import { followedBandsKeys } from "@/hooks/api/user/useFollowedBands";
@@ -19,6 +21,10 @@ export const fanExploreKeys = {
     [...fanExploreKeys.all, "recommendedBands", params] as const,
   searchBands: (params: Omit<FanExploreSearchParams, "cursor">) =>
     [...fanExploreKeys.all, "searchBands", params] as const,
+  searchPerformances: (params: Omit<FanExploreSearchParams, "cursor">) =>
+    [...fanExploreKeys.all, "searchPerformances", params] as const,
+  searchContents: (params: Omit<FanExploreSearchParams, "cursor">) =>
+    [...fanExploreKeys.all, "searchContents", params] as const,
   bandDetail: (bandId: number) =>
     [...fanExploreKeys.all, "bandDetail", bandId] as const,
 };
@@ -51,6 +57,7 @@ export const useFanExploreBandDetailQuery = (bandId: number) => {
 
 export const useFanExploreBandSearchQuery = (
   params: Omit<FanExploreSearchParams, "cursor">,
+  enabled = true,
 ) => {
   return useInfiniteQuery({
     queryKey: fanExploreKeys.searchBands(params),
@@ -62,7 +69,45 @@ export const useFanExploreBandSearchQuery = (
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
-    enabled: params.keyword.trim().length > 0,
+    enabled: enabled && params.keyword.trim().length > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExplorePerformanceSearchQuery = (
+  params: Omit<FanExploreSearchParams, "cursor">,
+  enabled = true,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.searchPerformances(params),
+    queryFn: ({ pageParam }) =>
+      searchFanExplorePerformances({
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
+    enabled: enabled && params.keyword.trim().length > 0,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFanExploreContentSearchQuery = (
+  params: Omit<FanExploreSearchParams, "cursor">,
+  enabled = true,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanExploreKeys.searchContents(params),
+    queryFn: ({ pageParam }) =>
+      searchFanExploreContents({
+        ...params,
+        cursor: pageParam,
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? String(lastPage.nextCursor ?? "") || undefined : undefined,
+    enabled: enabled && params.keyword.trim().length > 0,
     staleTime: 1000 * 30,
   });
 };

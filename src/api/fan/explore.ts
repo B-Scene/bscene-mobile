@@ -6,10 +6,14 @@ import type {
   FanExploreApiResponse,
   FanExploreBand,
   FanExploreBandDetail,
+  FanExploreContent,
   FanExplorePageResponse,
+  FanExplorePerformance,
   FanExploreRecommendationParams,
   FanExploreSearchParams,
   NormalizedFanExploreBandsResponse,
+  NormalizedFanExploreContentsResponse,
+  NormalizedFanExplorePerformancesResponse,
 } from "@/types/fan/explore";
 
 const assertSuccess = <T>({
@@ -58,12 +62,50 @@ const getItems = <T>(result: FanExplorePageResponse<T> | T[]) => {
     result.data ??
     result.list ??
     result.results ??
+    result.bands ??
+    result.performances ??
+    result.concerts ??
+    result.posts ??
+    result.contents ??
     result.recommendations ??
     result.recommendedBands ??
     result.recommendBands ??
     result.bandRecommendations ??
     []
   );
+};
+
+const normalizeCursorPage = <T>(
+  result: FanExplorePageResponse<T> | T[],
+): {
+  items: T[];
+  hasNext: boolean;
+  page: number;
+  nextCursor: number | null;
+} => {
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      hasNext: false,
+      nextCursor: null,
+      page: 0,
+    };
+  }
+
+  const nextCursor =
+    typeof result.nextCursor === "number"
+      ? result.nextCursor
+      : typeof result.nextCursor === "string"
+        ? Number(result.nextCursor)
+        : null;
+
+  return {
+    ...result,
+    items: getItems(result),
+    page: result.page ?? 0,
+    hasNext: result.hasNext ?? nextCursor != null,
+    nextCursor: Number.isFinite(nextCursor) ? nextCursor : null,
+  };
 };
 
 const removeEmptyParams = (params: Record<string, unknown>) =>
@@ -223,6 +265,58 @@ export const searchFanExploreBands = async ({
     hasNext: result.hasNext ?? nextCursor != null,
     nextCursor: Number.isFinite(nextCursor) ? nextCursor : null,
   };
+};
+
+export const searchFanExplorePerformances = async ({
+  keyword,
+  sort = "POPULAR",
+  cursor,
+  size = 20,
+  genre,
+  region,
+}: FanExploreSearchParams): Promise<NormalizedFanExplorePerformancesResponse> => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<
+      FanExplorePageResponse<FanExplorePerformance> | FanExplorePerformance[]
+    >
+  >("/explore/search", {
+    params: removeEmptyParams({
+      keyword,
+      type: "PERFORMANCE",
+      sort,
+      genre,
+      region,
+      cursor,
+      size,
+    }),
+  });
+
+  return normalizeCursorPage(assertSuccess(response));
+};
+
+export const searchFanExploreContents = async ({
+  keyword,
+  sort = "POPULAR",
+  cursor,
+  size = 20,
+  genre,
+  region,
+}: FanExploreSearchParams): Promise<NormalizedFanExploreContentsResponse> => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<FanExplorePageResponse<FanExploreContent> | FanExploreContent[]>
+  >("/explore/search", {
+    params: removeEmptyParams({
+      keyword,
+      type: "POST",
+      sort,
+      genre,
+      region,
+      cursor,
+      size,
+    }),
+  });
+
+  return normalizeCursorPage(assertSuccess(response));
 };
 
 export const followExploreBand = async (bandId: number) => {

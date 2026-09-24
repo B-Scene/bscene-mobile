@@ -51,6 +51,76 @@ export interface FanExploreBand {
   contentTypes?: string[];
 }
 
+export interface FanExplorePerformance {
+  performanceId?: number;
+  concertId?: number;
+  id?: number | string;
+  performanceTitle?: string;
+  performanceName?: string;
+  concertTitle?: string;
+  concertName?: string;
+  title?: string;
+  name?: string;
+  location?: string | null;
+  venue?: string | null;
+  place?: string | null;
+  posterImageUrl?: string | null;
+  posterUrl?: string | null;
+  posterImage?: string | null;
+  performancePosterUrl?: string | null;
+  performanceImageUrl?: string | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  startAt?: string | null;
+  startedAt?: string | null;
+  startDateTime?: string | null;
+  performanceDate?: string | null;
+  performanceTime?: string | null;
+  startDate?: string | null;
+  startTime?: string | null;
+  time?: string | null;
+  status?: string | null;
+}
+
+export interface FanExploreContent {
+  post?: FanExploreContent;
+  content?: FanExploreContent | string | null;
+  detail?: FanExploreContent;
+  band?: FanExploreBand;
+  contentId?: number;
+  postId?: number;
+  id?: number | string;
+  bandId?: number;
+  bandName?: string | null;
+  name?: string | null;
+  genre?: string | null;
+  region?: string | null;
+  profileImageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+  type?: string | null;
+  title?: string | null;
+  contentText?: string | null;
+  body?: string | null;
+  text?: string | null;
+  mediaType?: string | null;
+  contentType?: string | null;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  videoThumbnailUrl?: string | null;
+  mediaUrl?: string[] | string;
+  mediaUrls?: string[] | string;
+  imageUrls?: string[] | string;
+  images?: string[] | string;
+  tags?: string[] | string | null;
+  likes?: number;
+  comments?: number;
+  liked?: boolean;
+  createdAt?: string | null;
+  likeCount?: number;
+  commentCount?: number;
+  isLiked?: boolean;
+}
+
 export interface FanExploreBandDetail extends FanExploreBand {
   profile?: FanExploreBandDetail;
   bandProfile?: FanExploreBandDetail;
@@ -69,6 +139,11 @@ export interface FanExplorePageResponse<T> {
   data?: T[];
   list?: T[];
   results?: T[];
+  bands?: T[];
+  performances?: T[];
+  concerts?: T[];
+  posts?: T[];
+  contents?: T[];
   recommendations?: T[];
   recommendedBands?: T[];
   recommendBands?: T[];
@@ -81,6 +156,22 @@ export interface FanExplorePageResponse<T> {
 export interface NormalizedFanExploreBandsResponse
   extends FanExplorePageResponse<FanExploreBand> {
   items: FanExploreBand[];
+  hasNext: boolean;
+  page: number;
+  nextCursor: number | null;
+}
+
+export interface NormalizedFanExplorePerformancesResponse
+  extends FanExplorePageResponse<FanExplorePerformance> {
+  items: FanExplorePerformance[];
+  hasNext: boolean;
+  page: number;
+  nextCursor: number | null;
+}
+
+export interface NormalizedFanExploreContentsResponse
+  extends FanExplorePageResponse<FanExploreContent> {
+  items: FanExploreContent[];
   hasNext: boolean;
   page: number;
   nextCursor: number | null;
