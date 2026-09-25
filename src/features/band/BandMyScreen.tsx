@@ -89,7 +89,7 @@ export function BandMyScreen() {
               { label: "밴드 프로필 관리" },
               { label: "멤버 관리" },
               { label: "모집 공고 관리" },
-              { label: "받은 지원 관리" },
+              { label: "받은 지원 관리", href: "/band/my/applications" },
             ]}
           />
 
