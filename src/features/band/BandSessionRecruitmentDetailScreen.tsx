@@ -1,8 +1,9 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import {
   useAddSessionRecruitmentInterest,
+  useDeleteSessionRecruitment,
   useRemoveSessionRecruitmentInterest,
   useSessionRecruitmentDetailQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
@@ -45,6 +46,7 @@ export function BandSessionRecruitmentDetailScreen() {
   const query = useSessionRecruitmentDetailQuery(recruitmentId);
   const addInterestMutation = useAddSessionRecruitmentInterest();
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
+  const deleteMutation = useDeleteSessionRecruitment();
   const detail = query.data;
   const isInterested = detail?.isInterested ?? false;
   const isInterestPending =
@@ -63,6 +65,38 @@ export function BandSessionRecruitmentDetailScreen() {
     } catch {
       Alert.alert("관심 공고", "관심 상태를 변경하지 못했어요.");
     }
+  };
+
+  const editRecruitment = () => {
+    if (!detail) return;
+
+    router.push(
+      `/band/session/recruitments/form?recruitmentId=${detail.sessionRecruitmentId}` as Parameters<
+        typeof router.push
+      >[0],
+    );
+  };
+
+  const deleteRecruitment = () => {
+    if (!detail) return;
+
+    Alert.alert("모집 공고 삭제", "이 모집 공고를 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              await deleteMutation.mutateAsync(detail.sessionRecruitmentId);
+              router.replace("/band/session" as Parameters<typeof router.replace>[0]);
+            } catch {
+              Alert.alert("모집 공고 삭제", "모집 공고를 삭제하지 못했어요.");
+            }
+          })();
+        },
+      },
+    ]);
   };
 
   return (
@@ -119,6 +153,24 @@ export function BandSessionRecruitmentDetailScreen() {
           <Section title="지원 자격">
             <Text style={styles.body}>{detail.qualification}</Text>
           </Section>
+
+          {detail.isMine ? (
+            <View style={styles.ownerActions}>
+              <AppButton
+                label="수정"
+                variant="secondary"
+                style={styles.ownerButton}
+                onPress={editRecruitment}
+              />
+              <AppButton
+                label="삭제"
+                variant="ghost"
+                loading={deleteMutation.isPending}
+                style={styles.ownerButton}
+                onPress={deleteRecruitment}
+              />
+            </View>
+          ) : null}
 
           <AppButton
             label={isInterested ? "관심 공고 해제" : "관심 공고 등록"}
@@ -225,5 +277,12 @@ const styles = StyleSheet.create({
     color: colors.neutral800,
     fontSize: 14,
     lineHeight: 22,
+  },
+  ownerActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  ownerButton: {
+    flex: 1,
   },
 });

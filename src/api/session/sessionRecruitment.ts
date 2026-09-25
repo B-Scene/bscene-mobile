@@ -2,11 +2,17 @@ import { AxiosError } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  CreateSessionRecruitmentRequest,
+  CreateSessionRecruitmentResponse,
+  DeleteSessionRecruitmentResponse,
   SessionApiResponse,
   SessionRecruitmentDetailResponse,
+  SessionRecruitmentEditInfoResponse,
   SessionRecruitmentInterestResponse,
   SessionRecruitmentListParams,
   SessionRecruitmentListResponse,
+  UpdateSessionRecruitmentRequest,
+  UpdateSessionRecruitmentResponse,
 } from "@/types/session/sessionRecruitment";
 
 const removeEmptyParams = (params: Record<string, unknown>) =>
@@ -53,6 +59,47 @@ export const getSessionRecruitmentDetail = async (
 ) => {
   const response = await axiosInstance.get<
     SessionApiResponse<SessionRecruitmentDetailResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}`);
+
+  return assertSuccess(response);
+};
+
+export const createSessionRecruitment = async (
+  body: CreateSessionRecruitmentRequest,
+) => {
+  const response = await axiosInstance.post<
+    SessionApiResponse<CreateSessionRecruitmentResponse>
+  >("/sessions/recruitments", body);
+
+  return assertSuccess(response);
+};
+
+export const updateSessionRecruitment = async (
+  sessionRecruitmentId: number,
+  body: UpdateSessionRecruitmentRequest,
+) => {
+  const response = await axiosInstance.patch<
+    SessionApiResponse<UpdateSessionRecruitmentResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}`, body);
+
+  return assertSuccess(response);
+};
+
+export const getSessionRecruitmentEditInfo = async (
+  sessionRecruitmentId: number,
+) => {
+  const response = await axiosInstance.get<
+    SessionApiResponse<SessionRecruitmentEditInfoResponse>
+  >(`/sessions/recruitments/${sessionRecruitmentId}/edit`);
+
+  return assertSuccess(response);
+};
+
+export const deleteSessionRecruitment = async (
+  sessionRecruitmentId: number,
+) => {
+  const response = await axiosInstance.delete<
+    SessionApiResponse<DeleteSessionRecruitmentResponse>
   >(`/sessions/recruitments/${sessionRecruitmentId}`);
 
   return assertSuccess(response);

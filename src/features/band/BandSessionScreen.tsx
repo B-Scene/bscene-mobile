@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { Plus } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -49,7 +50,25 @@ export function BandSessionScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>
-      <AppHeader title="세션" showBack={false} />
+      <AppHeader
+        title="세션"
+        showBack={false}
+        rightContent={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="모집 공고 등록"
+            hitSlop={12}
+            style={styles.headerButton}
+            onPress={() =>
+              router.push(
+                "/band/session/recruitments/form" as Parameters<typeof router.push>[0],
+              )
+            }
+          >
+            <Plus size={22} color={colors.neutral900} />
+          </Pressable>
+        }
+      />
 
       <View style={styles.searchPanel}>
         <AppTextInput
@@ -84,7 +103,13 @@ export function BandSessionScreen() {
       ) : posts.length === 0 ? (
         <AppState
           title="모집 공고가 없어요"
-          description="다른 검색어로 다시 찾아보세요."
+          description="다른 검색어로 다시 찾거나 새 공고를 등록해 보세요."
+          actionLabel="모집 공고 등록"
+          onAction={() =>
+            router.push(
+              "/band/session/recruitments/form" as Parameters<typeof router.push>[0],
+            )
+          }
         />
       ) : (
         <FlatList
@@ -175,6 +200,12 @@ const styles = StyleSheet.create({
   },
   searchPanel: {
     gap: spacing.md,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   filterGroup: {
     flexDirection: "row",

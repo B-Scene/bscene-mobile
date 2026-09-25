@@ -9,6 +9,51 @@ export interface SessionApiResponse<T> {
 
 export type SessionRecruitmentSort = "LATEST" | "IMMINENT";
 
+export interface CreateSessionRecruitmentRequest {
+  bandMemberId: number;
+  recruitmentTitle: string;
+  summary: string;
+  content: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  practiceSchedule: string;
+  practicePlace: string;
+  deadlineAt: string;
+  qualification: string;
+}
+
+export interface CreateSessionRecruitmentResponse
+  extends CreateSessionRecruitmentRequest {
+  sessionRecruitmentId: number;
+  bandId: number;
+  createdAt: string;
+}
+
+export type UpdateSessionRecruitmentRequest = Omit<
+  CreateSessionRecruitmentRequest,
+  "bandMemberId"
+>;
+
+export type UpdateSessionRecruitmentResponse = CreateSessionRecruitmentResponse;
+
+export interface SessionRecruitmentEditInfoResponse {
+  recruitmentTitle: string;
+  summary: string;
+  content: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  practiceSchedule: string;
+  practicePlace: string;
+  deadlineAt: string;
+  qualification: string;
+}
+
+export type DeleteSessionRecruitmentResponse = null;
+
 export interface SessionRecruitmentListParams {
   part?: string;
   skillLevel?: string;
