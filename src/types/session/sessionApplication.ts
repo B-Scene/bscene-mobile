@@ -7,6 +7,36 @@ export interface SessionApiResponse<T> {
   timeStamp: string;
 }
 
+export interface SessionApplicationSearchParams {
+  part?: string;
+  skillLevel?: string;
+  genre?: string;
+  region?: string;
+  keyword?: string;
+  cursorId?: number;
+  size?: number;
+}
+
+export interface SessionApplicationSearchItem {
+  sessionApplicationId: number;
+  userId: number;
+  nickname: string;
+  profileImageUrl: string | null;
+  skillLevel: string;
+  part: string;
+  genre: string;
+  region: string;
+  title: string;
+  oneLineIntro: string;
+}
+
+export interface SessionApplicationSearchResponse {
+  content: SessionApplicationSearchItem[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
 export interface SessionApplicationCareer {
   sessionApplicationCareerId: number;
   name: string;
@@ -20,6 +50,29 @@ export interface SessionApplicationPortfolioLink {
   title: string | null;
   thumbnailUrl: string | null;
   mediaType: string | null;
+}
+
+export interface SessionApplicationDetailResponse {
+  sessionApplicationId: number;
+  title: string;
+  purpose: string;
+  userId: number;
+  nickname: string;
+  profileImageUrl: string | null;
+  isPublic: boolean;
+
+  oneLineIntro: string;
+  intro: string;
+
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+
+  availableActivities: string[];
+
+  careers: SessionApplicationCareer[];
+  portfolioLinks: SessionApplicationPortfolioLink[];
 }
 
 export interface SessionApplicationSummaryItem {
@@ -53,15 +106,19 @@ export interface MySessionApplicationDetailResponse {
   defaultPart: string;
   defaultSkillLevel: string;
   defaultRegion: string;
+
   purpose: string;
   title: string;
   oneLineIntro: string;
   intro: string;
+
   part: string;
   skillLevel: string;
   genre: string;
   region: string;
+
   availableActivities: string[];
+
   careers: SessionApplicationCareer[];
   portfolioLinks: SessionApplicationPortfolioLink[];
 }
@@ -141,6 +198,7 @@ export interface ApplicationSubmissionDetailResponse {
   applicationSubmissionId: number;
   sessionRecruitmentId: number;
   recruitmentTitle: string;
+
   bandId: number;
   bandName: string;
   isOwner: boolean;
