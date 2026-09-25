@@ -7,7 +7,6 @@ import {
   Trash2,
 } from "lucide-react-native";
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -40,6 +39,7 @@ import {
 } from "@/shared/constants/theme";
 import type {
   CreateSessionApplicationRequest,
+  MySessionApplicationDetailResponse,
 } from "@/types/session/sessionApplication";
 
 const PART_OPTIONS = [
@@ -108,16 +108,42 @@ type CareerDraft = {
   description: string;
 };
 
+type FormInitialValues = {
+  purpose: string;
+  title: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  activities: string[];
+  careers: CareerDraft[];
+  portfolioLinks: string[];
+};
+
+const EMPTY_INITIAL_VALUES: FormInitialValues = {
+  purpose: "",
+  title: "",
+  oneLineIntro: "",
+  intro: "",
+  part: "",
+  skillLevel: "",
+  genre: "",
+  region: "",
+  activities: [],
+  careers: [],
+  portfolioLinks: [""],
+};
+
 const parseRouteId = (
   value?: string | string[],
 ) => {
-  const raw =
-    Array.isArray(value)
-      ? value[0]
-      : value;
+  const raw = Array.isArray(value)
+    ? value[0]
+    : value;
 
-  const parsed =
-    Number(raw);
+  const parsed = Number(raw);
 
   return Number.isFinite(parsed) &&
     parsed > 0
@@ -135,6 +161,76 @@ const normalizeEnumValue = (
     "etc."
     ? "etc"
     : trimmed;
+};
+
+const createEditInitialValues = (
+  detail: MySessionApplicationDetailResponse,
+): FormInitialValues => {
+  return {
+    purpose:
+      detail.purpose ?? "",
+
+    title:
+      detail.title ?? "",
+
+    oneLineIntro:
+      detail.oneLineIntro ?? "",
+
+    intro:
+      detail.intro ?? "",
+
+    part:
+      detail.part ||
+      detail.defaultPart ||
+      "",
+
+    skillLevel:
+      detail.skillLevel ||
+      detail.defaultSkillLevel ||
+      "",
+
+    genre:
+      detail.genre ?? "",
+
+    region:
+      detail.region ||
+      detail.defaultRegion ||
+      "",
+
+    activities:
+      detail.availableActivities ??
+      [],
+
+    careers:
+      detail.careers.map(
+        (
+          career,
+          index,
+        ) => ({
+          id:
+            career.sessionApplicationCareerId ||
+            -(index + 1),
+
+          name:
+            career.name ?? "",
+
+          period:
+            career.period ?? "",
+
+          description:
+            career.description ??
+            "",
+        }),
+      ),
+
+    portfolioLinks:
+      detail.portfolioLinks.length >
+      0
+        ? detail.portfolioLinks.map(
+            (link) => link.url,
+          )
+        : [""],
+  };
 };
 
 export function BandSessionApplicationFormScreen() {
@@ -159,6 +255,139 @@ export function BandSessionApplicationFormScreen() {
       applicationId,
     );
 
+  if (
+    isEdit &&
+    detailQuery.isLoading
+  ) {
+    return (
+      <Screen>
+        <AppHeader title="지원서 수정" />
+
+        <AppState
+          loading
+          title="지원서를 불러오는 중이에요"
+        />
+      </Screen>
+    );
+  }
+
+  if (
+    !isEdit &&
+    summaryQuery.isLoading
+  ) {
+    return (
+      <Screen>
+        <AppHeader title="지원서 작성" />
+
+        <AppState
+          loading
+          title="지원서 정보를 불러오는 중이에요"
+        />
+      </Screen>
+    );
+  }
+
+  if (
+    isEdit &&
+    (
+      detailQuery.isError ||
+      !detailQuery.data
+    )
+  ) {
+    return (
+      <Screen>
+        <AppHeader title="지원서 수정" />
+
+        <AppState
+          title="지원서를 불러오지 못했어요"
+          description="잠시 후 다시 시도해 주세요."
+          actionLabel="다시 시도"
+          onAction={() =>
+            void detailQuery.refetch()
+          }
+        />
+      </Screen>
+    );
+  }
+
+  if (
+    !isEdit &&
+    summaryQuery.isError
+  ) {
+    return (
+      <Screen>
+        <AppHeader title="지원서 작성" />
+
+        <AppState
+          title="지원서 정보를 불러오지 못했어요"
+          description="잠시 후 다시 시도해 주세요."
+          actionLabel="다시 시도"
+          onAction={() =>
+            void summaryQuery.refetch()
+          }
+        />
+      </Screen>
+    );
+  }
+
+  let initialValues =
+    EMPTY_INITIAL_VALUES;
+
+  if (
+    isEdit &&
+    detailQuery.data
+  ) {
+    initialValues =
+      createEditInitialValues(
+        detailQuery.data,
+      );
+  } else {
+    const shouldCreateDefault =
+      !summaryQuery.data
+        ?.hasDefaultApplication &&
+      (
+        summaryQuery.data
+          ?.applicationCount ??
+        0
+      ) === 0;
+
+    initialValues = {
+      ...EMPTY_INITIAL_VALUES,
+
+      purpose:
+        shouldCreateDefault
+          ? "기본"
+          : "",
+    };
+  }
+
+  return (
+    <BandSessionApplicationForm
+      key={
+        isEdit
+          ? `edit-${applicationId}`
+          : "create"
+      }
+      applicationId={
+        applicationId
+      }
+      isEdit={isEdit}
+      initialValues={
+        initialValues
+      }
+    />
+  );
+}
+
+function BandSessionApplicationForm({
+  applicationId,
+  isEdit,
+  initialValues,
+}: {
+  applicationId: number;
+  isEdit: boolean;
+  initialValues: FormInitialValues;
+}) {
   const createMutation =
     useCreateSessionApplicationMutation();
 
@@ -166,178 +395,72 @@ export function BandSessionApplicationFormScreen() {
     useUpdateSessionApplicationMutation();
 
   const [purpose, setPurpose] =
-    useState("");
+    useState(
+      initialValues.purpose,
+    );
 
   const [title, setTitle] =
-    useState("");
+    useState(
+      initialValues.title,
+    );
 
   const [
     oneLineIntro,
     setOneLineIntro,
-  ] = useState("");
+  ] = useState(
+    initialValues.oneLineIntro,
+  );
 
   const [intro, setIntro] =
-    useState("");
+    useState(
+      initialValues.intro,
+    );
 
   const [part, setPart] =
-    useState("");
+    useState(
+      initialValues.part,
+    );
 
   const [
     skillLevel,
     setSkillLevel,
-  ] = useState("");
+  ] = useState(
+    initialValues.skillLevel,
+  );
 
   const [genre, setGenre] =
-    useState("");
+    useState(
+      initialValues.genre,
+    );
 
   const [region, setRegion] =
-    useState("");
+    useState(
+      initialValues.region,
+    );
 
   const [
     activities,
     setActivities,
-  ] = useState<string[]>([]);
+  ] = useState<string[]>(
+    initialValues.activities,
+  );
 
-  const [careers, setCareers] =
-    useState<CareerDraft[]>([]);
+  const [
+    careers,
+    setCareers,
+  ] = useState<CareerDraft[]>(
+    initialValues.careers,
+  );
 
   const [
     portfolioLinks,
     setPortfolioLinks,
-  ] = useState<string[]>([""]);
-
-  const [
-    initialized,
-    setInitialized,
-  ] = useState(false);
+  ] = useState<string[]>(
+    initialValues.portfolioLinks,
+  );
 
   const isDefaultPurpose =
     purpose.trim() === "기본";
-/* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (
-      initialized ||
-      isEdit ||
-      summaryQuery.isLoading
-    ) {
-      return;
-    }
-
-    if (
-      !summaryQuery.data
-        ?.hasDefaultApplication &&
-      (
-        summaryQuery.data
-          ?.applicationCount ??
-        0
-      ) === 0
-    ) {
-      setPurpose("기본");
-    }
-
-    setInitialized(true);
-  }, [
-    initialized,
-    isEdit,
-    summaryQuery.data,
-    summaryQuery.isLoading,
-  ]);
-
-  /* eslint-enable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (
-      !isEdit ||
-      !detailQuery.data ||
-      initialized
-    ) {
-      return;
-    }
-
-    const detail =
-      detailQuery.data;
-
-    setPurpose(
-      detail.purpose ?? "",
-    );
-
-    setTitle(
-      detail.title ?? "",
-    );
-
-    setOneLineIntro(
-      detail.oneLineIntro ?? "",
-    );
-
-    setIntro(
-      detail.intro ?? "",
-    );
-
-    setPart(
-      detail.part ||
-        detail.defaultPart ||
-        "",
-    );
-
-    setSkillLevel(
-      detail.skillLevel ||
-        detail.defaultSkillLevel ||
-        "",
-    );
-
-    setGenre(
-      detail.genre ?? "",
-    );
-
-    setRegion(
-      detail.region ||
-        detail.defaultRegion ||
-        "",
-    );
-
-    setActivities(
-      detail.availableActivities ??
-        [],
-    );
-
-    setCareers(
-      detail.careers.map(
-        (
-          career,
-          index,
-        ) => ({
-          id:
-            career.sessionApplicationCareerId ||
-            Date.now() + index,
-
-          name:
-            career.name ?? "",
-
-          period:
-            career.period ?? "",
-
-          description:
-            career.description ??
-            "",
-        }),
-      ),
-    );
-
-    setPortfolioLinks(
-      detail.portfolioLinks
-        .length > 0
-        ? detail.portfolioLinks.map(
-            (link) =>
-              link.url,
-          )
-        : [""],
-    );
-
-    setInitialized(true);
-  }, [
-    detailQuery.data,
-    initialized,
-    isEdit,
-  ]);
 
   const isValid =
     useMemo(() => {
@@ -424,7 +547,8 @@ export function BandSessionApplicationFormScreen() {
             career.id === id
               ? {
                   ...career,
-                  [key]: value,
+                  [key]:
+                    value,
                 }
               : career,
         ),
@@ -499,10 +623,8 @@ export function BandSessionApplicationFormScreen() {
         careers
           .filter(
             (career) =>
-              career.name
-                .trim() &&
-              career.period
-                .trim(),
+              career.name.trim() &&
+              career.period.trim(),
           )
           .map(
             (career) => ({
@@ -513,8 +635,7 @@ export function BandSessionApplicationFormScreen() {
                 career.period.trim(),
 
               description:
-                career.description
-                  .trim() ||
+                career.description.trim() ||
                 undefined,
             }),
           );
@@ -641,51 +762,13 @@ export function BandSessionApplicationFormScreen() {
           isEdit
             ? "지원서 수정"
             : "지원서 등록",
+
           isEdit
             ? "지원서를 수정하지 못했어요."
             : "지원서를 등록하지 못했어요.",
         );
       }
     };
-
-  if (
-    isEdit &&
-    detailQuery.isLoading
-  ) {
-    return (
-      <Screen>
-        <AppHeader title="지원서 수정" />
-
-        <AppState
-          loading
-          title="지원서를 불러오는 중이에요"
-        />
-      </Screen>
-    );
-  }
-
-  if (
-    isEdit &&
-    (
-      detailQuery.isError ||
-      !detailQuery.data
-    )
-  ) {
-    return (
-      <Screen>
-        <AppHeader title="지원서 수정" />
-
-        <AppState
-          title="지원서를 불러오지 못했어요"
-          description="잠시 후 다시 시도해 주세요."
-          actionLabel="다시 시도"
-          onAction={() =>
-            void detailQuery.refetch()
-          }
-        />
-      </Screen>
-    );
-  }
 
   const isSubmitting =
     createMutation.isPending ||
@@ -722,8 +805,8 @@ export function BandSessionApplicationFormScreen() {
         <Text
           style={styles.helper}
         >
-          기본 지원서의 유형은
-          변경할 수 없어요.
+          기본 지원서의 유형은 변경할 수
+          없어요.
         </Text>
       ) : null}
 
@@ -732,7 +815,9 @@ export function BandSessionApplicationFormScreen() {
         value={title}
         placeholder="지원서 제목을 입력해 주세요"
         maxLength={50}
-        onChangeText={setTitle}
+        onChangeText={
+          setTitle
+        }
       />
 
       <AppTextInput
@@ -756,7 +841,9 @@ export function BandSessionApplicationFormScreen() {
 
         <TextInput
           value={intro}
-          onChangeText={setIntro}
+          onChangeText={
+            setIntro
+          }
           multiline
           maxLength={500}
           textAlignVertical="top"
@@ -780,14 +867,20 @@ export function BandSessionApplicationFormScreen() {
 
       <ChoiceSection
         title="파트"
-        options={PART_OPTIONS}
+        options={
+          PART_OPTIONS
+        }
         value={part}
-        onSelect={setPart}
+        onSelect={
+          setPart
+        }
       />
 
       <ChoiceSection
         title="실력대"
-        options={SKILL_OPTIONS}
+        options={
+          SKILL_OPTIONS
+        }
         value={skillLevel}
         onSelect={
           setSkillLevel
@@ -796,16 +889,24 @@ export function BandSessionApplicationFormScreen() {
 
       <ChoiceSection
         title="선호 장르"
-        options={GENRE_OPTIONS}
+        options={
+          GENRE_OPTIONS
+        }
         value={genre}
-        onSelect={setGenre}
+        onSelect={
+          setGenre
+        }
       />
 
       <ChoiceSection
         title="활동 지역"
-        options={REGION_OPTIONS}
+        options={
+          REGION_OPTIONS
+        }
         value={region}
-        onSelect={setRegion}
+        onSelect={
+          setRegion
+        }
       />
 
       <AppCard
@@ -867,7 +968,9 @@ export function BandSessionApplicationFormScreen() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={addCareer}
+            onPress={
+              addCareer
+            }
             style={
               styles.addButton
             }
@@ -894,8 +997,7 @@ export function BandSessionApplicationFormScreen() {
           <Text
             style={styles.helper}
           >
-            경력이 있다면 추가해
-            주세요.
+            경력이 있다면 추가해 주세요.
           </Text>
         ) : (
           careers.map(
@@ -919,8 +1021,7 @@ export function BandSessionApplicationFormScreen() {
                       styles.repeatTitle
                     }
                   >
-                    경력{" "}
-                    {index + 1}
+                    경력 {index + 1}
                   </Text>
 
                   <Pressable
@@ -1100,8 +1201,12 @@ export function BandSessionApplicationFormScreen() {
             ? "지원서 저장"
             : "지원서 등록"
         }
-        disabled={!isValid}
-        loading={isSubmitting}
+        disabled={
+          !isValid
+        }
+        loading={
+          isSubmitting
+        }
         onPress={() =>
           void submit()
         }
@@ -1152,7 +1257,9 @@ function ChoiceSection({
                 )
               }
               onPress={() =>
-                onSelect(option)
+                onSelect(
+                  option,
+                )
               }
             />
           ),
@@ -1175,7 +1282,8 @@ const styles =
     },
 
     label: {
-      color: colors.neutral800,
+      color:
+        colors.neutral800,
       fontSize: 14,
       fontWeight: "700",
     },
