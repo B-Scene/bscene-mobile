@@ -382,3 +382,17 @@
 ## 다음 세션이 가장 먼저 해야 할 작업
 
 밴드 세션 메시지/채팅을 연결한다.
+
+## MEDIUM 전환 메모
+
+- 현재까지 완료: 밴드 세션 모집 목록/상세/등록/수정/삭제, 지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 조회/취소/참여 확정까지 LOW 범위에서 구현하고 검증했다.
+- 막힌 문제: 다음 Work Unit인 밴드 세션 메시지/채팅은 웹 기준 `/chat/rooms`, `/chat/rooms/{chatRoomId}`, `/chat/ws-ticket` REST API와 `/api/ws/chat` WebSocket을 함께 사용한다.
+- MEDIUM이 필요한 이유: WebSocket 연결, ticket 발급, ping/pong heartbeat, reconnect, read receipt, 실시간 메시지 동기화가 포함되어 LOW 단순 CRUD 범위를 넘는다.
+- 관련 최소 파일:
+  - `bscene-client/src/api/session/sessionChat.ts`
+  - `bscene-client/src/types/session/sessionChat.ts`
+  - `bscene-client/src/hooks/api/session/useSessionChat.ts`
+  - `bscene-client/src/features/session/chat/SessionChatView.tsx`
+  - `bscene-mobile/src/hooks/api/session/useSessionApplication.ts`
+  - `bscene-mobile/src/features/band/BandSessionApplicationsScreen.tsx`
+- MEDIUM에서 가장 먼저 해야 할 작업: React Native 환경에서 WebSocket URL 생성, 인증 ticket 발급, 채팅방 목록/상세, 메시지 송수신 hook 설계를 모바일 패턴에 맞게 이식한다.
