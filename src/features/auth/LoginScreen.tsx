@@ -33,37 +33,13 @@ type OAuthProvider =
 const createOAuthUrls = (
   provider: OAuthProvider,
 ) => {
-  const callbackPath =
-    `oauth/callback/${provider}`;
-
   const callbackUrl =
     Linking.createURL(
-      callbackPath,
+      "oauth/callback",
     );
 
-  /*
-   * Web B:Scene은 백엔드에 redirect_origin만 전달하고,
-   * 백엔드가 최종적으로
-   *
-   *   /oauth/callback/{provider}
-   *
-   * 를 붙여서 프론트로 돌려보낸다.
-   *
-   * 따라서 실제 callbackUrl에서 해당 suffix를 제거해서
-   * 현재 앱 환경의 redirect origin을 만든다.
-   *
-   * Expo Go:
-   * exp://192.168.x.x:8081/--/oauth/callback/kakao
-   *                ↓
-   * exp://192.168.x.x:8081/--
-   *
-   * Development / Production Build:
-   * bscenemobile://oauth/callback/kakao
-   *                ↓
-   * bscenemobile:/
-   */
   const callbackSuffix =
-    `/oauth/callback/${provider}`;
+    "/oauth/callback";
 
   const redirectOrigin =
     callbackUrl.endsWith(
