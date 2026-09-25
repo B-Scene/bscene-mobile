@@ -1,30 +1,54 @@
 {
   "expo": {
-    "name": "bscene-mobile",
+    "name": "B:Scene",
     "slug": "bscene-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bscenemobile",
     "userInterfaceStyle": "automatic",
+
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.bscene.mobile",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "B:Scene 라이브 방송을 위해 마이크 접근 권한이 필요합니다.",
+        "NSCameraUsageDescription": "프로필 및 콘텐츠 촬영을 위해 카메라 접근 권한이 필요합니다.",
+        "NSPhotoLibraryUsageDescription": "프로필 및 콘텐츠 이미지를 선택하기 위해 사진 접근 권한이 필요합니다.",
+        "UIBackgroundModes": [
+          "audio",
+          "remote-notification"
+        ]
+      }
     },
+
     "android": {
+      "package": "com.bscene.mobile",
+
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+
+      "predictiveBackGestureEnabled": false,
+
+      "permissions": [
+        "RECORD_AUDIO",
+        "CAMERA"
+      ]
     },
+
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router",
+
       [
         "expo-splash-screen",
         {
@@ -33,10 +57,22 @@
           "imageWidth": 76
         }
       ],
+
       "expo-secure-store",
+
       "expo-notifications",
-      "expo-audio"
+
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "B:Scene에서 이미지를 선택하기 위해 사진 접근 권한이 필요합니다.",
+          "cameraPermission": "B:Scene에서 사진을 촬영하기 위해 카메라 권한이 필요합니다."
+        }
+      ],
+
+      "@config-plugins/react-native-webrtc"
     ],
+
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
