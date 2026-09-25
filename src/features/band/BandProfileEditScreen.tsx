@@ -20,7 +20,6 @@ import {
 } from "react-native";
 
 import {
-    useEffect,
     useState,
 } from "react";
 
@@ -106,10 +105,10 @@ const REGIONS = [
   ["JEJU", "제주"],
 ] as const;
 
-const PARTS: Array<[
+const PARTS: [
   BandMemberPart,
   string,
-]> = [
+][] = [
   ["VOCAL", "보컬"],
   ["GUITAR", "기타"],
   ["BASS", "베이스"],
@@ -283,17 +282,6 @@ function BandProfileEditForm({
     setUploading,
   ] = useState(false);
 
-  useEffect(() => {
-    if (member) {
-      setActivityName(
-        member.nickname,
-      );
-
-      setPart(
-        member.part as BandMemberPart,
-      );
-    }
-  }, [member]);
 
   const imageUrl =
     selectedImage?.uri ??
