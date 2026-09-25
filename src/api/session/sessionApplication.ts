@@ -2,6 +2,7 @@ import { AxiosError } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  ApplicationSubmissionDetailResponse,
   ApplySessionRecruitmentRequest,
   ApplySessionRecruitmentResponse,
   SessionApiResponse,
@@ -41,6 +42,16 @@ export const applySessionRecruitment = async (
   const response = await axiosInstance.post<
     SessionApiResponse<ApplySessionRecruitmentResponse>
   >(`/sessions/recruitments/${sessionRecruitmentId}/applications`, body);
+
+  return assertSuccess(response);
+};
+
+export const getApplicationSubmissionDetail = async (
+  applicationSubmissionId: number,
+) => {
+  const response = await axiosInstance.get<
+    SessionApiResponse<ApplicationSubmissionDetailResponse>
+  >(`/sessions/recruitments/submissions/${applicationSubmissionId}`);
 
   return assertSuccess(response);
 };

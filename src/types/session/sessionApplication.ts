@@ -41,3 +41,47 @@ export interface ApplySessionRecruitmentResponse {
   bandName: string;
   applicationTitle: string;
 }
+
+export interface SessionApplicationCareer {
+  sessionApplicationCareerId: number;
+  name: string;
+  period: string;
+  description: string;
+}
+
+export interface SessionApplicationPortfolioLink {
+  sessionApplicationLinkId: number;
+  url: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  mediaType: string | null;
+}
+
+export interface ApplicationSubmissionDetailResponse {
+  applicationSubmissionId: number;
+  sessionRecruitmentId: number;
+  recruitmentTitle: string;
+  bandId: number;
+  bandName: string;
+  isOwner: boolean;
+  deadlineAt: string;
+  sessionApplicationId: number;
+  title: string;
+  userId: number;
+  profileImageUrl: string | null;
+  nickname: string;
+  defaultPart: string;
+  defaultSkillLevel: string;
+  defaultRegion: string;
+  isPublic: boolean;
+  purpose: string;
+  oneLineIntro: string;
+  intro: string;
+  part: string;
+  skillLevel: string;
+  genre: string;
+  region: string;
+  availableActivities: string[];
+  careers: SessionApplicationCareer[];
+  portfolioLinks: SessionApplicationPortfolioLink[];
+}

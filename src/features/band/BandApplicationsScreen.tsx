@@ -1,5 +1,6 @@
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
 import { AppCard } from "@/shared/components/AppCard";
@@ -141,7 +142,19 @@ function RecruitmentApplicationCard({
 
       <View style={styles.applicants}>
         {post.recruiters.map((applicant) => (
-          <ApplicantRow key={applicant.applySubmissionId} applicant={applicant} />
+          <Pressable
+            key={applicant.applySubmissionId}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push(
+                `/band/my/applications/${applicant.applySubmissionId}` as Parameters<
+                  typeof router.push
+                >[0],
+              )
+            }
+          >
+            <ApplicantRow applicant={applicant} />
+          </Pressable>
         ))}
       </View>
     </AppCard>
