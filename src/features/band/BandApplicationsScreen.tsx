@@ -147,7 +147,7 @@ function RecruitmentApplicationCard({
             accessibilityRole="button"
             onPress={() =>
               router.push(
-                `/band/my/applications/${applicant.applySubmissionId}` as Parameters<
+                `/band/my/applications/${applicant.applySubmissionId}?status=${applicant.status}` as Parameters<
                   typeof router.push
                 >[0],
               )

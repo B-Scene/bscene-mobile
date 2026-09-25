@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";
+import { useAcceptApplicationSubmissionMutation } from "@/hooks/api/user/useReceivedApplications";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -10,6 +11,7 @@ import { Avatar } from "@/shared/components/Avatar";
 import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
 import { colors, radius, spacing } from "@/shared/constants/theme";
+import type { ApplicantStatus } from "@/types/user/receivedApplications";
 
 const parseRouteId = (value?: string | string[]) => {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -38,10 +40,47 @@ const splitGenres = (value: string) =>
     .filter(Boolean);
 
 export function BandApplicationDetailScreen() {
-  const params = useLocalSearchParams<{ applySubmissionId?: string }>();
+  const params = useLocalSearchParams<{
+    applySubmissionId?: string;
+    status?: ApplicantStatus;
+  }>();
   const applySubmissionId = parseRouteId(params.applySubmissionId);
   const query = useApplicationSubmissionDetailQuery(applySubmissionId);
+  const acceptMutation = useAcceptApplicationSubmissionMutation();
   const detail = query.data;
+  const isAlreadyDecided = params.status != null && params.status !== "PENDING";
+
+  const decide = (isApproved: boolean) => {
+    Alert.alert(
+      isApproved ? "지원 수락" : "지원 거절",
+      isApproved ? "이 지원자를 수락할까요?" : "이 지원자를 거절할까요?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: isApproved ? "수락" : "거절",
+          style: isApproved ? "default" : "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await acceptMutation.mutateAsync({
+                  applySubmissionId,
+                  isApproved,
+                });
+                router.back();
+              } catch {
+                Alert.alert(
+                  isApproved ? "지원 수락" : "지원 거절",
+                  isApproved
+                    ? "지원 수락에 실패했어요."
+                    : "지원 거절에 실패했어요.",
+                );
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <Screen contentStyle={styles.container}>
@@ -132,6 +171,28 @@ export function BandApplicationDetailScreen() {
               <Text style={styles.meta}>등록된 포트폴리오가 없어요.</Text>
             )}
           </Section>
+
+          {isAlreadyDecided ? (
+            <Text style={styles.decidedText}>이미 처리되었거나 취소된 지원이에요.</Text>
+          ) : null}
+
+          <View style={styles.decisionActions}>
+            <AppButton
+              label="거절"
+              variant="secondary"
+              disabled={isAlreadyDecided}
+              loading={acceptMutation.isPending}
+              style={styles.decisionButton}
+              onPress={() => decide(false)}
+            />
+            <AppButton
+              label="수락"
+              disabled={isAlreadyDecided}
+              loading={acceptMutation.isPending}
+              style={styles.decisionButton}
+              onPress={() => decide(true)}
+            />
+          </View>
 
           <AppButton
             label="지원자 목록으로"
@@ -287,5 +348,18 @@ const styles = StyleSheet.create({
     color: colors.secondary600,
     fontSize: 13,
     fontWeight: "800",
+  },
+  decidedText: {
+    color: colors.neutral600,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  decisionActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  decisionButton: {
+    flex: 1,
   },
 });

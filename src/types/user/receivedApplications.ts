@@ -52,3 +52,7 @@ export interface ReceivedApplicationsResponse {
   items: ReceivedRecruitmentPost[];
   pageInfo: PageInfo;
 }
+
+export interface AcceptApplicationSubmissionRequest {
+  isApproved: boolean;
+}

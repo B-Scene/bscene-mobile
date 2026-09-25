@@ -2,6 +2,7 @@ import { AxiosError } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  AcceptApplicationSubmissionRequest,
   ApiResponse,
   GetReceivedApplicationsParams,
   ReceivedApplicationsResponse,
@@ -40,6 +41,18 @@ export const getReceivedApplications = async (
   >("/users/me/recruitments/receives", {
     params: removeEmptyParams(params as Record<string, unknown>),
   });
+
+  return assertSuccess(response);
+};
+
+export const acceptApplicationSubmission = async (
+  applySubmissionId: number,
+  body: AcceptApplicationSubmissionRequest,
+) => {
+  const response = await axiosInstance.post<ApiResponse<null>>(
+    `/users/me/${applySubmissionId}/acceptance`,
+    body,
+  );
 
   return assertSuccess(response);
 };
