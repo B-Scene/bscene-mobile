@@ -1,6 +1,11 @@
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
+import {
+  useApplySessionRecruitmentMutation,
+  useMySessionApplicationSummaryQuery,
+} from "@/hooks/api/session/useSessionApplication";
 import {
   useAddSessionRecruitmentInterest,
   useDeleteSessionRecruitment,
@@ -13,8 +18,10 @@ import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
 import { Badge } from "@/shared/components/Badge";
+import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
 import { colors, spacing } from "@/shared/constants/theme";
+import type { SessionRecruitmentDetailResponse } from "@/types/session/sessionRecruitment";
 
 const parseRouteId = (value?: string | string[]) => {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -172,6 +179,8 @@ export function BandSessionRecruitmentDetailScreen() {
             </View>
           ) : null}
 
+          {!detail.isMine ? <ApplyRecruitmentCard detail={detail} /> : null}
+
           <AppButton
             label={isInterested ? "관심 공고 해제" : "관심 공고 등록"}
             variant={isInterested ? "secondary" : "primary"}
@@ -181,6 +190,100 @@ export function BandSessionRecruitmentDetailScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+function ApplyRecruitmentCard({
+  detail,
+}: {
+  detail: SessionRecruitmentDetailResponse;
+}) {
+  const summaryQuery = useMySessionApplicationSummaryQuery();
+  const applyMutation = useApplySessionRecruitmentMutation();
+  const applications = summaryQuery.data?.applications ?? [];
+  const [manualSelectedApplicationId, setManualSelectedApplicationId] = useState(0);
+  const selectedApplicationId =
+    manualSelectedApplicationId ||
+    summaryQuery.data?.sessionApplicationId ||
+    applications[0]?.sessionApplicationId ||
+    0;
+
+  const apply = async () => {
+    if (selectedApplicationId <= 0) {
+      Alert.alert("세션 지원", "지원할 지원서를 선택해 주세요.");
+      return;
+    }
+
+    try {
+      const result = await applyMutation.mutateAsync({
+        sessionRecruitmentId: detail.sessionRecruitmentId,
+        body: { sessionApplicationId: selectedApplicationId },
+      });
+      Alert.alert(
+        "세션 지원 완료",
+        `${result.bandName}에 ${result.applicationTitle} 지원서로 지원했어요.`,
+      );
+    } catch {
+      Alert.alert("세션 지원", "지원서를 제출하지 못했어요.");
+    }
+  };
+
+  if (summaryQuery.isLoading) {
+    return (
+      <AppCard style={styles.applyCard}>
+        <Text style={styles.sectionTitle}>세션 지원</Text>
+        <Text style={styles.meta}>내 지원서를 불러오는 중이에요.</Text>
+      </AppCard>
+    );
+  }
+
+  if (summaryQuery.isError) {
+    return (
+      <AppCard style={styles.applyCard}>
+        <Text style={styles.sectionTitle}>세션 지원</Text>
+        <Text style={styles.body}>내 지원서를 불러오지 못했어요.</Text>
+        <AppButton
+          label="다시 시도"
+          variant="secondary"
+          onPress={() => void summaryQuery.refetch()}
+        />
+      </AppCard>
+    );
+  }
+
+  if (applications.length === 0) {
+    return (
+      <AppCard style={styles.applyCard}>
+        <Text style={styles.sectionTitle}>세션 지원</Text>
+        <Text style={styles.body}>
+          아직 등록된 지원서가 없어요. 지원서 작성 화면은 다음 단계에서 연결됩니다.
+        </Text>
+      </AppCard>
+    );
+  }
+
+  return (
+    <AppCard style={styles.applyCard}>
+      <Text style={styles.sectionTitle}>세션 지원</Text>
+      <Text style={styles.body}>제출할 지원서를 선택해 주세요.</Text>
+      <View style={styles.applicationChips}>
+        {applications.map((application) => (
+          <Chip
+            key={application.sessionApplicationId}
+            label={application.title}
+            selected={selectedApplicationId === application.sessionApplicationId}
+            onPress={() =>
+              setManualSelectedApplicationId(application.sessionApplicationId)
+            }
+          />
+        ))}
+      </View>
+      <AppButton
+        label="지원하기"
+        loading={applyMutation.isPending}
+        onPress={() => void apply()}
+      />
+    </AppCard>
   );
 }
 
@@ -284,5 +387,13 @@ const styles = StyleSheet.create({
   },
   ownerButton: {
     flex: 1,
+  },
+  applyCard: {
+    gap: spacing.md,
+  },
+  applicationChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
 });
