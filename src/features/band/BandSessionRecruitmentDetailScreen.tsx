@@ -126,8 +126,7 @@ export function BandSessionRecruitmentDetailScreen() {
   const createChatMutation =
     useCreateChatRoomMutation();
 
-  const detail =
-    query.data;
+  const detail = query.data;
 
   const isInterested =
     detail?.isInterested ??
@@ -281,10 +280,14 @@ export function BandSessionRecruitmentDetailScreen() {
       ) : (
         <>
           <AppCard
-            style={styles.heroCard}
+            style={
+              styles.heroCard
+            }
           >
             <View
-              style={styles.bandRow}
+              style={
+                styles.bandRow
+              }
             >
               <Avatar
                 imageUrl={
@@ -310,9 +313,7 @@ export function BandSessionRecruitmentDetailScreen() {
                 </Text>
 
                 <Text
-                  style={
-                    styles.meta
-                  }
+                  style={styles.meta}
                 >
                   {[
                     detail.bandGenre,
@@ -325,9 +326,7 @@ export function BandSessionRecruitmentDetailScreen() {
             </View>
 
             <View
-              style={
-                styles.badges
-              }
+              style={styles.badges}
             >
               <Badge
                 label={formatDday(
@@ -358,7 +357,9 @@ export function BandSessionRecruitmentDetailScreen() {
           </AppCard>
 
           <AppCard
-            style={styles.infoCard}
+            style={
+              styles.infoCard
+            }
           >
             <InfoRow
               label="모집 파트"
@@ -508,8 +509,8 @@ function ApplyRecruitmentCard({
     useApplySessionRecruitmentMutation();
 
   const applications =
-    summaryQuery.data?.applications ??
-    [];
+    summaryQuery.data
+      ?.applications ?? [];
 
   const [
     manualSelectedApplicationId,
@@ -524,50 +525,54 @@ function ApplyRecruitmentCard({
       ?.sessionApplicationId ||
     0;
 
-  const apply = async () => {
-    if (
-      selectedApplicationId <= 0
-    ) {
-      Alert.alert(
-        "세션 지원",
-        "지원할 지원서를 선택해 주세요.",
-      );
-
-      return;
-    }
-
-    try {
-      const result =
-        await applyMutation.mutateAsync(
-          {
-            sessionRecruitmentId:
-              detail.sessionRecruitmentId,
-
-            body: {
-              sessionApplicationId:
-                selectedApplicationId,
-            },
-          },
+  const apply =
+    async () => {
+      if (
+        selectedApplicationId <=
+        0
+      ) {
+        Alert.alert(
+          "세션 지원",
+          "지원할 지원서를 선택해 주세요.",
         );
 
-      Alert.alert(
-        "세션 지원 완료",
-        `${result.bandName}에 ${result.applicationTitle} 지원서로 지원했어요.`,
-      );
-    } catch {
-      Alert.alert(
-        "세션 지원",
-        "지원서를 제출하지 못했어요.",
-      );
-    }
-  };
+        return;
+      }
+
+      try {
+        const result =
+          await applyMutation.mutateAsync(
+            {
+              sessionRecruitmentId:
+                detail.sessionRecruitmentId,
+
+              body: {
+                sessionApplicationId:
+                  selectedApplicationId,
+              },
+            },
+          );
+
+        Alert.alert(
+          "세션 지원 완료",
+          `${result.bandName}에 ${result.applicationTitle} 지원서로 지원했어요.`,
+        );
+      } catch {
+        Alert.alert(
+          "세션 지원",
+          "지원서를 제출하지 못했어요.",
+        );
+      }
+    };
 
   if (
     summaryQuery.isLoading
   ) {
     return (
       <AppCard
-        style={styles.applyCard}
+        style={
+          styles.applyCard
+        }
       >
         <Text
           style={
@@ -592,7 +597,9 @@ function ApplyRecruitmentCard({
   ) {
     return (
       <AppCard
-        style={styles.applyCard}
+        style={
+          styles.applyCard
+        }
       >
         <Text
           style={
@@ -625,7 +632,9 @@ function ApplyRecruitmentCard({
   ) {
     return (
       <AppCard
-        style={styles.applyCard}
+        style={
+          styles.applyCard
+        }
       >
         <Text
           style={
@@ -639,10 +648,20 @@ function ApplyRecruitmentCard({
           style={styles.body}
         >
           아직 등록된 지원서가
-          없어요. 지원서 작성
-          화면은 다음 단계에서
-          연결됩니다.
+          없어요. 지원서를 먼저
+          작성해 주세요.
         </Text>
+
+        <AppButton
+          label="지원서 작성하기"
+          onPress={() =>
+            router.push(
+              "/band/session/applications/form" as Parameters<
+                typeof router.push
+              >[0],
+            )
+          }
+        />
       </AppCard>
     );
   }
@@ -703,6 +722,18 @@ function ApplyRecruitmentCard({
           void apply()
         }
       />
+
+      <AppButton
+        label="지원서 관리"
+        variant="secondary"
+        onPress={() =>
+          router.push(
+            "/band/session/applications/manage" as Parameters<
+              typeof router.push
+            >[0],
+          )
+        }
+      />
     </AppCard>
   );
 }
@@ -719,13 +750,17 @@ function InfoRow({
       style={styles.infoRow}
     >
       <Text
-        style={styles.infoLabel}
+        style={
+          styles.infoLabel
+        }
       >
         {label}
       </Text>
 
       <Text
-        style={styles.infoValue}
+        style={
+          styles.infoValue
+        }
       >
         {value}
       </Text>
@@ -779,13 +814,15 @@ const styles =
     },
 
     bandName: {
-      color: colors.neutral900,
+      color:
+        colors.neutral900,
       fontSize: 15,
       fontWeight: "900",
     },
 
     meta: {
-      color: colors.neutral600,
+      color:
+        colors.neutral600,
       fontSize: 12,
       lineHeight: 18,
     },
@@ -797,7 +834,8 @@ const styles =
     },
 
     title: {
-      color: colors.neutral900,
+      color:
+        colors.neutral900,
       fontSize: 24,
       fontWeight: "900",
       lineHeight: 31,
@@ -815,14 +853,16 @@ const styles =
     },
 
     infoLabel: {
-      color: colors.neutral600,
+      color:
+        colors.neutral600,
       fontSize: 13,
       fontWeight: "700",
     },
 
     infoValue: {
       flex: 1,
-      color: colors.neutral900,
+      color:
+        colors.neutral900,
       fontSize: 13,
       fontWeight: "700",
       textAlign: "right",
@@ -833,13 +873,15 @@ const styles =
     },
 
     sectionTitle: {
-      color: colors.neutral900,
+      color:
+        colors.neutral900,
       fontSize: 17,
       fontWeight: "900",
     },
 
     body: {
-      color: colors.neutral800,
+      color:
+        colors.neutral800,
       fontSize: 14,
       lineHeight: 22,
     },
