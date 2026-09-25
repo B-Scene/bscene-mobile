@@ -1,14 +1,20 @@
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
 import {
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  useMemo,
+  useState,
+} from "react";
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
-import { useChatRoomsQuery } from "@/hooks/api/session/useSessionChat";
+import {
+  useChatRoomsQuery,
+  useSessionChatRoomListSocket,
+} from "@/hooks/api/session/useSessionChat";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
@@ -16,14 +22,21 @@ import { Avatar } from "@/shared/components/Avatar";
 import { Badge } from "@/shared/components/Badge";
 import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
-import { colors, spacing } from "@/shared/constants/theme";
+import {
+  colors,
+  spacing,
+} from "@/shared/constants/theme";
 import type {
-    ChatRoomListFilter,
-    ChatRoomListItem,
+  ChatRoomListFilter,
+  ChatRoomListItem,
 } from "@/types/session/sessionChat";
 
-const formatChatTime = (value: string | null) => {
-  if (!value) return "";
+const formatChatTime = (
+  value: string | null,
+) => {
+  if (!value) {
+    return "";
+  }
 
   const date = new Date(value);
 
@@ -34,32 +47,61 @@ const formatChatTime = (value: string | null) => {
   const now = new Date();
 
   if (
-    now.getFullYear() === date.getFullYear() &&
-    now.getMonth() === date.getMonth() &&
-    now.getDate() === date.getDate()
+    now.getFullYear() ===
+      date.getFullYear() &&
+    now.getMonth() ===
+      date.getMonth() &&
+    now.getDate() ===
+      date.getDate()
   ) {
-    return `${String(date.getHours()).padStart(2, "0")}:${String(
+    return `${String(
+      date.getHours(),
+    ).padStart(2, "0")}:${String(
       date.getMinutes(),
     ).padStart(2, "0")}`;
   }
 
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+  return `${
+    date.getMonth() + 1
+  }/${date.getDate()}`;
 };
 
-const getStatusLabel = (status: string | null) => {
-  if (!status) return null;
+const getStatusLabel = (
+  status: string | null,
+) => {
+  if (!status) {
+    return null;
+  }
 
-  const normalized = status.toUpperCase();
+  const normalized =
+    status.toUpperCase();
 
-  if (normalized.includes("ACCEPT")) return "수락";
-  if (normalized.includes("REJECT")) return "거절";
-  if (normalized.includes("PENDING")) return "대기";
+  if (
+    normalized.includes("ACCEPT")
+  ) {
+    return "수락";
+  }
+
+  if (
+    normalized.includes("REJECT")
+  ) {
+    return "거절";
+  }
+
+  if (
+    normalized.includes("PENDING")
+  ) {
+    return "대기";
+  }
 
   return status;
 };
 
 export function BandSessionMailboxScreen() {
-  const [filter, setFilter] = useState<ChatRoomListFilter>("ALL");
+  const [filter, setFilter] =
+    useState<ChatRoomListFilter>(
+      "ALL",
+    );
 
   const queryParams = useMemo(
     () => ({
@@ -69,35 +111,88 @@ export function BandSessionMailboxScreen() {
     [filter],
   );
 
-  const query = useChatRoomsQuery(queryParams);
-  const rooms = query.data?.content ?? [];
+  const query =
+    useChatRoomsQuery(
+      queryParams,
+    );
+
+  const socket =
+    useSessionChatRoomListSocket();
+
+  const rooms =
+    query.data?.content ?? [];
 
   return (
-    <Screen scroll={false} contentStyle={styles.container}>
+    <Screen
+      scroll={false}
+      contentStyle={
+        styles.container
+      }
+    >
       <AppHeader title="쪽지함" />
 
-      <View style={styles.filters}>
+      <View
+        style={
+          styles.connectionRow
+        }
+      >
+        <View
+          style={[
+            styles.connectionDot,
+            socket.isConnected
+              ? styles.connectedDot
+              : styles.disconnectedDot,
+          ]}
+        />
+
+        <Text
+          style={
+            styles.connectionText
+          }
+        >
+          {socket.isConnected
+            ? "실시간 연결됨"
+            : "실시간 연결 중"}
+        </Text>
+      </View>
+
+      <View
+        style={styles.filters}
+      >
         <Chip
           label="전체"
-          selected={filter === "ALL"}
-          onPress={() => setFilter("ALL")}
+          selected={
+            filter === "ALL"
+          }
+          onPress={() =>
+            setFilter("ALL")
+          }
         />
 
         <Chip
           label="안읽음"
-          selected={filter === "UNREAD"}
-          onPress={() => setFilter("UNREAD")}
+          selected={
+            filter === "UNREAD"
+          }
+          onPress={() =>
+            setFilter("UNREAD")
+          }
         />
       </View>
 
       {query.isLoading ? (
-        <AppState loading title="쪽지함을 불러오는 중이에요" />
+        <AppState
+          loading
+          title="쪽지함을 불러오는 중이에요"
+        />
       ) : query.isError ? (
         <AppState
           title="쪽지함을 불러오지 못했어요"
           description="잠시 후 다시 시도해 주세요."
           actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
+          onAction={() =>
+            void query.refetch()
+          }
         />
       ) : rooms.length === 0 ? (
         <AppState
@@ -111,13 +206,37 @@ export function BandSessionMailboxScreen() {
       ) : (
         <FlatList
           data={rooms}
-          keyExtractor={(item) => String(item.chatRoomId)}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => <ChatRoomCard room={item} />}
+          keyExtractor={(item) =>
+            String(
+              item.chatRoomId,
+            )
+          }
+          contentContainerStyle={
+            styles.list
+          }
+          renderItem={({
+            item,
+          }) => (
+            <ChatRoomCard
+              room={item}
+            />
+          )}
+          refreshing={
+            query.isRefetching
+          }
+          onRefresh={() =>
+            void query.refetch()
+          }
           ListFooterComponent={
             query.data?.hasNext ? (
-              <Text style={styles.footer}>
-                더 이전 쪽지는 pagination 단계에서 이어서 연결합니다
+              <Text
+                style={
+                  styles.footer
+                }
+              >
+                더 이전 쪽지는
+                pagination 단계에서
+                이어서 연결합니다
               </Text>
             ) : null
           }
@@ -127,8 +246,15 @@ export function BandSessionMailboxScreen() {
   );
 }
 
-function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
-  const statusLabel = getStatusLabel(room.applicationStatus);
+function ChatRoomCard({
+  room,
+}: {
+  room: ChatRoomListItem;
+}) {
+  const statusLabel =
+    getStatusLabel(
+      room.applicationStatus,
+    );
 
   return (
     <Pressable
@@ -141,35 +267,72 @@ function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
         )
       }
     >
-      <AppCard style={styles.card}>
+      <AppCard
+        style={styles.card}
+      >
         <Avatar
-          imageUrl={room.counterpartProfileImageUrl}
-          label={room.counterpartName}
+          imageUrl={
+            room.counterpartProfileImageUrl
+          }
+          label={
+            room.counterpartName
+          }
           size={50}
         />
 
-        <View style={styles.content}>
-          <View style={styles.headerRow}>
-            <View style={styles.nameRow}>
-              <Text numberOfLines={1} style={styles.name}>
-                {room.counterpartName}
+        <View
+          style={styles.content}
+        >
+          <View
+            style={
+              styles.headerRow
+            }
+          >
+            <View
+              style={
+                styles.nameRow
+              }
+            >
+              <Text
+                numberOfLines={1}
+                style={styles.name}
+              >
+                {
+                  room.counterpartName
+                }
               </Text>
 
-              {room.unreadCount > 0 ? (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadText}>
-                    {room.unreadCount > 99 ? "99+" : room.unreadCount}
+              {room.unreadCount >
+              0 ? (
+                <View
+                  style={
+                    styles.unreadBadge
+                  }
+                >
+                  <Text
+                    style={
+                      styles.unreadText
+                    }
+                  >
+                    {room.unreadCount >
+                    99
+                      ? "99+"
+                      : room.unreadCount}
                   </Text>
                 </View>
               ) : null}
 
               {statusLabel ? (
                 <Badge
-                  label={statusLabel}
+                  label={
+                    statusLabel
+                  }
                   tone={
-                    statusLabel === "수락"
+                    statusLabel ===
+                    "수락"
                       ? "yellow"
-                      : statusLabel === "거절"
+                      : statusLabel ===
+                          "거절"
                         ? "neutral"
                         : "pink"
                   }
@@ -177,18 +340,33 @@ function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
               ) : null}
             </View>
 
-            <Text style={styles.time}>
-              {formatChatTime(room.lastMessageAt)}
+            <Text
+              style={styles.time}
+            >
+              {formatChatTime(
+                room.lastMessageAt,
+              )}
             </Text>
           </View>
 
-          <Text numberOfLines={2} style={styles.preview}>
-            {room.lastMessage || "아직 주고받은 메시지가 없어요."}
+          <Text
+            numberOfLines={2}
+            style={
+              styles.preview
+            }
+          >
+            {room.lastMessage ||
+              "아직 주고받은 메시지가 없어요."}
           </Text>
 
           {!room.canSend ? (
-            <Text style={styles.disabledText}>
-              현재 메시지를 보낼 수 없는 대화입니다.
+            <Text
+              style={
+                styles.disabledText
+              }
+            >
+              현재 메시지를 보낼 수
+              없는 대화입니다.
             </Text>
           ) : null}
         </View>
@@ -197,90 +375,124 @@ function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    gap: spacing.lg,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      gap: spacing.lg,
+    },
 
-  filters: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
+    connectionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.xs,
+    },
 
-  list: {
-    paddingBottom: spacing.xxl,
-  },
+    connectionDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+    },
 
-  card: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
+    connectedDot: {
+      backgroundColor:
+        colors.primary500,
+    },
 
-  content: {
-    flex: 1,
-    gap: spacing.sm,
-  },
+    disconnectedDot: {
+      backgroundColor:
+        colors.neutral400,
+    },
 
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
+    connectionText: {
+      color: colors.neutral600,
+      fontSize: 11,
+    },
 
-  nameRow: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
+    filters: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
 
-  name: {
-    color: colors.neutral900,
-    fontSize: 16,
-    fontWeight: "900",
-  },
+    list: {
+      paddingBottom:
+        spacing.xxl,
+    },
 
-  unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary500,
-  },
+    card: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: spacing.md,
+      marginBottom:
+        spacing.md,
+    },
 
-  unreadText: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: "900",
-  },
+    content: {
+      flex: 1,
+      gap: spacing.sm,
+    },
 
-  time: {
-    color: colors.neutral500,
-    fontSize: 11,
-  },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent:
+        "space-between",
+      gap: spacing.sm,
+    },
 
-  preview: {
-    color: colors.neutral700,
-    fontSize: 13,
-    lineHeight: 19,
-  },
+    nameRow: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+    },
 
-  disabledText: {
-    color: colors.neutral500,
-    fontSize: 11,
-  },
+    name: {
+      color: colors.neutral900,
+      fontSize: 16,
+      fontWeight: "900",
+    },
 
-  footer: {
-    paddingVertical: spacing.md,
-    color: colors.neutral600,
-    fontSize: 12,
-    textAlign: "center",
-  },
-});
+    unreadBadge: {
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
+      paddingHorizontal: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor:
+        colors.primary500,
+    },
+
+    unreadText: {
+      color: colors.white,
+      fontSize: 10,
+      fontWeight: "900",
+    },
+
+    time: {
+      color: colors.neutral500,
+      fontSize: 11,
+    },
+
+    preview: {
+      color: colors.neutral700,
+      fontSize: 13,
+      lineHeight: 19,
+    },
+
+    disabledText: {
+      color: colors.neutral500,
+      fontSize: 11,
+    },
+
+    footer: {
+      paddingVertical:
+        spacing.md,
+      color: colors.neutral600,
+      fontSize: 12,
+      textAlign: "center",
+    },
+  });
