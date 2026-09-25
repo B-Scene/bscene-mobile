@@ -1,8 +1,16 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const ACCESS_TOKEN_KEY = "bscene.accessToken";
-const REFRESH_TOKEN_KEY = "bscene.refreshToken";
+import type { AuthUser } from "@/types/auth/auth";
+
+const ACCESS_TOKEN_KEY =
+  "bscene.accessToken";
+
+const REFRESH_TOKEN_KEY =
+  "bscene.refreshToken";
+
+const AUTH_USER_KEY =
+  "bscene.authUser";
 
 export type AuthTokens = {
   accessToken: string;
@@ -10,81 +18,136 @@ export type AuthTokens = {
 };
 
 const getWebStorage = () => {
-  if (Platform.OS !== "web") {
-    return null;
-  }
-
-  if (typeof window === "undefined") {
+  if (
+    Platform.OS !== "web" ||
+    typeof window === "undefined"
+  ) {
     return null;
   }
 
   return window.localStorage;
 };
 
+const getItem = async (
+  key: string,
+) => {
+  if (Platform.OS === "web") {
+    return (
+      getWebStorage()?.getItem(
+        key,
+      ) ?? null
+    );
+  }
+
+  return SecureStore.getItemAsync(
+    key,
+  );
+};
+
+const setItem = async (
+  key: string,
+  value: string,
+) => {
+  if (Platform.OS === "web") {
+    getWebStorage()?.setItem(
+      key,
+      value,
+    );
+
+    return;
+  }
+
+  await SecureStore.setItemAsync(
+    key,
+    value,
+  );
+};
+
+const removeItem = async (
+  key: string,
+) => {
+  if (Platform.OS === "web") {
+    getWebStorage()?.removeItem(
+      key,
+    );
+
+    return;
+  }
+
+  await SecureStore.deleteItemAsync(
+    key,
+  );
+};
+
 export const secureTokenStorage = {
   async getAccessToken() {
-    if (Platform.OS === "web") {
-      return getWebStorage()?.getItem(ACCESS_TOKEN_KEY) ?? null;
-    }
-
-    return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+    return getItem(
+      ACCESS_TOKEN_KEY,
+    );
   },
 
   async getRefreshToken() {
-    if (Platform.OS === "web") {
-      return getWebStorage()?.getItem(REFRESH_TOKEN_KEY) ?? null;
-    }
-
-    return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+    return getItem(
+      REFRESH_TOKEN_KEY,
+    );
   },
 
-  async setTokens(tokens: AuthTokens) {
-    if (Platform.OS === "web") {
-      const storage = getWebStorage();
-
-      storage?.setItem(
-        ACCESS_TOKEN_KEY,
-        tokens.accessToken,
-      );
-
-      storage?.setItem(
-        REFRESH_TOKEN_KEY,
-        tokens.refreshToken,
-      );
-
-      return;
-    }
-
+  async setTokens(
+    tokens: AuthTokens,
+  ) {
     await Promise.all([
-      SecureStore.setItemAsync(
+      setItem(
         ACCESS_TOKEN_KEY,
         tokens.accessToken,
       ),
 
-      SecureStore.setItemAsync(
+      setItem(
         REFRESH_TOKEN_KEY,
         tokens.refreshToken,
       ),
     ]);
   },
 
-  async clearTokens() {
-    if (Platform.OS === "web") {
-      const storage = getWebStorage();
+  async getUser(): Promise<AuthUser | null> {
+    const raw =
+      await getItem(
+        AUTH_USER_KEY,
+      );
 
-      storage?.removeItem(ACCESS_TOKEN_KEY);
-      storage?.removeItem(REFRESH_TOKEN_KEY);
-
-      return;
+    if (!raw) {
+      return null;
     }
 
+    try {
+      return JSON.parse(
+        raw,
+      ) as AuthUser;
+    } catch {
+      return null;
+    }
+  },
+
+  async setUser(
+    user: AuthUser,
+  ) {
+    await setItem(
+      AUTH_USER_KEY,
+      JSON.stringify(user),
+    );
+  },
+
+  async clearTokens() {
     await Promise.all([
-      SecureStore.deleteItemAsync(
+      removeItem(
         ACCESS_TOKEN_KEY,
       ),
 
-      SecureStore.deleteItemAsync(
+      removeItem(
         REFRESH_TOKEN_KEY,
+      ),
+
+      removeItem(
+        AUTH_USER_KEY,
       ),
     ]);
   },
