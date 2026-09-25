@@ -24,7 +24,8 @@
 - Phase 19 밴드 콘텐츠 등록/수정: 1차 API 연동 완료
 - Phase 20 밴드 공연 등록/수정: 1차 API 연동 완료
 - Phase 21 팬 탐색 공연/콘텐츠 검색: 1차 API 연동 완료
-- 전체 기준 대략 51%
+- Phase 22 밴드 알림 설정: 1차 API 연동 완료
+- 전체 기준 대략 53%
 
 ## 완료된 작업
 
@@ -83,16 +84,19 @@
 - 팬 탐색 검색에 밴드/공연/콘텐츠 결과 유형 탭을 추가했다.
 - 팬 탐색 공연 검색 `/explore/search?type=PERFORMANCE`와 콘텐츠 검색 `/explore/search?type=POST` API를 연결했다.
 - 팬 탐색 공연 결과는 기존 공연 상세로, 콘텐츠 결과는 게시 밴드 프로필로 이동하도록 1차 연결했다.
+- 밴드 마이 탭을 실제 요약/메뉴 화면으로 교체했다.
+- 밴드 모집 공고 알림 설정 `/band/my/recruit-alert`와 라이브 알림 설정 `/band/my/live-alert` 화면을 추가했다.
+- 밴드 알림 설정 조회/변경을 `/users/me/notification-settings?mode=BAND`, `/users/me/notification-settings/{settingType}` API에 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색, 공연 관심/알림 mutation, 팬 마이페이지/세부 목록/알림 설정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정을 구현한 상태. 다음은 밴드 알림 설정 API 연동이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정을 구현한 상태. 다음은 팬 콘텐츠 상세 route와 콘텐츠 좋아요/댓글 API 연동이다.
 
 ## 다음에 해야 할 작업
 
-1. 밴드 알림 설정 화면과 notification settings API를 연결한다.
-2. 팬 콘텐츠 상세 route와 콘텐츠 좋아요/댓글 API를 연결한다.
+1. 팬 콘텐츠 상세 route와 콘텐츠 좋아요/댓글 API를 연결한다.
+2. 밴드 세션/모집 공고 관리 API를 연결한다.
 3. Band home 네이티브 파일 업로드/이미지 선택 UX를 보강한다.
 
 ## 변경한 주요 파일
@@ -199,7 +203,7 @@
 - 팬 마이페이지 endpoint는 웹과 동일하게 `/users/me`, `/users/me/information`을 사용한다.
 - 팬 마이페이지 세부 목록 endpoint는 웹과 동일하게 `/users/me/follows`, `/users/me/performance/interest`, `/users/me/performance/history`를 사용한다.
 - 푸시 토큰 등록 endpoint는 웹과 동일하게 `/notifications/tokens`를 사용한다.
-- 알림 설정 endpoint는 웹과 동일하게 `/users/me/notification-settings`, `/users/me/notification-settings/{settingType}`을 사용한다.
+- 알림 설정 endpoint는 웹과 동일하게 `/users/me/notification-settings`, `/users/me/notification-settings/{settingType}`을 사용하고 mode `FAN`/`BAND`를 구분한다.
 - 밴드 홈 요약 endpoint는 웹 Band MyPage와 동일하게 `/users/me`를 사용한다.
 - 밴드 홈 세부 조회 endpoint는 웹과 동일하게 `/users/me/profiles`, `/bands/{bandId}`, `/bands/{bandId}/posts`, `/bands/{bandId}/performances`, `/bands/{bandId}/music-links`를 사용한다.
 - 밴드 콘텐츠 상세/삭제 endpoint는 웹과 동일하게 `/posts/{postId}` GET/DELETE를 사용한다.
@@ -241,6 +245,8 @@
 - `/band/home/contents/[postId]`: 밴드 콘텐츠 상세/삭제
 - `/band/home/concerts/form`: 밴드 공연 등록/수정
 - `/band/home/concerts/[performanceId]`: 밴드 공연 상세/삭제
+- `/band/my/recruit-alert`: 밴드 모집 공고 알림 설정
+- `/band/my/live-alert`: 밴드 라이브 알림 설정
 - `/band/session`: 밴드 세션 탭
 - `/band/live`: 밴드 라이브 탭
 - `/band/my`: 밴드 마이 탭
@@ -269,6 +275,7 @@
 - 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
 - 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 상세는 아직 웹 parity 전이다.
 - 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정을 완료했다. 프로필 수정 화면은 아직 웹 parity 전이다.
+- 밴드 마이페이지는 요약, 메뉴, 밴드 알림 설정을 완료했다. 밴드 프로필/멤버/모집/지원 관리 화면은 아직 웹 parity 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
@@ -309,6 +316,7 @@
 - 팬 마이페이지 로그아웃 후 `/login` 이동
 - 팬 마이페이지 세부 목록 pagination 및 상세 이동
 - 팬 알림 설정 조회/변경 실제 API 상태 동기화
+- 밴드 알림 설정 조회/변경 실제 API 상태 동기화
 - 밴드 홈 `/users/me` 실제 API 응답 렌더링
 - 밴드 홈 `/users/me/profiles`, `/bands/{bandId}`, 콘텐츠/공연/음원 링크 실제 API 응답 렌더링
 - 밴드 콘텐츠 상세 `/posts/{postId}` 실제 API 응답 렌더링 및 삭제 후 목록 갱신
@@ -323,8 +331,8 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `96fa975`
+- 최근 완료 커밋: `3145453`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-밴드 알림 설정 화면과 notification settings API를 연결한다.
+팬 콘텐츠 상세 route와 콘텐츠 좋아요/댓글 API를 연결한다.
