@@ -82,7 +82,7 @@ export function SplashScreen() {
       <Svg
         width="100%"
         height="100%"
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         pointerEvents="none"
       >
         <Defs>
