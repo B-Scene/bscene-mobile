@@ -85,12 +85,24 @@ export function BandMyScreen() {
 
           <MenuSection
             title="현재 선택된 밴드 관리"
-            items={[
-              { label: "밴드 프로필 관리" },
-              { label: "멤버 관리" },
-              { label: "모집 공고 관리" },
-              { label: "받은 지원 관리", href: "/band/my/applications" },
-            ]}
+           items={[
+            {
+              label: "밴드 프로필 관리",
+              href: "/band/my/profile/edit",
+            },
+            {
+              label: "멤버 관리",
+              href: "/band/my/members",
+            },
+            {
+              label: "모집 공고 관리",
+              href: "/band/session",
+            },
+            {
+              label: "받은 지원 관리",
+              href: "/band/my/applications",
+            },
+          ]}
           />
 
           <MenuSection
