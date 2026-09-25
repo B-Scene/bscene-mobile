@@ -9,11 +9,18 @@ import type {
   FanExploreContent,
   FanExplorePageResponse,
   FanExplorePerformance,
+  FanExplorePostComment,
+  FanExplorePostCommentsParams,
+  FanExplorePostCommentsResponse,
+  FanExplorePostDetail,
+  FanExplorePostLikeResponse,
   FanExploreRecommendationParams,
   FanExploreSearchParams,
   NormalizedFanExploreBandsResponse,
+  NormalizedFanExplorePostComment,
   NormalizedFanExploreContentsResponse,
   NormalizedFanExplorePerformancesResponse,
+  UpsertFanExplorePostCommentRequest,
 } from "@/types/fan/explore";
 
 const assertSuccess = <T>({
@@ -170,6 +177,119 @@ const normalizeBandDetail = (result: FanExploreBandDetail) => {
   };
 };
 
+const toNumberOrNull = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const normalizePostDetail = (result: FanExplorePostDetail) => {
+  const postInfo =
+    (typeof result.content === "object" && result.content != null
+      ? result.content
+      : result.post ?? result.detail ?? result) as FanExplorePostDetail;
+  const bandInfo = postInfo.band ?? result.band;
+
+  return {
+    ...postInfo,
+    band: bandInfo,
+    postId:
+      postInfo.postId ??
+      postInfo.contentId ??
+      toNumberOrNull(postInfo.id) ??
+      undefined,
+    bandId: postInfo.bandId ?? bandInfo?.bandId ?? toNumberOrNull(bandInfo?.id) ?? undefined,
+    bandName: postInfo.bandName ?? postInfo.name ?? bandInfo?.bandName ?? bandInfo?.name,
+    profileImageUrl:
+      postInfo.profileImageUrl ??
+      postInfo.bandProfileImageUrl ??
+      bandInfo?.profileImageUrl ??
+      bandInfo?.bandProfileImageUrl ??
+      bandInfo?.imageUrl,
+    type: postInfo.type ?? postInfo.mediaType ?? postInfo.contentType,
+    likeCount: postInfo.likeCount ?? postInfo.likes ?? 0,
+    commentCount: postInfo.commentCount ?? postInfo.comments ?? 0,
+    isLiked: postInfo.isLiked ?? postInfo.liked ?? false,
+  };
+};
+
+const normalizePostLike = (
+  result: FanExplorePostLikeResponse | null | undefined,
+  fallbackIsLiked: boolean,
+) => ({
+  isLiked: result?.isLiked ?? result?.liked ?? fallbackIsLiked,
+  likeCount: result?.likeCount ?? result?.likes,
+});
+
+const normalizePostComment = (
+  result: FanExplorePostComment,
+): NormalizedFanExplorePostComment => {
+  const commentInfo = result.comment ?? result;
+  const author =
+    commentInfo.author ??
+    commentInfo.user ??
+    commentInfo.member ??
+    commentInfo.writer ??
+    commentInfo;
+
+  return {
+    commentId:
+      toNumberOrNull(commentInfo.commentId) ?? toNumberOrNull(commentInfo.id),
+    authorId:
+      toNumberOrNull(author.userId) ??
+      toNumberOrNull(author.memberId) ??
+      toNumberOrNull(author.authorId) ??
+      toNumberOrNull(author.writerId),
+    authorName:
+      author.nickname ??
+      author.authorName ??
+      author.userName ??
+      author.memberName ??
+      author.writerName ??
+      author.name ??
+      "사용자",
+    writerMode: author.writerMode ?? commentInfo.writerMode ?? null,
+    profileImageUrl:
+      author.profileImageUrl ??
+      author.authorProfileImageUrl ??
+      author.userProfileImageUrl ??
+      author.memberProfileImageUrl ??
+      author.writerProfileImageUrl ??
+      null,
+    content:
+      commentInfo.content ??
+      commentInfo.body ??
+      commentInfo.text ??
+      commentInfo.commentText ??
+      "",
+    createdAt: commentInfo.createdAt ?? null,
+    updatedAt: commentInfo.updatedAt ?? null,
+    isMine:
+      commentInfo.isMine ??
+      commentInfo.mine ??
+      commentInfo.owner ??
+      commentInfo.editable ??
+      false,
+  };
+};
+
+const normalizePostComments = (
+  result: FanExplorePageResponse<FanExplorePostComment> | FanExplorePostComment[],
+): FanExplorePostCommentsResponse => {
+  const items = getItems(result).map(normalizePostComment);
+  const page = normalizeCursorPage(result);
+
+  return {
+    items,
+    myComments: items.filter((item) => item.isMine),
+    hasNext: page.hasNext,
+    nextCursor: page.nextCursor,
+  };
+};
+
 export const getRecommendedExploreBands = async ({
   size = 20,
   cursor,
@@ -217,6 +337,71 @@ export const getFanExploreBandDetail = async (bandId: number) => {
   >(`/bands/${bandId}/detail`);
 
   return normalizeBandDetail(assertSuccess(response));
+};
+
+export const getFanExplorePostDetail = async (postId: number) => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<FanExplorePostDetail>
+  >(`/posts/${postId}/detail`);
+
+  return normalizePostDetail(assertSuccess(response));
+};
+
+export const likeFanExplorePost = async (postId: number) => {
+  const response = await axiosInstance.post<
+    FanExploreApiResponse<FanExplorePostLikeResponse>
+  >(`/posts/${postId}/likes`);
+
+  return normalizePostLike(assertMutationSuccess(response), true);
+};
+
+export const unlikeFanExplorePost = async (postId: number) => {
+  const response = await axiosInstance.delete<
+    FanExploreApiResponse<FanExplorePostLikeResponse>
+  >(`/posts/${postId}/likes`);
+
+  return normalizePostLike(assertMutationSuccess(response), false);
+};
+
+export const getFanExplorePostComments = async (
+  postId: number,
+  { cursor, size = 10 }: FanExplorePostCommentsParams = {},
+) => {
+  const response = await axiosInstance.get<
+    FanExploreApiResponse<
+      FanExplorePageResponse<FanExplorePostComment> | FanExplorePostComment[]
+    >
+  >(`/posts/${postId}/comments`, {
+    params: removeEmptyParams({ cursor, size }),
+  });
+
+  return normalizePostComments(assertSuccess(response));
+};
+
+export const createFanExplorePostComment = async (
+  postId: number,
+  body: UpsertFanExplorePostCommentRequest,
+) => {
+  const response = await axiosInstance.post<
+    FanExploreApiResponse<FanExplorePostComment | null>
+  >(`/posts/${postId}/comments`, body);
+  const result = assertMutationSuccess(response);
+
+  return result ? normalizePostComment(result) : null;
+};
+
+export const deleteFanExplorePostComment = async ({
+  postId,
+  commentId,
+}: {
+  postId: number;
+  commentId: number;
+}) => {
+  const response = await axiosInstance.delete<FanExploreApiResponse<null>>(
+    `/posts/${postId}/comments/${commentId}`,
+  );
+
+  return assertMutationSuccess(response);
 };
 
 export const searchFanExploreBands = async ({

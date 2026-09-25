@@ -394,14 +394,16 @@ function ContentRow({ item }: { item: ExploreContentItem }) {
       </View>
       <View style={styles.actions}>
         <AppButton
-          label="밴드"
+          label="보기"
           variant="ghost"
-          disabled={item.bandId == null}
+          disabled={item.postId == null}
           style={styles.compactButton}
           onPress={() => {
-            if (item.bandId == null) return;
+            if (item.postId == null) return;
             router.push(
-              `/fan/bands/${item.bandId}` as Parameters<typeof router.push>[0],
+              `/fan/explore/contents/${item.postId}` as Parameters<
+                typeof router.push
+              >[0],
             );
           }}
         />
