@@ -27,7 +27,8 @@
 - Phase 22 밴드 알림 설정: 1차 API 연동 완료
 - Phase 23 팬 콘텐츠 상세/상호작용: 1차 API 연동 완료
 - Phase 24 밴드 세션 모집: 목록/상세 1차 API 연동 완료
-- 전체 기준 대략 57%
+- Phase 25 밴드 세션 모집 관리: 등록/수정/삭제 1차 API 연동 완료
+- 전체 기준 대략 59%
 
 ## 완료된 작업
 
@@ -95,15 +96,18 @@
 - 밴드 세션 탭 placeholder를 실제 세션 모집 목록 화면으로 교체했다.
 - 세션 모집 목록 `/sessions/recruitments`, 상세 `/sessions/recruitments/{sessionRecruitmentId}`, 관심 등록/해제 `/sessions/recruitments/{sessionRecruitmentId}/interest` API를 연결했다.
 - 밴드 세션 모집 상세 route `/band/session/recruitments/[recruitmentId]`를 추가했다.
+- 밴드 세션 모집 등록/수정 route `/band/session/recruitments/form`을 추가했다.
+- 세션 모집 등록 `/sessions/recruitments`, 수정 `/sessions/recruitments/{sessionRecruitmentId}`, 수정 정보 `/sessions/recruitments/{sessionRecruitmentId}/edit`, 삭제 `/sessions/recruitments/{sessionRecruitmentId}` API를 연결했다.
+- 밴드 세션 목록과 상세 화면에서 모집 공고 등록/수정/삭제 진입을 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정, 밴드 세션 모집 목록/상세를 구현한 상태. 다음은 밴드 세션 모집 등록/수정/삭제 또는 지원서/지원자 관리 API 연동이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정, 밴드 세션 모집 목록/상세/등록/수정/삭제를 구현한 상태. 다음은 밴드 세션 지원서/지원자 관리 API 연동이다.
 
 ## 다음에 해야 할 작업
 
-1. 밴드 세션 모집 등록/수정/삭제 API와 form을 연결한다.
+1. 밴드 세션 지원서/지원자 관리 API를 연결한다.
 2. 팬 콘텐츠 댓글 수정/페이지네이션 UX를 보강한다.
 3. Band home 네이티브 파일 업로드/이미지 선택 UX를 보강한다.
 
@@ -219,7 +223,8 @@
 - 밴드 콘텐츠 등록/수정 endpoint는 웹과 동일하게 `/bands/{bandId}/posts` POST, `/posts/{postId}` PUT을 사용한다.
 - 밴드 공연 상세/삭제 endpoint는 웹과 동일하게 `/performances/{performanceId}` GET/DELETE를 사용한다.
 - 밴드 공연 등록/수정 endpoint는 웹과 동일하게 `/bands/{bandId}/performances` POST, `/performances/{performanceId}` PATCH를 사용한다.
-- 밴드 세션 모집 endpoint는 웹과 동일하게 `/sessions/recruitments`, `/sessions/recruitments/{sessionRecruitmentId}`, `/sessions/recruitments/{sessionRecruitmentId}/interest`를 사용한다.
+- 밴드 세션 모집 endpoint는 웹과 동일하게 `/sessions/recruitments`, `/sessions/recruitments/{sessionRecruitmentId}`, `/sessions/recruitments/{sessionRecruitmentId}/edit`, `/sessions/recruitments/{sessionRecruitmentId}/interest`를 사용한다.
+- 밴드 세션 모집 등록 payload의 `bandMemberId`는 현재 모바일 밴드 마이 요약의 `bandMemberProfileId`를 사용한다. 실제 백엔드 응답/권한 검증에서 `bandMemberId`와 profile id 매핑 확인이 필요하다.
 - Genre/region 목록은 API query를 사용하되, env/API 미설정 상태에서도 화면 확인이 가능하도록 임시 fallback label을 두었다.
 
 ## 인증 관련 결정사항
@@ -260,6 +265,7 @@
 - `/band/my/live-alert`: 밴드 라이브 알림 설정
 - `/band/session`: 밴드 세션 탭
 - `/band/session/recruitments/[recruitmentId]`: 밴드 세션 모집 공고 상세
+- `/band/session/recruitments/form`: 밴드 세션 모집 공고 등록/수정
 - `/band/live`: 밴드 라이브 탭
 - `/band/my`: 밴드 마이 탭
 - `/onboarding/agreement`
@@ -288,7 +294,7 @@
 - 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 콘텐츠 상세/좋아요/댓글, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 댓글 수정/페이지네이션 UX는 아직 웹 parity 전이다.
 - 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정을 완료했다. 프로필 수정 화면은 아직 웹 parity 전이다.
 - 밴드 마이페이지는 요약, 메뉴, 밴드 알림 설정을 완료했다. 밴드 프로필/멤버/모집/지원 관리 화면은 아직 웹 parity 전이다.
-- 밴드 세션은 모집 목록/상세/관심 토글을 완료했다. 모집 등록/수정/삭제, 지원서/지원자 관리, 세션 찾기는 아직 웹 parity 전이다.
+- 밴드 세션은 모집 목록/상세/등록/수정/삭제/관심 토글을 완료했다. 지원서/지원자 관리, 세션 찾기, 모집 공고 페이지네이션은 아직 웹 parity 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
@@ -338,6 +344,8 @@
 - 밴드 공연 상세 `/performances/{performanceId}` 실제 API 응답 렌더링 및 삭제 후 목록 갱신
 - 밴드 공연 등록/수정 `/bands/{bandId}/performances`, `/performances/{performanceId}` 실제 API 저장 및 상세 이동
 - 밴드 세션 모집 목록/상세/관심 `/sessions/recruitments` 실제 API 상태 동기화
+- 밴드 세션 모집 등록/수정/삭제 `/sessions/recruitments` 실제 API 저장, 상세 이동, 목록 갱신
+- 밴드 세션 모집 등록 payload의 `bandMemberId`와 모바일 `bandMemberProfileId` 매핑 검증
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -346,8 +354,8 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `3026cfe`
+- 최근 완료 커밋: `01676ba`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-밴드 세션 모집 등록/수정/삭제 API와 form을 연결한다.
+밴드 세션 지원서/지원자 관리 API를 연결한다.
