@@ -1,8 +1,25 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  router,
+  useLocalSearchParams,
+} from "expo-router";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { useApplicationSubmissionDetailQuery } from "@/hooks/api/session/useSessionApplication";
-import { useAcceptApplicationSubmissionMutation } from "@/hooks/api/user/useReceivedApplications";
+import {
+  useApplicationSubmissionDetailQuery,
+} from "@/hooks/api/session/useSessionApplication";
+import {
+  useCreateChatRoomMutation,
+} from "@/hooks/api/session/useSessionChat";
+import {
+  useAcceptApplicationSubmissionMutation,
+} from "@/hooks/api/user/useReceivedApplications";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -10,66 +27,184 @@ import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
 import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
-import { colors, radius, spacing } from "@/shared/constants/theme";
-import type { ApplicantStatus } from "@/types/user/receivedApplications";
+import {
+  colors,
+  radius,
+  spacing,
+} from "@/shared/constants/theme";
+import type {
+  ApplicantStatus,
+} from "@/types/user/receivedApplications";
 
-const parseRouteId = (value?: string | string[]) => {
-  const rawValue = Array.isArray(value) ? value[0] : value;
-  const parsed = Number(rawValue);
+const parseRouteId = (
+  value?: string | string[],
+) => {
+  const rawValue =
+    Array.isArray(value)
+      ? value[0]
+      : value;
 
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  const parsed =
+    Number(rawValue);
+
+  return Number.isFinite(parsed) &&
+    parsed > 0
+    ? parsed
+    : 0;
 };
 
-const formatDeadline = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+const formatDeadline = (
+  value: string,
+) => {
+  const date =
+    new Date(value);
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hour = String(date.getHours()).padStart(2, "0");
-  const minute = String(date.getMinutes()).padStart(2, "0");
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return value;
+  }
+
+  const year =
+    date.getFullYear();
+
+  const month = String(
+    date.getMonth() + 1,
+  ).padStart(2, "0");
+
+  const day = String(
+    date.getDate(),
+  ).padStart(2, "0");
+
+  const hour = String(
+    date.getHours(),
+  ).padStart(2, "0");
+
+  const minute = String(
+    date.getMinutes(),
+  ).padStart(2, "0");
 
   return `${year}.${month}.${day}. ${hour}:${minute}`;
 };
 
-const splitGenres = (value: string) =>
+const splitGenres = (
+  value: string,
+) =>
   value
     .split(/[,/·]/)
-    .map((item) => item.trim())
+    .map((item) =>
+      item.trim(),
+    )
     .filter(Boolean);
 
 export function BandApplicationDetailScreen() {
-  const params = useLocalSearchParams<{
-    applySubmissionId?: string;
-    status?: ApplicantStatus;
-  }>();
-  const applySubmissionId = parseRouteId(params.applySubmissionId);
-  const query = useApplicationSubmissionDetailQuery(applySubmissionId);
-  const acceptMutation = useAcceptApplicationSubmissionMutation();
-  const detail = query.data;
-  const isAlreadyDecided = params.status != null && params.status !== "PENDING";
+  const params =
+    useLocalSearchParams<{
+      applySubmissionId?: string;
+      status?: ApplicantStatus;
+    }>();
 
-  const decide = (isApproved: boolean) => {
+  const applySubmissionId =
+    parseRouteId(
+      params.applySubmissionId,
+    );
+
+  const query =
+    useApplicationSubmissionDetailQuery(
+      applySubmissionId,
+    );
+
+  const acceptMutation =
+    useAcceptApplicationSubmissionMutation();
+
+  const createChatMutation =
+    useCreateChatRoomMutation();
+
+  const detail = query.data;
+
+  const isAlreadyDecided =
+    params.status != null &&
+    params.status !== "PENDING";
+
+  const openChat = async () => {
+    if (
+      applySubmissionId <= 0 ||
+      createChatMutation.isPending
+    ) {
+      return;
+    }
+
+    try {
+      const room =
+        await createChatMutation.mutateAsync(
+          {
+            contextType:
+              "RECRUITMENT",
+
+            applicationSubmissionId:
+              applySubmissionId,
+          },
+        );
+
+      router.push(
+        `/band/session/messages/${room.chatRoomId}` as Parameters<
+          typeof router.push
+        >[0],
+      );
+    } catch {
+      Alert.alert(
+        "쪽지",
+        "채팅방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.",
+      );
+    }
+  };
+
+  const decide = (
+    isApproved: boolean,
+  ) => {
     Alert.alert(
-      isApproved ? "지원 수락" : "지원 거절",
-      isApproved ? "이 지원자를 수락할까요?" : "이 지원자를 거절할까요?",
+      isApproved
+        ? "지원 수락"
+        : "지원 거절",
+
+      isApproved
+        ? "이 지원자를 수락할까요?"
+        : "이 지원자를 거절할까요?",
+
       [
-        { text: "취소", style: "cancel" },
         {
-          text: isApproved ? "수락" : "거절",
-          style: isApproved ? "default" : "destructive",
+          text: "취소",
+          style: "cancel",
+        },
+
+        {
+          text: isApproved
+            ? "수락"
+            : "거절",
+
+          style: isApproved
+            ? "default"
+            : "destructive",
+
           onPress: () => {
             void (async () => {
               try {
-                await acceptMutation.mutateAsync({
-                  applySubmissionId,
-                  isApproved,
-                });
+                await acceptMutation.mutateAsync(
+                  {
+                    applySubmissionId,
+                    isApproved,
+                  },
+                );
+
                 router.back();
               } catch {
                 Alert.alert(
-                  isApproved ? "지원 수락" : "지원 거절",
+                  isApproved
+                    ? "지원 수락"
+                    : "지원 거절",
+
                   isApproved
                     ? "지원 수락에 실패했어요."
                     : "지원 거절에 실패했어요.",
@@ -83,121 +218,351 @@ export function BandApplicationDetailScreen() {
   };
 
   return (
-    <Screen contentStyle={styles.container}>
+    <Screen
+      contentStyle={
+        styles.container
+      }
+    >
       <AppHeader title="지원서 상세" />
 
       {query.isLoading ? (
-        <AppState loading title="지원서 정보를 불러오는 중이에요" />
-      ) : query.isError || !detail ? (
+        <AppState
+          loading
+          title="지원서 정보를 불러오는 중이에요"
+        />
+      ) : query.isError ||
+        !detail ? (
         <AppState
           title="지원서 정보를 불러오지 못했어요"
           description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
           actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
+          onAction={() =>
+            void query.refetch()
+          }
         />
       ) : (
         <>
-          <AppCard style={styles.recruitmentCard}>
-            <Text style={styles.sectionEyebrow}>지원 공고</Text>
-            <Text style={styles.recruitmentTitle}>
-              {detail.recruitmentTitle} · {detail.bandName}
+          <AppCard
+            style={
+              styles.recruitmentCard
+            }
+          >
+            <Text
+              style={
+                styles.sectionEyebrow
+              }
+            >
+              지원 공고
             </Text>
-            <Text style={styles.meta}>모집 마감 {formatDeadline(detail.deadlineAt)}</Text>
+
+            <Text
+              style={
+                styles.recruitmentTitle
+              }
+            >
+              {
+                detail.recruitmentTitle
+              }{" "}
+              · {detail.bandName}
+            </Text>
+
+            <Text
+              style={styles.meta}
+            >
+              모집 마감{" "}
+              {formatDeadline(
+                detail.deadlineAt,
+              )}
+            </Text>
           </AppCard>
 
-          <AppCard style={styles.profileCard}>
+          <AppCard
+            style={
+              styles.profileCard
+            }
+          >
             <Avatar
-              imageUrl={detail.profileImageUrl}
+              imageUrl={
+                detail.profileImageUrl
+              }
               label={detail.nickname}
               size={76}
             />
-            <View style={styles.profileText}>
-              <Text style={styles.profileTitle}>{detail.part} 세션 지원합니다</Text>
-              <Text style={styles.nickname}>{detail.nickname}</Text>
-              <Text style={styles.meta}>
-                {[detail.part, detail.skillLevel, detail.region]
+
+            <View
+              style={
+                styles.profileText
+              }
+            >
+              <Text
+                style={
+                  styles.profileTitle
+                }
+              >
+                {detail.part} 세션
+                지원합니다
+              </Text>
+
+              <Text
+                style={
+                  styles.nickname
+                }
+              >
+                {detail.nickname}
+              </Text>
+
+              <Text
+                style={styles.meta}
+              >
+                {[
+                  detail.part,
+                  detail.skillLevel,
+                  detail.region,
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </Text>
             </View>
           </AppCard>
 
+          <AppButton
+            label="지원자에게 쪽지 보내기"
+            variant="secondary"
+            loading={
+              createChatMutation.isPending
+            }
+            onPress={() =>
+              void openChat()
+            }
+          />
+
           <Section title="세션 소개">
-            <Text style={styles.quote}>“{detail.oneLineIntro}”</Text>
-            <Text style={styles.body}>{detail.intro}</Text>
+            <Text
+              style={styles.quote}
+            >
+              “
+              {
+                detail.oneLineIntro
+              }
+              ”
+            </Text>
+
+            <Text
+              style={styles.body}
+            >
+              {detail.intro}
+            </Text>
           </Section>
 
           <Section title="세션 정보">
-            <InfoGroup label="파트" values={[detail.part]} />
-            <InfoGroup label="실력대" values={[detail.skillLevel]} />
-            <InfoGroup label="선호 장르" values={splitGenres(detail.genre)} />
-            <InfoGroup label="활동 지역" values={[detail.region]} />
-            <InfoGroup label="가능한 활동" values={detail.availableActivities} />
+            <InfoGroup
+              label="파트"
+              values={[
+                detail.part,
+              ]}
+            />
+
+            <InfoGroup
+              label="실력대"
+              values={[
+                detail.skillLevel,
+              ]}
+            />
+
+            <InfoGroup
+              label="선호 장르"
+              values={splitGenres(
+                detail.genre,
+              )}
+            />
+
+            <InfoGroup
+              label="활동 지역"
+              values={[
+                detail.region,
+              ]}
+            />
+
+            <InfoGroup
+              label="가능한 활동"
+              values={
+                detail.availableActivities
+              }
+            />
           </Section>
 
           <Section title="경력">
-            {detail.careers.length > 0 ? (
-              detail.careers.map((career) => (
-                <View key={career.sessionApplicationCareerId} style={styles.career}>
-                  <Text style={styles.careerPeriod}>{career.period}</Text>
-                  <Text style={styles.careerTitle}>{career.name}</Text>
-                  <Text style={styles.body}>{career.description}</Text>
-                </View>
-              ))
+            {detail.careers.length >
+            0 ? (
+              detail.careers.map(
+                (career) => (
+                  <View
+                    key={
+                      career.sessionApplicationCareerId
+                    }
+                    style={
+                      styles.career
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.careerPeriod
+                      }
+                    >
+                      {career.period}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.careerTitle
+                      }
+                    >
+                      {career.name}
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.body
+                      }
+                    >
+                      {
+                        career.description
+                      }
+                    </Text>
+                  </View>
+                ),
+              )
             ) : (
-              <Text style={styles.meta}>등록된 경력이 없어요.</Text>
+              <Text
+                style={styles.meta}
+              >
+                등록된 경력이
+                없어요.
+              </Text>
             )}
           </Section>
 
           <Section title="포트폴리오">
-            {detail.portfolioLinks.length > 0 ? (
-              detail.portfolioLinks.map((link) => (
-                <Pressable
-                  key={link.sessionApplicationLinkId}
-                  accessibilityRole="link"
-                  style={styles.linkRow}
-                  onPress={() => void Linking.openURL(link.url)}
-                >
-                  <View style={styles.linkText}>
-                    <Text style={styles.linkTitle}>{link.title ?? link.url}</Text>
-                    <Text numberOfLines={1} style={styles.meta}>
-                      {link.url}
+            {detail.portfolioLinks
+              .length > 0 ? (
+              detail.portfolioLinks.map(
+                (link) => (
+                  <Pressable
+                    key={
+                      link.sessionApplicationLinkId
+                    }
+                    accessibilityRole="link"
+                    style={
+                      styles.linkRow
+                    }
+                    onPress={() =>
+                      void Linking.openURL(
+                        link.url,
+                      )
+                    }
+                  >
+                    <View
+                      style={
+                        styles.linkText
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.linkTitle
+                        }
+                      >
+                        {link.title ??
+                          link.url}
+                      </Text>
+
+                      <Text
+                        numberOfLines={
+                          1
+                        }
+                        style={
+                          styles.meta
+                        }
+                      >
+                        {link.url}
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={
+                        styles.linkAction
+                      }
+                    >
+                      열기
                     </Text>
-                  </View>
-                  <Text style={styles.linkAction}>열기</Text>
-                </Pressable>
-              ))
+                  </Pressable>
+                ),
+              )
             ) : (
-              <Text style={styles.meta}>등록된 포트폴리오가 없어요.</Text>
+              <Text
+                style={styles.meta}
+              >
+                등록된 포트폴리오가
+                없어요.
+              </Text>
             )}
           </Section>
 
           {isAlreadyDecided ? (
-            <Text style={styles.decidedText}>이미 처리되었거나 취소된 지원이에요.</Text>
+            <Text
+              style={
+                styles.decidedText
+              }
+            >
+              이미 처리되었거나
+              취소된 지원이에요.
+            </Text>
           ) : null}
 
-          <View style={styles.decisionActions}>
+          <View
+            style={
+              styles.decisionActions
+            }
+          >
             <AppButton
               label="거절"
               variant="secondary"
-              disabled={isAlreadyDecided}
-              loading={acceptMutation.isPending}
-              style={styles.decisionButton}
-              onPress={() => decide(false)}
+              disabled={
+                isAlreadyDecided
+              }
+              loading={
+                acceptMutation.isPending
+              }
+              style={
+                styles.decisionButton
+              }
+              onPress={() =>
+                decide(false)
+              }
             />
+
             <AppButton
               label="수락"
-              disabled={isAlreadyDecided}
-              loading={acceptMutation.isPending}
-              style={styles.decisionButton}
-              onPress={() => decide(true)}
+              disabled={
+                isAlreadyDecided
+              }
+              loading={
+                acceptMutation.isPending
+              }
+              style={
+                styles.decisionButton
+              }
+              onPress={() =>
+                decide(true)
+              }
             />
           </View>
 
           <AppButton
             label="지원자 목록으로"
             variant="secondary"
-            onPress={() => router.back()}
+            onPress={() =>
+              router.back()
+            }
           />
         </>
       )}
@@ -213,153 +578,219 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <AppCard style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <AppCard
+      style={styles.section}
+    >
+      <Text
+        style={
+          styles.sectionTitle
+        }
+      >
+        {title}
+      </Text>
+
       {children}
     </AppCard>
   );
 }
 
-function InfoGroup({ label, values }: { label: string; values: string[] }) {
-  const filteredValues = values.filter(Boolean);
+function InfoGroup({
+  label,
+  values,
+}: {
+  label: string;
+  values: string[];
+}) {
+  const filteredValues =
+    values.filter(Boolean);
 
   return (
-    <View style={styles.infoGroup}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <View style={styles.badges}>
-        {filteredValues.length > 0 ? (
-          filteredValues.map((value) => <Badge key={value} label={value} />)
+    <View
+      style={styles.infoGroup}
+    >
+      <Text
+        style={styles.infoLabel}
+      >
+        {label}
+      </Text>
+
+      <View
+        style={styles.badges}
+      >
+        {filteredValues.length >
+        0 ? (
+          filteredValues.map(
+            (value) => (
+              <Badge
+                key={value}
+                label={value}
+              />
+            ),
+          )
         ) : (
-          <Text style={styles.meta}>미입력</Text>
+          <Text
+            style={styles.meta}
+          >
+            미입력
+          </Text>
         )}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    gap: spacing.lg,
-  },
-  recruitmentCard: {
-    gap: spacing.xs,
-  },
-  sectionEyebrow: {
-    color: colors.neutral600,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  recruitmentTitle: {
-    color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "900",
-    lineHeight: 24,
-  },
-  meta: {
-    color: colors.neutral600,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  profileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.lg,
-  },
-  profileText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  profileTitle: {
-    color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 24,
-  },
-  nickname: {
-    color: colors.neutral800,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  section: {
-    gap: spacing.md,
-  },
-  sectionTitle: {
-    color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  quote: {
-    color: colors.secondary600,
-    fontSize: 15,
-    fontWeight: "800",
-    lineHeight: 22,
-  },
-  body: {
-    color: colors.neutral800,
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  infoGroup: {
-    gap: spacing.sm,
-  },
-  infoLabel: {
-    color: colors.neutral800,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  badges: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
-  career: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.secondary400,
-    gap: spacing.xs,
-    paddingLeft: spacing.md,
-  },
-  careerPeriod: {
-    color: colors.neutral500,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  careerTitle: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  linkRow: {
-    minHeight: 56,
-    borderRadius: radius.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  linkText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  linkTitle: {
-    color: colors.neutral900,
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  linkAction: {
-    color: colors.secondary600,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  decidedText: {
-    color: colors.neutral600,
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  decisionActions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  decisionButton: {
-    flex: 1,
-  },
-});
+const styles =
+  StyleSheet.create({
+    container: {
+      gap: spacing.lg,
+    },
+
+    recruitmentCard: {
+      gap: spacing.xs,
+    },
+
+    sectionEyebrow: {
+      color: colors.neutral600,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+
+    recruitmentTitle: {
+      color: colors.neutral900,
+      fontSize: 17,
+      fontWeight: "900",
+      lineHeight: 24,
+    },
+
+    meta: {
+      color: colors.neutral600,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+
+    profileCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.lg,
+    },
+
+    profileText: {
+      flex: 1,
+      gap: spacing.xs,
+    },
+
+    profileTitle: {
+      color: colors.neutral900,
+      fontSize: 18,
+      fontWeight: "900",
+      lineHeight: 24,
+    },
+
+    nickname: {
+      color: colors.neutral800,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    section: {
+      gap: spacing.md,
+    },
+
+    sectionTitle: {
+      color: colors.neutral900,
+      fontSize: 17,
+      fontWeight: "900",
+    },
+
+    quote: {
+      color: colors.secondary600,
+      fontSize: 15,
+      fontWeight: "800",
+      lineHeight: 22,
+    },
+
+    body: {
+      color: colors.neutral800,
+      fontSize: 14,
+      lineHeight: 22,
+    },
+
+    infoGroup: {
+      gap: spacing.sm,
+    },
+
+    infoLabel: {
+      color: colors.neutral800,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    badges: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+    },
+
+    career: {
+      borderLeftWidth: 3,
+      borderLeftColor:
+        colors.secondary400,
+      gap: spacing.xs,
+      paddingLeft:
+        spacing.md,
+    },
+
+    careerPeriod: {
+      color: colors.neutral500,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+
+    careerTitle: {
+      color: colors.neutral900,
+      fontSize: 15,
+      fontWeight: "900",
+    },
+
+    linkRow: {
+      minHeight: 56,
+      borderRadius:
+        radius.sm,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+    },
+
+    linkText: {
+      flex: 1,
+      gap: spacing.xs,
+    },
+
+    linkTitle: {
+      color: colors.neutral900,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    linkAction: {
+      color: colors.secondary600,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
+    decidedText: {
+      color: colors.neutral600,
+      fontSize: 13,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+
+    decisionActions: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+
+    decisionButton: {
+      flex: 1,
+    },
+  });
