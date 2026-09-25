@@ -1,4 +1,7 @@
-import { AxiosError } from "axios";
+import {
+  AxiosError,
+  type AxiosResponse,
+} from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
@@ -10,6 +13,7 @@ import type {
   CancelSessionApplicationSubmissionResponse,
   CreateSessionApplicationRequest,
   CreateSessionApplicationResponse,
+  DeleteSessionApplicationResponse,
   FinalizeApplicationSubmissionRequest,
   FinalizeApplicationSubmissionResponse,
   MySessionApplicationDetailResponse,
@@ -35,12 +39,10 @@ const removeEmptyParams = (
   );
 
 const assertSuccess = <T>(
-  response: Awaited<
-    ReturnType<
-      typeof axiosInstance.get<SessionApiResponse<T>>
-    >
+  response: AxiosResponse<
+    SessionApiResponse<T>
   >,
-) => {
+): T => {
   const { data } = response;
 
   if (
@@ -60,12 +62,10 @@ const assertSuccess = <T>(
 };
 
 const assertNullableSuccess = <T>(
-  response: Awaited<
-    ReturnType<
-      typeof axiosInstance.get<SessionApiResponse<T>>
-    >
+  response: AxiosResponse<
+    SessionApiResponse<T>
   >,
-) => {
+): T => {
   const { data } = response;
 
   if (!data.isSuccess) {
@@ -86,7 +86,9 @@ export const getMySessionApplicationSummary =
     const response =
       await axiosInstance.get<
         SessionApiResponse<SessionApplicationSummaryResponse>
-      >("/sessions/applications/summary");
+      >(
+        "/sessions/applications/summary",
+      );
 
     return assertSuccess(response);
   };
@@ -147,7 +149,9 @@ export const deleteSessionApplication =
         `/sessions/applications/${sessionApplicationId}`,
       );
 
-    return assertNullableSuccess(response);
+    return assertNullableSuccess(
+      response,
+    );
   };
 
 export const updateSessionApplicationVisibility =
@@ -229,7 +233,9 @@ export const cancelSessionApplicationSubmission =
         `/sessions/applications/submissions/${applicationSubmissionId}`,
       );
 
-    return assertNullableSuccess(response);
+    return assertNullableSuccess(
+      response,
+    );
   };
 
 export const finalizeApplicationSubmission =
@@ -247,5 +253,7 @@ export const finalizeApplicationSubmission =
         body,
       );
 
-    return assertNullableSuccess(response);
+    return assertNullableSuccess(
+      response,
+    );
   };
