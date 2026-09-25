@@ -1,4 +1,5 @@
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -14,17 +15,22 @@ import {
   getApplicationSubmissions,
   getMySessionApplicationDetail,
   getMySessionApplicationSummary,
+  getSessionApplicationDetail,
+  getSessionApplicationsSearch,
   updateSessionApplication,
   updateSessionApplicationVisibility,
 } from "@/api/session/sessionApplication";
+
 import {
   sessionRecruitmentKeys,
 } from "@/hooks/api/session/useSessionRecruitment";
+
 import type {
   ApplicationSubmissionsParams,
   ApplySessionRecruitmentRequest,
   CreateSessionApplicationRequest,
   FinalizeApplicationSubmissionRequest,
+  SessionApplicationSearchParams,
   UpdateSessionApplicationRequest,
   UpdateSessionApplicationVisibilityRequest,
 } from "@/types/session/sessionApplication";
@@ -32,6 +38,31 @@ import type {
 export const sessionApplicationKeys = {
   all: [
     "sessionApplications",
+  ] as const,
+
+  searches: () => [
+    ...sessionApplicationKeys.all,
+    "search",
+  ] as const,
+
+  searchInfinite: (
+    params: SessionApplicationSearchParams,
+  ) => [
+    ...sessionApplicationKeys.searches(),
+    "infinite",
+    params,
+  ] as const,
+
+  details: () => [
+    ...sessionApplicationKeys.all,
+    "detail",
+  ] as const,
+
+  detail: (
+    sessionApplicationId: number,
+  ) => [
+    ...sessionApplicationKeys.details(),
+    sessionApplicationId,
   ] as const,
 
   summary: () => [
@@ -72,6 +103,68 @@ export const sessionApplicationKeys = {
   ] as const,
 };
 
+export const useSessionApplicationsSearchInfiniteQuery =
+  (
+    params: SessionApplicationSearchParams = {},
+    enabled = true,
+  ) => {
+    return useInfiniteQuery({
+      queryKey:
+        sessionApplicationKeys.searchInfinite(
+          params,
+        ),
+
+      queryFn: ({
+        pageParam,
+      }) =>
+        getSessionApplicationsSearch({
+          ...params,
+          cursorId:
+            pageParam,
+        }),
+
+      initialPageParam:
+        undefined as number | undefined,
+
+      getNextPageParam: (
+        lastPage,
+      ) =>
+        lastPage.hasNext
+          ? lastPage.nextCursor ??
+            undefined
+          : undefined,
+
+      enabled,
+
+      staleTime:
+        1000 * 30,
+    });
+  };
+
+export const useSessionApplicationDetailQuery =
+  (
+    sessionApplicationId: number,
+  ) => {
+    return useQuery({
+      queryKey:
+        sessionApplicationKeys.detail(
+          sessionApplicationId,
+        ),
+
+      queryFn: () =>
+        getSessionApplicationDetail(
+          sessionApplicationId,
+        ),
+
+      enabled:
+        sessionApplicationId >
+        0,
+
+      staleTime:
+        1000 * 30,
+    });
+  };
+
 export const useMySessionApplicationSummaryQuery =
   () => {
     return useQuery({
@@ -102,7 +195,8 @@ export const useMySessionApplicationDetailQuery =
         ),
 
       enabled:
-        sessionApplicationId > 0,
+        sessionApplicationId >
+        0,
 
       staleTime:
         1000 * 30,
@@ -126,6 +220,11 @@ export const useCreateSessionApplicationMutation =
         queryClient.invalidateQueries({
           queryKey:
             sessionApplicationKeys.summary(),
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            sessionApplicationKeys.searches(),
         });
       },
     });
@@ -160,7 +259,19 @@ export const useUpdateSessionApplicationMutation =
 
         queryClient.invalidateQueries({
           queryKey:
+            sessionApplicationKeys.searches(),
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
             sessionApplicationKeys.myDetail(
+              variables.sessionApplicationId,
+            ),
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            sessionApplicationKeys.detail(
               variables.sessionApplicationId,
             ),
         });
@@ -190,9 +301,21 @@ export const useDeleteSessionApplicationMutation =
             sessionApplicationKeys.summary(),
         });
 
+        queryClient.invalidateQueries({
+          queryKey:
+            sessionApplicationKeys.searches(),
+        });
+
         queryClient.removeQueries({
           queryKey:
             sessionApplicationKeys.myDetail(
+              sessionApplicationId,
+            ),
+        });
+
+        queryClient.removeQueries({
+          queryKey:
+            sessionApplicationKeys.detail(
               sessionApplicationId,
             ),
         });
@@ -228,7 +351,19 @@ export const useUpdateSessionApplicationVisibilityMutation =
 
         queryClient.invalidateQueries({
           queryKey:
+            sessionApplicationKeys.searches(),
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
             sessionApplicationKeys.myDetail(
+              result.sessionApplicationId,
+            ),
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            sessionApplicationKeys.detail(
               result.sessionApplicationId,
             ),
         });

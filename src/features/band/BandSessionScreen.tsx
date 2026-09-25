@@ -137,53 +137,61 @@ export function BandSessionScreen() {
           styles.searchPanel
         }
       >
-        <View
-          style={
-            styles.quickActionsRow
-          }
-        >
-          <AppButton
-            label="내 지원 현황"
-            variant="secondary"
-            style={
-              styles.quickActionButton
-            }
-            onPress={() =>
-              router.push(
-                "/band/session/applications" as Parameters<
-                  typeof router.push
-                >[0],
-              )
-            }
-          />
+        <View style={styles.quickActionsRow}>
+  <AppButton
+    label="세션 찾기"
+    variant="secondary"
+    style={styles.quickActionButton}
+    onPress={() =>
+      router.push(
+        "/band/session/find" as Parameters<
+          typeof router.push
+        >[0],
+      )
+    }
+  />
 
-          <AppButton
-            label="지원서 관리"
-            variant="secondary"
-            style={
-              styles.quickActionButton
-            }
-            onPress={() =>
-              router.push(
-                "/band/session/applications/manage" as Parameters<
-                  typeof router.push
-                >[0],
-              )
-            }
-          />
-        </View>
+  <AppButton
+    label="지원서 관리"
+    variant="secondary"
+    style={styles.quickActionButton}
+    onPress={() =>
+      router.push(
+        "/band/session/applications/manage" as Parameters<
+          typeof router.push
+        >[0],
+      )
+    }
+  />
+</View>
 
-        <AppButton
-          label="쪽지함"
-          variant="secondary"
-          onPress={() =>
-            router.push(
-              "/band/session/messages" as Parameters<
-                typeof router.push
-              >[0],
-            )
-          }
-        />
+<View style={styles.quickActionsRow}>
+  <AppButton
+    label="내 지원 현황"
+    variant="secondary"
+    style={styles.quickActionButton}
+    onPress={() =>
+      router.push(
+        "/band/session/applications" as Parameters<
+          typeof router.push
+        >[0],
+      )
+    }
+  />
+
+  <AppButton
+    label="쪽지함"
+    variant="secondary"
+    style={styles.quickActionButton}
+    onPress={() =>
+      router.push(
+        "/band/session/messages" as Parameters<
+          typeof router.push
+        >[0],
+      )
+    }
+  />
+</View>
 
         <AppTextInput
           label="세션 모집 검색"

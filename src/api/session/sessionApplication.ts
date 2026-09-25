@@ -4,6 +4,7 @@ import {
 } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
+
 import type {
   ApplicationSubmissionDetailResponse,
   ApplicationSubmissionsParams,
@@ -18,6 +19,9 @@ import type {
   FinalizeApplicationSubmissionResponse,
   MySessionApplicationDetailResponse,
   SessionApiResponse,
+  SessionApplicationDetailResponse,
+  SessionApplicationSearchParams,
+  SessionApplicationSearchResponse,
   SessionApplicationSummaryResponse,
   UpdateSessionApplicationRequest,
   UpdateSessionApplicationResponse,
@@ -39,9 +43,7 @@ const removeEmptyParams = (
   );
 
 const assertSuccess = <T>(
-  response: AxiosResponse<
-    SessionApiResponse<T>
-  >,
+  response: AxiosResponse<SessionApiResponse<T>>,
 ): T => {
   const { data } = response;
 
@@ -62,9 +64,7 @@ const assertSuccess = <T>(
 };
 
 const assertNullableSuccess = <T>(
-  response: AxiosResponse<
-    SessionApiResponse<T>
-  >,
+  response: AxiosResponse<SessionApiResponse<T>>,
 ): T => {
   const { data } = response;
 
@@ -80,6 +80,39 @@ const assertNullableSuccess = <T>(
 
   return data.result;
 };
+
+export const getSessionApplicationsSearch =
+  async (
+    params: SessionApplicationSearchParams = {},
+  ) => {
+    const response =
+      await axiosInstance.get<
+        SessionApiResponse<SessionApplicationSearchResponse>
+      >(
+        "/sessions/applications/search",
+        {
+          params: removeEmptyParams(
+            params as Record<string, unknown>,
+          ),
+        },
+      );
+
+    return assertSuccess(response);
+  };
+
+export const getSessionApplicationDetail =
+  async (
+    sessionApplicationId: number,
+  ) => {
+    const response =
+      await axiosInstance.get<
+        SessionApiResponse<SessionApplicationDetailResponse>
+      >(
+        `/sessions/applications/${sessionApplicationId}`,
+      );
+
+    return assertSuccess(response);
+  };
 
 export const getMySessionApplicationSummary =
   async () => {
@@ -211,10 +244,7 @@ export const getApplicationSubmissions =
         "/sessions/applications/submissions",
         {
           params: removeEmptyParams(
-            params as Record<
-              string,
-              unknown
-            >,
+            params as Record<string, unknown>,
           ),
         },
       );
