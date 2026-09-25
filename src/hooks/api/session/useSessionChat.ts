@@ -18,9 +18,11 @@ import {
   issueChatWebSocketTicket,
   leaveChatRoom,
 } from "@/api/session/sessionChat";
+import { useAuthStore } from "@/stores/useAuthStore";
 import type {
   ChatRoomDetailParams,
   ChatRoomsParams,
+  ChatRoomsResponse,
   CreateChatRoomRequest,
   DirectMessageClientFrame,
   DirectMessageData,
@@ -71,7 +73,6 @@ type IntervalHandle = ReturnType<typeof setInterval>;
 
 interface UseSessionDirectMessageSocketParams {
   chatRoomId?: number;
-
   enabled?: boolean;
 
   onMessage?: (
@@ -117,10 +118,7 @@ export const useChatRoomsQuery = (
 ) => {
   return useQuery({
     queryKey: sessionChatKeys.roomList(params),
-
-    queryFn: () =>
-      getChatRooms(params),
-
+    queryFn: () => getChatRooms(params),
     staleTime: 1000 * 15,
   });
 };
@@ -134,12 +132,9 @@ export const useChatRoomDetailQuery = (
       chatRoomId,
       params,
     ),
-
     queryFn: () =>
       getChatRoomDetail(chatRoomId, params),
-
     enabled: chatRoomId > 0,
-
     staleTime: 1000 * 10,
   });
 };
@@ -192,9 +187,7 @@ export const useSessionDirectMessageSocket = ({
     useRef<TimeoutHandle | null>(null);
 
   const shouldReconnectRef = useRef(false);
-
   const reconnectAttemptRef = useRef(0);
-
   const connectionGenerationRef = useRef(0);
 
   const ticketRequestRef = useRef<
@@ -245,7 +238,6 @@ export const useSessionDirectMessageSocket = ({
   const clearHeartbeat = useCallback(() => {
     if (pingTimerRef.current) {
       clearInterval(pingTimerRef.current);
-
       pingTimerRef.current = null;
     }
 
@@ -344,7 +336,6 @@ export const useSessionDirectMessageSocket = ({
 
   const closeSocket = useCallback(() => {
     shouldReconnectRef.current = false;
-
     connectionGenerationRef.current += 1;
 
     clearReconnectTimer();
@@ -369,7 +360,6 @@ export const useSessionDirectMessageSocket = ({
     }
 
     socketRef.current = null;
-
     setIsConnected(false);
   }, [
     clearHeartbeat,
@@ -400,7 +390,6 @@ export const useSessionDirectMessageSocket = ({
       }
 
       shouldReconnectRef.current = true;
-
       setLastErrorMessage("");
 
       const connectionGeneration =
@@ -453,11 +442,8 @@ export const useSessionDirectMessageSocket = ({
 
         socket.onopen = () => {
           reconnectAttemptRef.current = 0;
-
           setIsConnected(true);
-
           setLastErrorMessage("");
-
           startHeartbeat();
         };
 
@@ -572,14 +558,12 @@ export const useSessionDirectMessageSocket = ({
 
         socket.onclose = () => {
           if (
-            socketRef.current ===
-            socket
+            socketRef.current === socket
           ) {
             socketRef.current = null;
           }
 
           clearHeartbeat();
-
           setIsConnected(false);
 
           if (
@@ -656,7 +640,6 @@ export const useSessionDirectMessageSocket = ({
     }
 
     shouldReconnectRef.current = true;
-
     reconnectAttemptRef.current = 0;
 
     void connectSocketRef.current();
@@ -758,11 +741,147 @@ export const useSessionDirectMessageSocket = ({
   return {
     isConnected,
     lastErrorMessage,
-
     sendMessage,
     sendRead,
-
     reconnect: connectSocket,
     close: closeSocket,
   };
+};
+
+export const useSessionChatRoomListSocket = ({
+  enabled = true,
+}: {
+  enabled?: boolean;
+} = {}) => {
+  const queryClient = useQueryClient();
+
+  const currentUserId =
+    useAuthStore(
+      (state) => state.user?.userId,
+    );
+
+  const handleMessage =
+    useCallback(
+      (message: DirectMessageData) => {
+        const cachedRoomLists =
+          queryClient.getQueriesData<ChatRoomsResponse>({
+            queryKey:
+              sessionChatKeys.rooms(),
+          });
+
+        let hasMatchingRoom = false;
+
+        cachedRoomLists.forEach(
+          ([queryKey, cachedRooms]) => {
+            if (!cachedRooms) {
+              return;
+            }
+
+            const roomIndex =
+              cachedRooms.content.findIndex(
+                (room) =>
+                  room.chatRoomId ===
+                  message.chatRoomId,
+              );
+
+            const queryParams =
+              queryKey[2];
+
+            const filter =
+              typeof queryParams ===
+                "object" &&
+              queryParams !== null &&
+              "filter" in queryParams
+                ? (
+                    queryParams as ChatRoomsParams
+                  ).filter
+                : undefined;
+
+            const receivedFromCounterpart =
+              currentUserId == null ||
+              message.senderId !==
+                currentUserId;
+
+            if (roomIndex < 0) {
+              if (
+                filter !== "UNREAD" ||
+                receivedFromCounterpart
+              ) {
+                void queryClient.invalidateQueries({
+                  queryKey,
+                  exact: true,
+                });
+              }
+
+              return;
+            }
+
+            hasMatchingRoom = true;
+
+            const existingRoom =
+              cachedRooms.content[
+                roomIndex
+              ];
+
+            const updatedRoom = {
+              ...existingRoom,
+
+              lastMessage:
+                message.content,
+
+              lastMessageAt:
+                message.createdAt,
+
+              unreadCount:
+                receivedFromCounterpart
+                  ? existingRoom.unreadCount +
+                    1
+                  : existingRoom.unreadCount,
+            };
+
+            queryClient.setQueryData<ChatRoomsResponse>(
+              queryKey,
+              {
+                ...cachedRooms,
+
+                content: [
+                  updatedRoom,
+
+                  ...cachedRooms.content.filter(
+                    (room) =>
+                      room.chatRoomId !==
+                      message.chatRoomId,
+                  ),
+                ],
+              },
+            );
+          },
+        );
+
+        if (!hasMatchingRoom) {
+          void queryClient.invalidateQueries({
+            queryKey:
+              sessionChatKeys.rooms(),
+          });
+        }
+      },
+      [
+        currentUserId,
+        queryClient,
+      ],
+    );
+
+  const refreshRoomLists =
+    useCallback(() => {
+      void queryClient.invalidateQueries({
+        queryKey:
+          sessionChatKeys.rooms(),
+      });
+    }, [queryClient]);
+
+  return useSessionDirectMessageSocket({
+    enabled,
+    onMessage: handleMessage,
+    onConnected: refreshRoomLists,
+  });
 };
