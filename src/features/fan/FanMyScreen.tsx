@@ -140,7 +140,12 @@ export function FanMyScreen() {
           />
           <MenuSection
             title="계정"
-            items={[{ label: "내 정보 수정" }]}
+            items={[
+              {
+                label: "내 정보 수정",
+                href: "/fan/my/profile/edit",
+              },
+            ]}
             footerLabel="로그아웃"
             onFooterPress={logout}
           />

@@ -1,6 +1,10 @@
-import type { UserApiResponse } from "@/types/user/myPage";
+import type {
+  UserApiResponse,
+} from "@/types/user/myPage";
 
-export type { UserApiResponse };
+export type {
+  UserApiResponse
+};
 
 export interface FanInformationResponse {
   nickname: string;
@@ -8,3 +12,14 @@ export interface FanInformationResponse {
   genres: string[];
   regions: string[];
 }
+
+export interface UpdateFanInformationRequest {
+  nickname: string;
+  genres: string[];
+  regions: string[];
+  profileImageUrl?: string;
+  deleteProfileImage?: boolean;
+}
+
+export type UpdateFanInformationResponse =
+  FanInformationResponse;

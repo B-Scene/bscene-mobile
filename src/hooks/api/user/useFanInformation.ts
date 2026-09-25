@@ -1,15 +1,74 @@
-import { useQuery } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
-import { getFanInformation } from "@/api/user/fanInformation";
+import {
+  getFanInformation,
+  updateFanInformation,
+} from "@/api/user/fanInformation";
+
+import {
+  fanMyPageKeys,
+} from "@/hooks/api/user/useFanMyPage";
+
+import {
+  myProfilesKeys,
+} from "@/hooks/api/user/useMyProfiles";
+
+import type {
+  UpdateFanInformationRequest,
+} from "@/types/user/fanInformation";
 
 export const fanInformationKeys = {
-  all: ["fanInformation"] as const,
+  all: [
+    "fanInformation",
+  ] as const,
 };
 
-export const useFanInformationQuery = () => {
-  return useQuery({
-    queryKey: fanInformationKeys.all,
-    queryFn: getFanInformation,
-    staleTime: 1000 * 30,
-  });
-};
+export const useFanInformationQuery =
+  () => {
+    return useQuery({
+      queryKey:
+        fanInformationKeys.all,
+
+      queryFn:
+        getFanInformation,
+
+      staleTime:
+        1000 * 30,
+    });
+  };
+
+export const useUpdateFanInformation =
+  () => {
+    const queryClient =
+      useQueryClient();
+
+    return useMutation({
+      mutationFn: (
+        body: UpdateFanInformationRequest,
+      ) =>
+        updateFanInformation(
+          body,
+        ),
+
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey:
+            fanInformationKeys.all,
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            fanMyPageKeys.all,
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            myProfilesKeys.all,
+        });
+      },
+    });
+  };
