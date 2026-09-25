@@ -8,6 +8,7 @@ import type {
   NotificationSettingsResponse,
   UpdateNotificationSettingParams,
   RegisterPushTokenRequest,
+  NotificationSettingType,
 } from "@/types/notification";
 
 type RawRecord = Record<string, unknown>;
@@ -41,6 +42,27 @@ const normalizeSettingKey = (key: string) =>
     .replace(/[\s_]+/g, "-")
     .toLowerCase();
 
+const NOTIFICATION_SETTING_KEY_BY_TYPE: Record<NotificationSettingType, string> = {
+  FAN_FOLLOWED_BAND_PERFORMANCE: "new-concert",
+  FAN_PERFORMANCE_REMINDER: "concert-reminder",
+  FAN_PERFORMANCE_UPDATE: "concert-info-change",
+  FAN_FOLLOWED_BAND_LIVE_START: "followed-band-live-start",
+  FAN_SCHEDULED_LIVE_REMINDER: "upcoming-live-reminder",
+  FAN_LIVE_REPLAY_READY: "live-replay",
+  BAND_NEW_SESSION_APPLICATION: "new-applicant",
+  BAND_SESSION_APPLICATION_STATUS: "application-status",
+  BAND_SESSION_RECRUITMENT_DEADLINE: "recruit-deadline",
+  BAND_SCHEDULED_LIVE_REMINDER: "upcoming-live-reminder",
+  BAND_LIVE_START_STATUS: "live-start-status",
+};
+
+const getNotificationSettingKey = (key: string) => {
+  const mapped =
+    NOTIFICATION_SETTING_KEY_BY_TYPE[key as NotificationSettingType];
+
+  return mapped ?? normalizeSettingKey(key);
+};
+
 const getSettingItemKey = (item: RawRecord) => {
   for (const key of [
     "key",
@@ -51,7 +73,7 @@ const getSettingItemKey = (item: RawRecord) => {
     "name",
     "id",
   ]) {
-    if (typeof item[key] === "string") return normalizeSettingKey(item[key]);
+    if (typeof item[key] === "string") return getNotificationSettingKey(item[key]);
   }
 
   return null;
@@ -80,7 +102,7 @@ const normalizeNotificationSettings = (
   } else if (isRecord(source)) {
     Object.entries(source).forEach(([key, value]) => {
       const enabled = getSettingBoolean(value);
-      if (enabled !== null) values[normalizeSettingKey(key)] = enabled;
+      if (enabled !== null) values[getNotificationSettingKey(key)] = enabled;
     });
   }
 
