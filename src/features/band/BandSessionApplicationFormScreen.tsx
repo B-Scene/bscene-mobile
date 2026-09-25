@@ -1,30 +1,30 @@
 import {
-    router,
-    useLocalSearchParams,
+  router,
+  useLocalSearchParams,
 } from "expo-router";
 import {
-    Plus,
-    Trash2,
+  Plus,
+  Trash2,
 } from "lucide-react-native";
 import {
-    useEffect,
-    useMemo,
-    useState,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 import {
-    Alert,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import {
-    useCreateSessionApplicationMutation,
-    useMySessionApplicationDetailQuery,
-    useMySessionApplicationSummaryQuery,
-    useUpdateSessionApplicationMutation,
+  useCreateSessionApplicationMutation,
+  useMySessionApplicationDetailQuery,
+  useMySessionApplicationSummaryQuery,
+  useUpdateSessionApplicationMutation,
 } from "@/hooks/api/session/useSessionApplication";
 import { AppButton } from "@/shared/components/AppButton";
 import { AppCard } from "@/shared/components/AppCard";
@@ -34,12 +34,12 @@ import { AppTextInput } from "@/shared/components/AppTextInput";
 import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
 import {
-    colors,
-    radius,
-    spacing,
+  colors,
+  radius,
+  spacing,
 } from "@/shared/constants/theme";
 import type {
-    CreateSessionApplicationRequest,
+  CreateSessionApplicationRequest,
 } from "@/types/session/sessionApplication";
 
 const PART_OPTIONS = [
@@ -213,7 +213,7 @@ export function BandSessionApplicationFormScreen() {
 
   const isDefaultPurpose =
     purpose.trim() === "기본";
-
+/* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (
       initialized ||
@@ -243,6 +243,7 @@ export function BandSessionApplicationFormScreen() {
     summaryQuery.isLoading,
   ]);
 
+  /* eslint-enable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (
       !isEdit ||
