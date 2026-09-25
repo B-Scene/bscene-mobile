@@ -66,7 +66,7 @@ export function useLiveChatSocket({
     useRef(0);
 
   const lastPongRef =
-    useRef(Date.now());
+  useRef(0);
 
   const callbacksRef =
     useRef({
