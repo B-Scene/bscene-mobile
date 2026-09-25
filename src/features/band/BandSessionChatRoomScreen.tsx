@@ -399,6 +399,7 @@ export function BandSessionChatRoomScreen() {
     );
 
   const socket =
+  
     useSessionDirectMessageSocket({
       chatRoomId,
 
@@ -421,12 +422,18 @@ export function BandSessionChatRoomScreen() {
         });
       },
     });
+    const socketIsConnected =
+    socket.isConnected;
 
-  useEffect(() => {
-    sendReadRef.current =
-      socket.sendRead;
-  }, [socket.sendRead]);
+    const socketSendRead =
+    socket.sendRead;
 
+    useEffect(() => {
+      sendReadRef.current =
+        socketSendRead;
+    }, [socketSendRead]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!room) {
       return;
@@ -466,11 +473,12 @@ export function BandSessionChatRoomScreen() {
       },
     );
   }, [room]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
-    if (!socket.isConnected) {
-      return;
-    }
+    if (!socketIsConnected) {
+    return;
+  }
 
     const latestReceivedId =
       messages.reduce(
@@ -502,9 +510,9 @@ export function BandSessionChatRoomScreen() {
     }
 
     const sent =
-      socket.sendRead(
-        latestReceivedId,
-      );
+    socketSendRead(
+      latestReceivedId,
+    );
 
     if (sent) {
       lastReadMessageIdRef.current =
@@ -516,11 +524,11 @@ export function BandSessionChatRoomScreen() {
       });
     }
   }, [
-    messages,
-    queryClient,
-    socket.isConnected,
-    socket.sendRead,
-  ]);
+  messages,
+  queryClient,
+  socketIsConnected,
+  socketSendRead,
+]);
 
   useEffect(() => {
     if (messages.length === 0) {
