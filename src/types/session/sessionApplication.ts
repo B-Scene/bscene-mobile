@@ -85,3 +85,38 @@ export interface ApplicationSubmissionDetailResponse {
   careers: SessionApplicationCareer[];
   portfolioLinks: SessionApplicationPortfolioLink[];
 }
+
+export interface ApplicationSubmissionItem {
+  applicationSubmissionId: number;
+  sessionRecruitmentId: number;
+  sessionApplicationId: number;
+  checkedAt: string | null;
+  status: string;
+  recruitmentTitle: string;
+  bandName: string;
+  appliedAgo: number;
+}
+
+export interface ApplicationSubmissionsParams {
+  cursorId?: number;
+  size?: number;
+}
+
+export interface ApplicationSubmissionsResponse {
+  content: ApplicationSubmissionItem[];
+  size: number;
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
+export type CancelSessionApplicationSubmissionResponse = null;
+
+export interface FinalizeApplicationSubmissionRequest {
+  isAccepted: boolean;
+  nickname?: string;
+  part?: string;
+}
+
+export interface FinalizeApplicationSubmissionResponse {
+  bandMemberProfileId?: number | null;
+}

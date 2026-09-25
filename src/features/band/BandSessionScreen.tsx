@@ -71,6 +71,15 @@ export function BandSessionScreen() {
       />
 
       <View style={styles.searchPanel}>
+        <AppButton
+          label="내 지원 현황"
+          variant="secondary"
+          onPress={() =>
+            router.push(
+              "/band/session/applications" as Parameters<typeof router.push>[0],
+            )
+          }
+        />
         <AppTextInput
           label="세션 모집 검색"
           value={keyword}
