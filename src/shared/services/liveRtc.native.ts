@@ -1,17 +1,50 @@
-import {
-    mediaDevices,
-    registerGlobals,
-    RTCPeerConnection,
+import type {
+  RTCPeerConnection as RTCPeerConnectionType,
 } from "react-native-webrtc";
 
 import {
-    resolveLiveMediaUrl,
+  resolveLiveMediaUrl,
 } from "@/api/live/live";
 import {
-    secureTokenStorage,
+  secureTokenStorage,
 } from "@/shared/utils/secureTokenStorage";
 
-registerGlobals();
+type WebRtcModule =
+  typeof import(
+    "react-native-webrtc"
+  );
+
+let webRtcModulePromise:
+  | Promise<WebRtcModule>
+  | null = null;
+
+const loadWebRtcModule =
+  async (): Promise<WebRtcModule> => {
+    if (!webRtcModulePromise) {
+      webRtcModulePromise =
+        import(
+          "react-native-webrtc"
+        )
+          .then((module) => {
+            module.registerGlobals();
+
+            return module;
+          })
+          .catch((error) => {
+            webRtcModulePromise = null;
+
+            throw error;
+          });
+    }
+
+    try {
+      return await webRtcModulePromise;
+    } catch {
+      throw new Error(
+        "Live 송출 및 공동 진행은 Expo Go에서 지원되지 않아요. Development Build에서 테스트해 주세요.",
+      );
+    }
+  };
 
 const BASE64 =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
@@ -93,7 +126,8 @@ const getRtcAuthorization =
 
 const waitForIceGatheringComplete =
   (
-    peer: RTCPeerConnection,
+    peer:
+      RTCPeerConnectionType,
   ) => {
     return new Promise<void>(
       (resolve) => {
@@ -218,7 +252,7 @@ const deleteRtcSession =
 
 export type LiveRtcHandle = {
   peerConnection:
-    RTCPeerConnection;
+    RTCPeerConnectionType;
 
   close:
     () => Promise<void>;
@@ -228,6 +262,12 @@ export const startWhipBroadcast =
   async (
     whipUrl: string,
   ): Promise<LiveRtcHandle> => {
+    const {
+      mediaDevices,
+      RTCPeerConnection,
+    } =
+      await loadWebRtcModule();
+
     const stream =
       await mediaDevices.getUserMedia(
         {
@@ -285,12 +325,10 @@ export const startWhipBroadcast =
       sessionUrl,
       authorization,
     } =
-      await createRtcSession(
-        {
-          url: whipUrl,
-          sdpOffer,
-        },
-      );
+      await createRtcSession({
+        url: whipUrl,
+        sdpOffer,
+      });
 
     await peer.setRemoteDescription(
       {
@@ -303,21 +341,22 @@ export const startWhipBroadcast =
       peerConnection:
         peer,
 
-      close: async () => {
-        stream
-          .getTracks()
-          .forEach(
-            (track) =>
-              track.stop(),
+      close:
+        async () => {
+          stream
+            .getTracks()
+            .forEach(
+              (track) =>
+                track.stop(),
+            );
+
+          peer.close();
+
+          await deleteRtcSession(
+            sessionUrl,
+            authorization,
           );
-
-        peer.close();
-
-        await deleteRtcSession(
-          sessionUrl,
-          authorization,
-        );
-      },
+        },
     };
   };
 
@@ -325,6 +364,11 @@ export const startWhepPlayback =
   async (
     whepUrl: string,
   ): Promise<LiveRtcHandle> => {
+    const {
+      RTCPeerConnection,
+    } =
+      await loadWebRtcModule();
+
     const peer =
       new RTCPeerConnection();
 
@@ -364,12 +408,10 @@ export const startWhepPlayback =
       sessionUrl,
       authorization,
     } =
-      await createRtcSession(
-        {
-          url: whepUrl,
-          sdpOffer,
-        },
-      );
+      await createRtcSession({
+        url: whepUrl,
+        sdpOffer,
+      });
 
     await peer.setRemoteDescription(
       {
@@ -382,13 +424,14 @@ export const startWhepPlayback =
       peerConnection:
         peer,
 
-      close: async () => {
-        peer.close();
+      close:
+        async () => {
+          peer.close();
 
-        await deleteRtcSession(
-          sessionUrl,
-          authorization,
-        );
-      },
+          await deleteRtcSession(
+            sessionUrl,
+            authorization,
+          );
+        },
     };
   };
