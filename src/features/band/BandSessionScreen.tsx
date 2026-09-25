@@ -1,7 +1,14 @@
 import { router } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
   useAddSessionRecruitmentInterest,
@@ -37,6 +44,7 @@ const formatPostedAgo = (postedAgo: number) => {
 export function BandSessionScreen() {
   const [keyword, setKeyword] = useState("");
   const [sort, setSort] = useState<SessionRecruitmentSort>("LATEST");
+
   const params = useMemo(
     () => ({
       keyword,
@@ -45,6 +53,7 @@ export function BandSessionScreen() {
     }),
     [keyword, sort],
   );
+
   const query = useSessionRecruitmentsQuery(params);
   const posts = query.data?.content ?? [];
 
@@ -61,7 +70,9 @@ export function BandSessionScreen() {
             style={styles.headerButton}
             onPress={() =>
               router.push(
-                "/band/session/recruitments/form" as Parameters<typeof router.push>[0],
+                "/band/session/recruitments/form" as Parameters<
+                  typeof router.push
+                >[0],
               )
             }
           >
@@ -71,27 +82,48 @@ export function BandSessionScreen() {
       />
 
       <View style={styles.searchPanel}>
-        <AppButton
-          label="내 지원 현황"
-          variant="secondary"
-          onPress={() =>
-            router.push(
-              "/band/session/applications" as Parameters<typeof router.push>[0],
-            )
-          }
-        />
+        <View style={styles.quickActions}>
+          <AppButton
+            label="내 지원 현황"
+            variant="secondary"
+            style={styles.quickActionButton}
+            onPress={() =>
+              router.push(
+                "/band/session/applications" as Parameters<
+                  typeof router.push
+                >[0],
+              )
+            }
+          />
+
+          <AppButton
+            label="쪽지함"
+            variant="secondary"
+            style={styles.quickActionButton}
+            onPress={() =>
+              router.push(
+                "/band/session/messages" as Parameters<
+                  typeof router.push
+                >[0],
+              )
+            }
+          />
+        </View>
+
         <AppTextInput
           label="세션 모집 검색"
           value={keyword}
           placeholder="파트, 밴드명, 키워드로 검색"
           onChangeText={setKeyword}
         />
+
         <View style={styles.filterGroup}>
           <Chip
             label="최신순"
             selected={sort === "LATEST"}
             onPress={() => setSort("LATEST")}
           />
+
           <Chip
             label="마감 임박"
             selected={sort === "IMMINENT"}
@@ -116,7 +148,9 @@ export function BandSessionScreen() {
           actionLabel="모집 공고 등록"
           onAction={() =>
             router.push(
-              "/band/session/recruitments/form" as Parameters<typeof router.push>[0],
+              "/band/session/recruitments/form" as Parameters<
+                typeof router.push
+              >[0],
             )
           }
         />
@@ -139,21 +173,33 @@ export function BandSessionScreen() {
   );
 }
 
-function RecruitmentRow({ item }: { item: SessionRecruitmentListItem }) {
+function RecruitmentRow({
+  item,
+}: {
+  item: SessionRecruitmentListItem;
+}) {
   const addInterestMutation = useAddSessionRecruitmentInterest();
   const removeInterestMutation = useRemoveSessionRecruitmentInterest();
-  const isPending = addInterestMutation.isPending || removeInterestMutation.isPending;
+
+  const isPending =
+    addInterestMutation.isPending || removeInterestMutation.isPending;
 
   const toggleInterest = async () => {
     try {
       if (item.isInterested) {
-        await removeInterestMutation.mutateAsync(item.sessionRecruitmentId);
+        await removeInterestMutation.mutateAsync(
+          item.sessionRecruitmentId,
+        );
+
         return;
       }
 
       await addInterestMutation.mutateAsync(item.sessionRecruitmentId);
     } catch {
-      Alert.alert("관심 공고", "관심 상태를 변경하지 못했어요.");
+      Alert.alert(
+        "관심 공고",
+        "관심 상태를 변경하지 못했어요.",
+      );
     }
   };
 
@@ -170,28 +216,64 @@ function RecruitmentRow({ item }: { item: SessionRecruitmentListItem }) {
     >
       <AppCard style={styles.card}>
         <View style={styles.rowHeader}>
-          <Badge label={formatDday(item.dDay)} tone="yellow" />
-          {item.isNew ? <Badge label="NEW" tone="pink" /> : null}
-          {item.isMine ? <Badge label="내 공고" /> : null}
+          <Badge
+            label={formatDday(item.dDay)}
+            tone="yellow"
+          />
+
+          {item.isNew ? (
+            <Badge
+              label="NEW"
+              tone="pink"
+            />
+          ) : null}
+
+          {item.isMine ? (
+            <Badge label="내 공고" />
+          ) : null}
         </View>
-        <Text numberOfLines={1} style={styles.title}>
+
+        <Text
+          numberOfLines={1}
+          style={styles.title}
+        >
           {item.recruitmentTitle}
         </Text>
+
         <Text style={styles.meta}>
-          {[item.bandName, item.bandGenre, item.bandRegion].filter(Boolean).join(" · ")}
+          {[item.bandName, item.bandGenre, item.bandRegion]
+            .filter(Boolean)
+            .join(" · ")}
         </Text>
-        <Text numberOfLines={2} style={styles.description}>
+
+        <Text
+          numberOfLines={2}
+          style={styles.description}
+        >
           {item.summary}
         </Text>
+
         <View style={styles.rowFooter}>
           <View style={styles.badges}>
             <Badge label={item.part} />
             <Badge label={item.skillLevel} />
-            <Text style={styles.meta}>{formatPostedAgo(item.postedAgo)}</Text>
+
+            <Text style={styles.meta}>
+              {formatPostedAgo(item.postedAgo)}
+            </Text>
           </View>
+
           <AppButton
-            label={item.isInterested ? "관심 해제" : "관심"}
-            variant={item.isInterested ? "secondary" : "ghost"}
+            label={
+              item.isInterested
+                ? "관심 해제"
+                : "관심"
+            }
+            variant={
+              item.isInterested
+                ? "secondary"
+                : "ghost"
+            }
             loading={isPending}
             style={styles.compactButton}
             onPress={() => void toggleInterest()}
@@ -207,53 +289,73 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.lg,
   },
+
   searchPanel: {
     gap: spacing.md,
   },
+
+  quickActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+
+  quickActionButton: {
+    flex: 1,
+  },
+
   headerButton: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
+
   filterGroup: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
   },
+
   listContent: {
     paddingBottom: spacing.xxl,
   },
+
   card: {
     gap: spacing.md,
     marginBottom: spacing.md,
   },
+
   rowHeader: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.xs,
   },
+
   title: {
     color: colors.neutral900,
     fontSize: 17,
     fontWeight: "900",
   },
+
   meta: {
     color: colors.neutral600,
     fontSize: 12,
     lineHeight: 18,
   },
+
   description: {
     color: colors.neutral700,
     fontSize: 13,
     lineHeight: 19,
   },
+
   rowFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },
+
   badges: {
     flex: 1,
     flexDirection: "row",
@@ -261,10 +363,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs,
   },
+
   compactButton: {
     minHeight: 38,
     paddingHorizontal: spacing.md,
   },
+
   footerText: {
     color: colors.neutral600,
     fontSize: 12,
