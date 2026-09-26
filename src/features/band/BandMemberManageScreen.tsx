@@ -4,6 +4,7 @@ import {
 
 import {
     Alert,
+    Pressable,
     StyleSheet,
     Text,
     View,
@@ -22,17 +23,13 @@ import {
     useActiveBandId,
 } from "@/hooks/api/user/useMyProfiles";
 
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
 
 import {
     colors,
-    spacing,
 } from "@/shared/constants/theme";
 
 const PART_LABELS:
@@ -166,7 +163,7 @@ export function BandMemberManageScreen() {
     >
       <AppHeader title="멤버 관리" />
 
-      <AppCard
+      <View
         style={
           styles.bandCard
         }
@@ -213,9 +210,8 @@ export function BandMemberManageScreen() {
         </View>
 
         {viewerIsOwner ? (
-          <AppButton
-            label="멤버 초대"
-            variant="secondary"
+          <Pressable
+            accessibilityRole="button"
             style={
               styles.inviteButton
             }
@@ -226,167 +222,163 @@ export function BandMemberManageScreen() {
                 >[0],
               )
             }
-          />
+          >
+            <Text style={styles.inviteButtonText}>멤버 초대</Text>
+          </Pressable>
         ) : null}
-      </AppCard>
+      </View>
 
-      <Text
-        style={
-          styles.sectionTitle
-        }
-      >
-        현재 멤버
-      </Text>
+      <View style={styles.memberList}>
+        <Text style={styles.sectionTitle}>현재 멤버</Text>
 
-      {activeMembers.map(
-        (member) => {
-          const name =
-            member.profileNickname ??
-            "닉네임 없음";
+        {activeMembers.map(
+          (member) => {
+            const name =
+              member.profileNickname ??
+              "닉네임 없음";
 
-          return (
-            <AppCard
-              key={member.id}
-              style={
-                styles.memberCard
-              }
-            >
-              <Avatar
-                label={name}
-                size={44}
-              />
-
+            return (
               <View
+                key={member.id}
                 style={
-                  styles.memberInfo
+                  styles.memberCard
                 }
               >
-                <Text
-                  style={
-                    styles.memberName
-                  }
-                >
-                  {name}
-                </Text>
+                <Avatar
+                  label={name}
+                  size={40}
+                />
 
-                <Text
+                <View
                   style={
-                    styles.meta
+                    styles.memberInfo
                   }
                 >
-                  {member.memberType ===
-                  "SESSION"
-                    ? "세션"
-                    : "멤버"}
-                  {member.part
-                    ? ` · ${
-                        PART_LABELS[
+                  <Text
+                    style={
+                      styles.memberName
+                    }
+                  >
+                    {name}
+                    {member.bandMemberProfileId === myProfileId ? " (나)" : ""}
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.meta
+                    }
+                  >
+                    {member.memberType ===
+                    "SESSION"
+                      ? "세션"
+                      : "멤버"}
+                    {member.part
+                      ? ` · ${
+                          PART_LABELS[
+                            member.part
+                          ] ??
                           member.part
-                        ] ??
-                        member.part
-                      }`
-                    : ""}
-                </Text>
-              </View>
+                        }`
+                      : ""}
+                  </Text>
+                </View>
 
-              {member.owner ? (
-                <Badge
-                  label="운영자"
-                  tone="yellow"
-                />
-              ) : viewerIsOwner ? (
-                <AppButton
-                  label="내보내기"
-                  variant="ghost"
-                  style={
-                    styles.removeButton
-                  }
-                  onPress={() =>
-                    remove(
-                      member.userId,
-                      name,
-                    )
-                  }
-                />
-              ) : null}
-            </AppCard>
-          );
-        },
-      )}
+                {member.owner ? (
+                  <Text style={styles.ownerBadge}>운영자</Text>
+                ) : viewerIsOwner ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={
+                      styles.removeButton
+                    }
+                    onPress={() =>
+                      remove(
+                        member.userId,
+                        name,
+                      )
+                    }
+                  >
+                    <Text style={styles.removeButtonText}>내보내기</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          },
+        )}
+      </View>
 
       {invitedMembers.length >
       0 ? (
         <>
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            초대 대기
-          </Text>
+          <View style={styles.sectionDivider} />
 
-          {invitedMembers.map(
-            (member) => {
-              const name =
-                member.profileNickname ??
-                "초대 사용자";
+          <View style={styles.memberList}>
+            <Text style={styles.sectionTitle}>초대 대기 멤버</Text>
 
-              return (
-                <AppCard
-                  key={
-                    member.id
-                  }
-                  style={
-                    styles.memberCard
-                  }
-                >
-                  <Avatar
-                    label={
-                      name
-                    }
-                    size={44}
-                  />
+            {invitedMembers.map(
+              (member) => {
+                const name =
+                  member.profileNickname ??
+                  "초대 사용자";
 
+                return (
                   <View
+                    key={
+                      member.id
+                    }
                     style={
-                      styles.memberInfo
+                      styles.memberCard
                     }
                   >
-                    <Text
-                      style={
-                        styles.memberName
+                    <Avatar
+                      label={
+                        name
                       }
-                    >
-                      {name}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.meta
-                      }
-                    >
-                      초대 발송됨
-                    </Text>
-                  </View>
-
-                  {viewerIsOwner ? (
-                    <AppButton
-                      label="취소"
-                      variant="ghost"
-                      style={
-                        styles.removeButton
-                      }
-                      onPress={() =>
-                        void removeMutation.mutateAsync(
-                          member.userId,
-                        )
-                      }
+                      size={40}
                     />
-                  ) : null}
-                </AppCard>
-              );
-            },
-          )}
+
+                    <View
+                      style={
+                        styles.memberInfo
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.memberName
+                        }
+                      >
+                        {name}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.meta
+                        }
+                      >
+                        초대 발송됨
+                      </Text>
+                    </View>
+
+                    {viewerIsOwner ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={
+                          styles.removeButton
+                        }
+                        onPress={() =>
+                          void removeMutation.mutateAsync(
+                            member.userId,
+                          )
+                        }
+                      >
+                        <Text style={styles.cancelButtonText}>취소</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              },
+            )}
+          </View>
         </>
       ) : null}
     </Screen>
@@ -396,70 +388,140 @@ export function BandMemberManageScreen() {
 const styles =
   StyleSheet.create({
     container: {
-      gap: spacing.lg,
-      paddingBottom:
-        spacing.xxl,
+      gap: 24,
+      paddingHorizontal: 24,
+      paddingBottom: 32,
+      backgroundColor: colors.white,
     },
 
     bandCard: {
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.md,
+      gap: 12,
+      borderRadius: 12,
+      backgroundColor: colors.white,
+      padding: 12,
+      shadowColor: colors.neutral900,
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 2,
     },
 
     bandInfo: {
       flex: 1,
-      gap: spacing.xs,
+      gap: 4,
     },
 
     bandName: {
       color:
         colors.neutral900,
-      fontSize: 17,
-      fontWeight: "900",
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 20,
     },
 
     meta: {
       color:
         colors.neutral600,
       fontSize: 12,
+      fontWeight: "500",
       lineHeight: 18,
     },
 
     inviteButton: {
-      minHeight: 38,
-      paddingHorizontal:
-        spacing.md,
+      minHeight: 28,
+      borderRadius: 8,
+      backgroundColor: colors.secondary400,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 15,
+      paddingVertical: 4,
+    },
+
+    inviteButtonText: {
+      color: colors.white,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    memberList: {
+      gap: 14,
     },
 
     sectionTitle: {
       color:
-        colors.neutral900,
-      fontSize: 17,
-      fontWeight: "900",
+        colors.neutral700,
+      fontSize: 15,
+      fontWeight: "500",
+      lineHeight: 20,
     },
 
     memberCard: {
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.md,
+      justifyContent: "space-between",
+      gap: 12,
+      borderRadius: 8,
+      backgroundColor: colors.white,
+      padding: 12,
+      shadowColor: colors.neutral900,
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 2,
     },
 
     memberInfo: {
       flex: 1,
-      gap: spacing.xs,
+      minWidth: 0,
+      gap: 3,
     },
 
     memberName: {
       color:
         colors.neutral900,
-      fontSize: 14,
-      fontWeight: "900",
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    ownerBadge: {
+      borderWidth: 1,
+      borderColor: colors.secondary500,
+      borderRadius: 999,
+      color: colors.secondary500,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
     },
 
     removeButton: {
-      minHeight: 36,
-      paddingHorizontal:
-        spacing.sm,
+      minHeight: 28,
+      justifyContent: "center",
+      paddingHorizontal: 4,
+    },
+
+    removeButtonText: {
+      color: colors.neutral500,
+      fontSize: 10,
+      fontWeight: "500",
+      lineHeight: 14,
+    },
+
+    cancelButtonText: {
+      color: colors.error,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    sectionDivider: {
+      height: 16,
+      backgroundColor: colors.neutral200,
+      marginHorizontal: -24,
     },
   });
