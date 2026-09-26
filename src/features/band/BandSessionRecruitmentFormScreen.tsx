@@ -1,6 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import Svg, { Circle, Path } from "react-native-svg";
 
 import {
   useCreateSessionRecruitment,
@@ -9,21 +17,21 @@ import {
 } from "@/hooks/api/session/useSessionRecruitment";
 import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
 import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
-import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
-import { colors, spacing } from "@/shared/constants/theme";
+import { colors } from "@/shared/constants/theme";
 import type {
   CreateSessionRecruitmentRequest,
   SessionRecruitmentEditInfoResponse,
   UpdateSessionRecruitmentRequest,
 } from "@/types/session/sessionRecruitment";
 
+type Step = 1 | 2;
+
 const PART_OPTIONS = ["보컬", "기타", "베이스", "키보드", "드럼", "etc"];
 const SKILL_OPTIONS = ["입문", "중급", "상급"];
+const DETAIL_MAX_LENGTH = 500;
 
 const parseRouteId = (value?: string | string[]) => {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -109,6 +117,7 @@ function RecruitmentForm({
   const deadline = splitDeadlineAt(initialValue?.deadlineAt);
   const createMutation = useCreateSessionRecruitment();
   const updateMutation = useUpdateSessionRecruitment();
+  const [step, setStep] = useState<Step>(1);
   const [title, setTitle] = useState(initialValue?.recruitmentTitle ?? "");
   const [summary, setSummary] = useState(initialValue?.summary ?? "");
   const [content, setContent] = useState(initialValue?.content ?? "");
@@ -129,26 +138,20 @@ function RecruitmentForm({
   );
   const [showErrors, setShowErrors] = useState(false);
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
-  const requiredValues = {
-    title,
-    summary,
-    content,
-    part,
-    skillLevel,
-    genre,
+  const hasStep1Error = [title, summary, content, part, skillLevel, genre].some(
+    (value) => !value.trim(),
+  );
+  const hasStep2Error = [
     region,
     practiceSchedule,
     practicePlace,
     deadlineDate,
     deadlineTime,
     qualification,
-  };
-  const hasRequiredError = Object.values(requiredValues).some(
-    (value) => !value.trim(),
-  );
+  ].some((value) => !value.trim());
 
   const submit = async () => {
-    if (hasRequiredError) {
+    if (hasStep1Error || hasStep2Error) {
       setShowErrors(true);
       return;
     }
@@ -198,183 +201,511 @@ function RecruitmentForm({
     }
   };
 
+  const goNext = () => {
+    if (hasStep1Error) {
+      setShowErrors(true);
+      return;
+    }
+
+    setShowErrors(false);
+    setStep(2);
+  };
+
   return (
     <Screen contentStyle={styles.container}>
       <AppHeader title={isEditMode ? "모집 공고 수정" : "모집 공고 등록"} />
+      <StepIndicator step={step} />
 
-      <AppCard style={styles.formCard}>
-        <AppTextInput
-          label="공고 제목"
-          value={title}
-          placeholder="함께할 세션을 찾는 제목"
-          error={showErrors && !title.trim() ? "제목을 입력해 주세요." : undefined}
-          onChangeText={setTitle}
-        />
-        <AppTextInput
-          label="한 줄 소개"
-          value={summary}
-          placeholder="공고를 짧게 소개해 주세요"
-          error={
-            showErrors && !summary.trim() ? "한 줄 소개를 입력해 주세요." : undefined
-          }
-          onChangeText={setSummary}
-        />
-        <AppTextInput
-          label="상세 내용"
-          value={content}
-          placeholder="활동 방향, 원하는 멤버, 분위기 등을 적어주세요"
-          multiline
-          textAlignVertical="top"
-          style={styles.multilineInput}
-          error={
-            showErrors && !content.trim() ? "상세 내용을 입력해 주세요." : undefined
-          }
-          onChangeText={setContent}
-        />
+      <View style={styles.body}>
+        <View style={styles.formCard}>
+          {step === 1 ? (
+            <>
+              <Field label="공고 제목" required error={showErrors && !title.trim()}>
+                <NativeInput
+                  value={title}
+                  placeholder="공고 제목을 입력해주세요"
+                  maxLength={50}
+                  error={showErrors && !title.trim()}
+                  onChangeText={setTitle}
+                />
+              </Field>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>모집 파트</Text>
-          <View style={styles.chips}>
-            {PART_OPTIONS.map((item) => (
-              <Chip
-                key={item}
-                label={item}
-                selected={part === item}
-                onPress={() => setPart(item)}
-              />
-            ))}
-          </View>
+              <Field
+                label="공고 한줄 소개"
+                required
+                error={showErrors && !summary.trim()}
+              >
+                <NativeInput
+                  value={summary}
+                  placeholder="공고 목록에 표시될 짧은 소개를 입력해주세요. (최대 50자)"
+                  maxLength={50}
+                  error={showErrors && !summary.trim()}
+                  onChangeText={setSummary}
+                />
+              </Field>
+
+              <Field
+                label="공고 상세 소개"
+                required
+                error={showErrors && !content.trim()}
+              >
+                <NativeInput
+                  value={content}
+                  placeholder="모집 공고의 상세 내용을 입력해주세요"
+                  multiline
+                  maxLength={DETAIL_MAX_LENGTH}
+                  error={showErrors && !content.trim()}
+                  onChangeText={setContent}
+                />
+                <Text style={styles.countText}>
+                  {content.length}/{DETAIL_MAX_LENGTH}
+                </Text>
+              </Field>
+
+              <Field label="모집 파트" required>
+                <View style={styles.optionWrap}>
+                  {PART_OPTIONS.map((item) => (
+                    <OptionChip
+                      key={item}
+                      label={item}
+                      selected={part === item}
+                      onPress={() => setPart(item)}
+                    />
+                  ))}
+                </View>
+              </Field>
+
+              <Field label="실력대" required>
+                <View style={styles.optionWrap}>
+                  {SKILL_OPTIONS.map((item) => (
+                    <OptionChip
+                      key={item}
+                      label={item}
+                      selected={skillLevel === item}
+                      onPress={() => setSkillLevel(item)}
+                    />
+                  ))}
+                </View>
+              </Field>
+
+              <Field label="장르" required error={showErrors && !genre.trim()}>
+                <NativeInput
+                  value={genre}
+                  placeholder="장르 선택"
+                  error={showErrors && !genre.trim()}
+                  onChangeText={setGenre}
+                />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label="활동 지역" required error={showErrors && !region.trim()}>
+                <NativeInput
+                  value={region}
+                  placeholder="지역 선택"
+                  error={showErrors && !region.trim()}
+                  onChangeText={setRegion}
+                />
+              </Field>
+
+              <Field
+                label="연습 일정"
+                required
+                error={showErrors && !practiceSchedule.trim()}
+              >
+                <NativeInput
+                  value={practiceSchedule}
+                  placeholder="연습 일정을 작성해주세요"
+                  error={showErrors && !practiceSchedule.trim()}
+                  onChangeText={setPracticeSchedule}
+                />
+              </Field>
+
+              <Field
+                label="연습 장소"
+                required
+                error={showErrors && !practicePlace.trim()}
+              >
+                <NativeInput
+                  value={practicePlace}
+                  placeholder="연습 장소를 작성해주세요"
+                  error={showErrors && !practicePlace.trim()}
+                  onChangeText={setPracticePlace}
+                />
+              </Field>
+
+              <Field
+                label="모집 마감일"
+                required
+                error={
+                  showErrors && (!deadlineDate.trim() || !deadlineTime.trim())
+                }
+              >
+                <NativeInput
+                  value={deadlineDate}
+                  placeholder="YYYY-MM-DD"
+                  error={showErrors && !deadlineDate.trim()}
+                  onChangeText={setDeadlineDate}
+                />
+                <NativeInput
+                  value={deadlineTime}
+                  placeholder="HH:mm"
+                  error={showErrors && !deadlineTime.trim()}
+                  onChangeText={setDeadlineTime}
+                />
+              </Field>
+
+              <Field
+                label="지원 자격"
+                required
+                error={showErrors && !qualification.trim()}
+              >
+                <NativeInput
+                  value={qualification}
+                  placeholder="지원 자격을 입력해주세요"
+                  multiline
+                  maxLength={DETAIL_MAX_LENGTH}
+                  error={showErrors && !qualification.trim()}
+                  onChangeText={setQualification}
+                />
+                <Text style={styles.countText}>
+                  {qualification.length}/{DETAIL_MAX_LENGTH}
+                </Text>
+              </Field>
+            </>
+          )}
         </View>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>실력</Text>
-          <View style={styles.chips}>
-            {SKILL_OPTIONS.map((item) => (
-              <Chip
-                key={item}
-                label={item}
-                selected={skillLevel === item}
-                onPress={() => setSkillLevel(item)}
-              />
-            ))}
-          </View>
+        <View style={styles.submitArea}>
+          {step === 1 ? (
+            <AppButton
+              label="다음"
+              style={[
+                styles.submitButton,
+                hasStep1Error ? styles.submitButtonDisabled : styles.submitButtonActive,
+              ]}
+              onPress={goNext}
+            />
+          ) : (
+            <AppButton
+              label={
+                isSubmitting
+                  ? isEditMode
+                    ? "수정 중"
+                    : "등록 중"
+                  : isEditMode
+                    ? "수정하기"
+                    : "모집 공고 등록"
+              }
+              loading={isSubmitting}
+              disabled={isSubmitting}
+              style={[
+                styles.submitButton,
+                hasStep2Error ? styles.submitButtonDisabled : styles.submitButtonActive,
+              ]}
+              onPress={() => void submit()}
+            />
+          )}
         </View>
-
-        <AppTextInput
-          label="장르"
-          value={genre}
-          placeholder="예: 인디"
-          error={showErrors && !genre.trim() ? "장르를 입력해 주세요." : undefined}
-          onChangeText={setGenre}
-        />
-        <AppTextInput
-          label="지역"
-          value={region}
-          placeholder="예: 서울"
-          error={showErrors && !region.trim() ? "지역을 입력해 주세요." : undefined}
-          onChangeText={setRegion}
-        />
-        <AppTextInput
-          label="연습 일정"
-          value={practiceSchedule}
-          placeholder="예: 매주 토요일 오후"
-          error={
-            showErrors && !practiceSchedule.trim()
-              ? "연습 일정을 입력해 주세요."
-              : undefined
-          }
-          onChangeText={setPracticeSchedule}
-        />
-        <AppTextInput
-          label="연습 장소"
-          value={practicePlace}
-          placeholder="예: 홍대 합주실"
-          error={
-            showErrors && !practicePlace.trim()
-              ? "연습 장소를 입력해 주세요."
-              : undefined
-          }
-          onChangeText={setPracticePlace}
-        />
-        <View style={styles.rowFields}>
-          <AppTextInput
-            label="마감일"
-            value={deadlineDate}
-            placeholder="YYYY-MM-DD"
-            error={
-              showErrors && !deadlineDate.trim()
-                ? "마감일을 입력해 주세요."
-                : undefined
-            }
-            style={styles.flexInput}
-            onChangeText={setDeadlineDate}
-          />
-          <AppTextInput
-            label="마감 시간"
-            value={deadlineTime}
-            placeholder="HH:mm"
-            error={
-              showErrors && !deadlineTime.trim()
-                ? "마감 시간을 입력해 주세요."
-                : undefined
-            }
-            style={styles.flexInput}
-            onChangeText={setDeadlineTime}
-          />
-        </View>
-        <AppTextInput
-          label="지원 자격"
-          value={qualification}
-          placeholder="필수 경험이나 조건을 적어주세요"
-          multiline
-          textAlignVertical="top"
-          style={styles.multilineInput}
-          error={
-            showErrors && !qualification.trim()
-              ? "지원 자격을 입력해 주세요."
-              : undefined
-          }
-          onChangeText={setQualification}
-        />
-
-        <AppButton
-          label={isEditMode ? "수정 완료" : "모집 공고 등록"}
-          loading={isSubmitting}
-          onPress={() => void submit()}
-        />
-      </AppCard>
+      </View>
     </Screen>
+  );
+}
+
+function StepIndicator({ step }: { step: Step }) {
+  return (
+    <View style={styles.stepWrap}>
+      <View style={styles.stepItem}>
+        {step > 1 ? <CheckStepIcon /> : <NumberStepIcon value="1" active />}
+        <Text
+          style={[
+            styles.stepLabel,
+            step === 1 ? styles.stepLabelActive : styles.stepLabelIdle,
+          ]}
+        >
+          기본 정보
+        </Text>
+      </View>
+      <View style={[styles.stepLine, step > 1 && styles.stepLineActive]} />
+      <View style={styles.stepItem}>
+        <NumberStepIcon value="2" active={step === 2} />
+        <Text
+          style={[
+            styles.stepLabel,
+            step === 2 ? styles.stepLabelActive : styles.stepLabelIdle,
+          ]}
+        >
+          모집 정보
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function Field({
+  label,
+  required = false,
+  error = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  error?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>
+        {label} {required ? <Text style={styles.required}>*</Text> : null}
+      </Text>
+      {children}
+      {error ? <Text style={styles.errorText}>{label}은 필수 항목이에요</Text> : null}
+    </View>
+  );
+}
+
+function NativeInput({
+  error = false,
+  multiline = false,
+  style,
+  ...props
+}: React.ComponentProps<typeof TextInput> & {
+  error?: boolean;
+}) {
+  return (
+    <TextInput
+      placeholderTextColor={colors.neutral500}
+      textAlignVertical={multiline ? "top" : "center"}
+      style={[
+        styles.input,
+        multiline && styles.textArea,
+        error && styles.inputError,
+        style,
+      ]}
+      multiline={multiline}
+      {...props}
+    />
+  );
+}
+
+function OptionChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={[styles.optionChip, selected ? styles.optionChipSelected : styles.optionChipIdle]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.optionChipText,
+          selected ? styles.optionChipTextSelected : styles.optionChipTextIdle,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function NumberStepIcon({ value, active }: { value: string; active: boolean }) {
+  return (
+    <View>
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+        <Circle
+          cx={12}
+          cy={12}
+          r={11}
+          fill={active ? colors.secondary500 : colors.white}
+          stroke={active ? colors.secondary500 : colors.secondary300}
+          strokeWidth={2}
+        />
+      </Svg>
+      <Text style={[styles.stepNumber, active && styles.stepNumberActive]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function CheckStepIcon() {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={12} fill={colors.secondary500} />
+      <Path
+        d="M7 12.2L10.2 15.4L17.2 8.6"
+        stroke={colors.white}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 104,
+    backgroundColor: colors.secondary0,
+  },
+  stepWrap: {
+    backgroundColor: colors.secondary0,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "center",
+    gap: 12,
+    paddingTop: 16,
+    paddingBottom: 18,
+  },
+  stepItem: {
+    alignItems: "center",
+    gap: 7,
+  },
+  stepLine: {
+    width: 128,
+    height: 2,
+    backgroundColor: colors.secondary300,
+    marginTop: 11,
+  },
+  stepLineActive: {
+    backgroundColor: colors.secondary500,
+  },
+  stepLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    lineHeight: 12,
+  },
+  stepLabelActive: {
+    color: colors.secondary500,
+  },
+  stepLabelIdle: {
+    color: colors.neutral400,
+  },
+  stepNumber: {
+    position: "absolute",
+    left: 0,
+    top: 5,
+    width: 24,
+    color: colors.secondary500,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+    textAlign: "center",
+  },
+  stepNumberActive: {
+    color: colors.white,
+  },
+  body: {
+    paddingHorizontal: 20,
   },
   formCard: {
-    gap: spacing.lg,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
   },
   field: {
-    gap: spacing.sm,
+    gap: 8,
   },
   label: {
-    color: colors.neutral800,
-    fontSize: 14,
-    fontWeight: "700",
+    color: colors.neutral900,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 20,
   },
-  chips: {
+  required: {
+    color: colors.error,
+  },
+  input: {
+    minHeight: 38,
+    borderWidth: 1,
+    borderColor: colors.neutral400,
+    borderRadius: 5,
+    backgroundColor: colors.white,
+    color: colors.neutral900,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  textArea: {
+    minHeight: 58,
+    paddingTop: 8,
+  },
+  inputError: {
+    borderColor: colors.error,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 10,
+    fontWeight: "500",
+    lineHeight: 12,
+  },
+  countText: {
+    alignSelf: "flex-end",
+    color: colors.neutral500,
+    fontSize: 10,
+    fontWeight: "500",
+    lineHeight: 12,
+    marginTop: -22,
+    marginRight: 13,
+  },
+  optionWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm,
+    gap: 8,
   },
-  rowFields: {
-    gap: spacing.md,
+  optionChip: {
+    minHeight: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
   },
-  flexInput: {
-    flex: 1,
+  optionChipSelected: {
+    backgroundColor: colors.secondary500,
   },
-  multilineInput: {
-    minHeight: 112,
-    paddingTop: spacing.md,
+  optionChipIdle: {
+    backgroundColor: colors.neutral300,
+  },
+  optionChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  optionChipTextSelected: {
+    color: colors.white,
+  },
+  optionChipTextIdle: {
+    color: colors.neutral600,
+  },
+  submitArea: {
+    marginTop: 18,
+  },
+  submitButton: {
+    minHeight: 52,
+    borderRadius: 12,
+  },
+  submitButtonActive: {
+    backgroundColor: colors.secondary500,
+  },
+  submitButtonDisabled: {
+    backgroundColor: colors.neutral300,
   },
 });
