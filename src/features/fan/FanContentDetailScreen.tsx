@@ -38,6 +38,7 @@ import {
   colors,
   spacing,
 } from "@/shared/constants/theme";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 import type {
   FanExplorePostDetail,
@@ -190,8 +191,18 @@ export function FanContentDetailScreen() {
     setEditingCommentText,
   ] = useState("");
 
+  const [
+    commentErrorMessage,
+    setCommentErrorMessage,
+  ] = useState("");
+
   const post =
     postQuery.data;
+
+  const currentUserId =
+    useAuthStore(
+      (state) => state.user?.userId,
+    );
 
   const comments =
     useMemo(() => {
@@ -226,6 +237,71 @@ export function FanContentDetailScreen() {
       );
     }, [
       commentsQuery.data,
+    ]);
+
+  const myCommentIds =
+    useMemo(() => {
+      return new Set(
+        comments
+          .filter(
+            (comment) =>
+              comment.isMine ||
+              (currentUserId != null &&
+                comment.authorId === currentUserId),
+          )
+          .map((comment) => comment.commentId)
+          .filter(
+            (
+              commentId,
+            ): commentId is number =>
+              commentId != null,
+          ),
+      );
+    }, [
+      comments,
+      currentUserId,
+    ]);
+
+  const myComments =
+    useMemo(() => {
+      const firstPageMyComments =
+        commentsQuery.data?.pages[0]?.myComments ??
+        [];
+
+      const mergedComments = [
+        ...firstPageMyComments,
+
+        ...comments.filter(
+          (comment) =>
+            comment.isMine ||
+            (currentUserId != null &&
+              comment.authorId === currentUserId),
+        ),
+      ];
+
+      const seen =
+        new Set<string>();
+
+      return mergedComments.filter(
+        (comment) => {
+          const key =
+            comment.commentId != null
+              ? String(comment.commentId)
+              : `${comment.authorId}-${comment.createdAt}-${comment.content}`;
+
+          if (seen.has(key)) {
+            return false;
+          }
+
+          seen.add(key);
+
+          return true;
+        },
+      );
+    }, [
+      comments,
+      commentsQuery.data?.pages,
+      currentUserId,
     ]);
 
   const mediaUrls =
@@ -287,6 +363,8 @@ export function FanContentDetailScreen() {
       }
 
       try {
+        setCommentErrorMessage("");
+
         await createCommentMutation.mutateAsync(
           {
             content:
@@ -296,6 +374,10 @@ export function FanContentDetailScreen() {
 
         setCommentText("");
       } catch {
+        setCommentErrorMessage(
+          "댓글을 등록하지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+
         Alert.alert(
           "댓글 작성",
           "댓글을 등록하지 못했어요.",
@@ -318,6 +400,8 @@ export function FanContentDetailScreen() {
     setEditingCommentText(
       content,
     );
+
+    setCommentErrorMessage("");
   };
 
   const cancelEdit =
@@ -352,6 +436,8 @@ export function FanContentDetailScreen() {
       }
 
       try {
+        setCommentErrorMessage("");
+
         await updateCommentMutation.mutateAsync(
           {
             commentId:
@@ -362,6 +448,10 @@ export function FanContentDetailScreen() {
 
         cancelEdit();
       } catch {
+        setCommentErrorMessage(
+          "댓글을 수정하지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+
         Alert.alert(
           "댓글 수정",
           "댓글을 수정하지 못했어요.",
@@ -393,10 +483,16 @@ export function FanContentDetailScreen() {
             "destructive",
 
           onPress: () => {
+            setCommentErrorMessage("");
+
             deleteCommentMutation.mutate(
               commentId,
               {
                 onError: () => {
+                  setCommentErrorMessage(
+                    "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.",
+                  );
+
                   Alert.alert(
                     "댓글 삭제",
                     "댓글을 삭제하지 못했어요.",
@@ -645,6 +741,7 @@ export function FanContentDetailScreen() {
               }
               placeholder="댓글을 입력하세요"
               multiline
+              maxLength={500}
               textAlignVertical="top"
               style={
                 styles.commentInput
@@ -654,15 +751,31 @@ export function FanContentDetailScreen() {
               }
             />
 
-            <AppButton
-              label="댓글 등록"
-              loading={
-                createCommentMutation.isPending
-              }
-              onPress={() =>
-                void submitComment()
-              }
-            />
+            <View style={styles.commentSubmitRow}>
+              <Text style={styles.counterText}>
+                {commentText.length}/500
+              </Text>
+
+              <AppButton
+                label="댓글 등록"
+                disabled={
+                  !commentText.trim()
+                }
+                loading={
+                  createCommentMutation.isPending
+                }
+                style={styles.commentSubmitButton}
+                onPress={() =>
+                  void submitComment()
+                }
+              />
+            </View>
+
+            {commentErrorMessage ? (
+              <Text style={styles.commentError}>
+                {commentErrorMessage}
+              </Text>
+            ) : null}
 
             {commentsQuery.isLoading ? (
               <Text
@@ -671,8 +784,25 @@ export function FanContentDetailScreen() {
                 댓글을 불러오는
                 중이에요
               </Text>
+            ) : commentsQuery.isError ? (
+              <View style={styles.commentErrorRow}>
+                <Text style={styles.meta}>
+                  댓글을 불러오지 못했어요
+                </Text>
+
+                <AppButton
+                  label="다시 시도"
+                  variant="ghost"
+                  style={styles.smallButton}
+                  onPress={() =>
+                    void commentsQuery.refetch()
+                  }
+                />
+              </View>
             ) : comments.length ===
-              0 ? (
+                0 &&
+              myComments.length ===
+                0 ? (
               <Text
                 style={styles.meta}
               >
@@ -731,6 +861,7 @@ export function FanContentDetailScreen() {
                                   editingCommentText
                                 }
                                 multiline
+                                maxLength={500}
                                 style={
                                   styles.editInput
                                 }
@@ -793,7 +924,14 @@ export function FanContentDetailScreen() {
                                 </Text>
                               ) : null}
 
-                              {comment.isMine ? (
+                              {comment.isMine ||
+                              (comment.commentId != null &&
+                                myCommentIds.has(
+                                  comment.commentId,
+                                )) ||
+                              (currentUserId != null &&
+                                comment.authorId ===
+                                  currentUserId) ? (
                                 <View
                                   style={
                                     styles.commentActions
@@ -950,6 +1088,40 @@ const styles =
       minHeight: 92,
       paddingTop:
         spacing.md,
+    },
+
+    commentSubmitRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.md,
+    },
+
+    counterText: {
+      color:
+        colors.neutral500,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+
+    commentSubmitButton: {
+      minHeight: 38,
+      paddingHorizontal:
+        spacing.lg,
+    },
+
+    commentError: {
+      color:
+        colors.error,
+      fontSize: 12,
+      lineHeight: 18,
+    },
+
+    commentErrorRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.md,
     },
 
     commentList: {
