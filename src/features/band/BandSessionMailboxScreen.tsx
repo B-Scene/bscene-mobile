@@ -9,7 +9,7 @@ import {
 } from "react-native";
 
 import {
-  useChatRoomsQuery,
+  useInfiniteChatRoomsQuery,
   useSessionChatRoomListSocket,
 } from "@/hooks/api/session/useSessionChat";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -67,10 +67,27 @@ export function BandSessionMailboxScreen() {
     [filter],
   );
 
-  const query = useChatRoomsQuery(queryParams);
+  const query = useInfiniteChatRoomsQuery(queryParams);
   useSessionChatRoomListSocket();
 
-  const rooms = query.data?.content ?? [];
+  const rooms = useMemo(
+    () =>
+      query.data?.pages.flatMap(
+        (page) => page.content,
+      ) ?? [],
+    [query.data?.pages],
+  );
+
+  const loadMore = () => {
+    if (
+      !query.hasNextPage ||
+      query.isFetchingNextPage
+    ) {
+      return;
+    }
+
+    void query.fetchNextPage();
+  };
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>
@@ -116,12 +133,18 @@ export function BandSessionMailboxScreen() {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => <ChatRoomCard room={item} />}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
-          refreshing={query.isRefetching}
+          refreshing={query.isRefetching && !query.isFetchingNextPage}
           onRefresh={() => void query.refetch()}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
           ListFooterComponent={
-            query.data?.hasNext ? (
+            query.isFetchingNextPage ? (
               <Text style={styles.footer}>
-                더 이전 쪽지는 pagination 단계에서 이어서 연결합니다
+                이전 쪽지를 불러오고 있어요
+              </Text>
+            ) : query.hasNextPage ? (
+              <Text style={styles.footer}>
+                아래로 스크롤하면 이전 쪽지를 더 불러와요
               </Text>
             ) : null
           }
