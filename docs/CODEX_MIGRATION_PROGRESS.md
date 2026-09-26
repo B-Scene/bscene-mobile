@@ -33,7 +33,8 @@
 - Phase 28 밴드 세션 지원자 상세: 1차 API 연동 완료
 - Phase 29 밴드 세션 지원 수락/거절: 1차 API 연동 완료
 - Phase 30 밴드 세션 지원 상태 관리: 1차 API 연동 완료
-- 전체 기준 대략 64%
+- Phase 31 밴드 세션 메시지/채팅: 1차 API/WebSocket 연동 및 쪽지함 pagination 완료
+- 전체 기준 대략 66%
 
 ## 완료된 작업
 
@@ -109,17 +110,21 @@
 - 밴드 세션 지원자 상세 route `/band/my/applications/[applySubmissionId]`를 추가하고 `/sessions/recruitments/submissions/{applicationSubmissionId}` API를 연결했다.
 - 밴드 세션 지원자 상세에서 `/users/me/{applySubmissionId}/acceptance` 수락/거절 API를 연결했다.
 - 밴드 세션 내 지원 현황 route `/band/session/applications`를 추가하고 지원 내역 조회, 지원 취소, 참여 확정 API를 연결했다.
+- 밴드 세션 쪽지함 `/band/session/messages`와 쪽지방 `/band/session/messages/[chatRoomId]`를 추가했다.
+- 세션 쪽지방 생성 `/chat/rooms`, 쪽지함 조회 `/chat/rooms`, 쪽지방 상세 `/chat/rooms/{chatRoomId}`, 나가기 `/chat/rooms/{chatRoomId}`, WebSocket ticket `/chat/ws-ticket` API를 연결했다.
+- 세션 쪽지 WebSocket `/api/ws/chat` 연결, ping/pong heartbeat, reconnect, 메시지 송신/수신, 읽음 처리, optimistic message UI를 모바일 패턴으로 이식했다.
+- 밴드 세션 쪽지함에 cursor 기반 pagination을 연결하고 새 메시지 수신 시 쪽지함 infinite query가 갱신되도록 처리했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리를 구현한 상태. 다음은 세션 메시지/채팅 연동이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 팬 콘텐츠 댓글 수정/페이지네이션 UX 보강이다.
 
 ## 다음에 해야 할 작업
 
-1. 밴드 세션 메시지/채팅을 연결한다.
-2. 팬 콘텐츠 댓글 수정/페이지네이션 UX를 보강한다.
-3. Band home 네이티브 파일 업로드/이미지 선택 UX를 보강한다.
+1. 팬 콘텐츠 댓글 수정/페이지네이션 UX를 보강한다.
+2. Band home 네이티브 파일 업로드/이미지 선택 UX를 보강한다.
+3. 팬 프로필 수정 화면의 웹 parity를 보강한다.
 
 ## 변경한 주요 파일
 
@@ -312,7 +317,7 @@
 - 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 콘텐츠 상세/좋아요/댓글, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 댓글 수정/페이지네이션 UX는 아직 웹 parity 전이다.
 - 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정을 완료했다. 프로필 수정 화면은 아직 웹 parity 전이다.
 - 밴드 마이페이지는 요약, 메뉴, 밴드 알림 설정을 완료했다. 밴드 프로필/멤버/모집/지원 관리 화면은 아직 웹 parity 전이다.
-- 밴드 세션은 모집 목록/상세/등록/수정/삭제/관심 토글/지원하기/받은 지원 목록/상세/수락/거절/내 지원 상태 관리를 완료했다. 지원서 작성, 세션 찾기, 세션 메시지/채팅, 모집 공고 페이지네이션은 아직 웹 parity 전이다.
+- 밴드 세션은 모집 목록/상세/등록/수정/삭제/관심 토글/지원하기/받은 지원 목록/상세/수락/거절/내 지원 상태 관리, 세션 찾기, 세션 메시지/채팅 1차 연동을 완료했다. 지원서 작성 고도화, 모집 공고 페이지네이션, 실제 기기 WebSocket QA는 아직 웹 parity/QA 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
@@ -369,6 +374,7 @@
 - 밴드 세션 지원자 상세 `/sessions/recruitments/submissions/{applicationSubmissionId}` 실제 API 렌더링
 - 밴드 세션 지원 수락/거절 `/users/me/{applySubmissionId}/acceptance` 실제 API 상태 동기화
 - 밴드 세션 지원 상태 `/sessions/applications/submissions`, 지원 취소, 참여 확정 실제 API 상태 동기화
+- 밴드 세션 쪽지함 `/chat/rooms` pagination, 쪽지방 상세 `/chat/rooms/{chatRoomId}`, WebSocket `/api/ws/chat` 실제 기기 송수신/읽음/재연결 상태 동기화
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -377,22 +383,12 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `668c95f`
+- 최근 완료 커밋: `ac4c4f6`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-밴드 세션 메시지/채팅을 연결한다.
+팬 콘텐츠 댓글 수정/페이지네이션 UX를 보강한다.
 
 ## MEDIUM 전환 메모
 
-- 현재까지 완료: 밴드 세션 모집 목록/상세/등록/수정/삭제, 지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 조회/취소/참여 확정까지 LOW 범위에서 구현하고 검증했다.
-- 막힌 문제: 다음 Work Unit인 밴드 세션 메시지/채팅은 웹 기준 `/chat/rooms`, `/chat/rooms/{chatRoomId}`, `/chat/ws-ticket` REST API와 `/api/ws/chat` WebSocket을 함께 사용한다.
-- MEDIUM이 필요한 이유: WebSocket 연결, ticket 발급, ping/pong heartbeat, reconnect, read receipt, 실시간 메시지 동기화가 포함되어 LOW 단순 CRUD 범위를 넘는다.
-- 관련 최소 파일:
-  - `bscene-client/src/api/session/sessionChat.ts`
-  - `bscene-client/src/types/session/sessionChat.ts`
-  - `bscene-client/src/hooks/api/session/useSessionChat.ts`
-  - `bscene-client/src/features/session/chat/SessionChatView.tsx`
-  - `bscene-mobile/src/hooks/api/session/useSessionApplication.ts`
-  - `bscene-mobile/src/features/band/BandSessionApplicationsScreen.tsx`
-- MEDIUM에서 가장 먼저 해야 할 작업: React Native 환경에서 WebSocket URL 생성, 인증 ticket 발급, 채팅방 목록/상세, 메시지 송수신 hook 설계를 모바일 패턴에 맞게 이식한다.
+- 없음.
