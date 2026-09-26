@@ -6,12 +6,11 @@ import {
   useUpdateNotificationSetting,
 } from "@/hooks/api/notification/useNotification";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
 import { Screen } from "@/shared/components/Screen";
-import { colors, radius, spacing } from "@/shared/constants/theme";
+import { colors } from "@/shared/constants/theme";
 import type { NotificationSettingType } from "@/types/notification";
 
 type SettingItem = {
@@ -90,8 +89,8 @@ export function BandNotificationSettingsScreen({
     <Screen contentStyle={styles.container}>
       <AppHeader title={title} />
 
-      <AppCard style={styles.bandCard}>
-        <Avatar imageUrl={profileImageUrl} label={bandName} size={48} />
+      <View style={styles.bandCard}>
+        <Avatar imageUrl={profileImageUrl} label={bandName} size={36} />
         <View style={styles.bandText}>
           <Text style={styles.bandName}>{bandName}</Text>
           <Text style={styles.bandDescription}>
@@ -100,7 +99,7 @@ export function BandNotificationSettingsScreen({
               : "현재 선택된 밴드의 라이브 운영 알림"}
           </Text>
         </View>
-      </AppCard>
+      </View>
 
       {query.isLoading ? (
         <AppState loading title="알림 설정을 불러오는 중이에요" />
@@ -117,7 +116,8 @@ export function BandNotificationSettingsScreen({
             const enabled = query.data?.values[item.keyName] ?? false;
 
             return (
-              <AppCard key={item.settingType} style={styles.settingCard}>
+              <View key={item.settingType}>
+                <View style={styles.settingCard}>
                 <View style={styles.settingText}>
                   <Text style={styles.settingLabel}>{item.label}</Text>
                   <Text style={styles.settingDescription}>
@@ -142,7 +142,9 @@ export function BandNotificationSettingsScreen({
                     ]}
                   />
                 </Pressable>
-              </AppCard>
+                </View>
+                <View style={styles.settingDivider} />
+              </View>
             );
           })}
         </View>
@@ -153,55 +155,69 @@ export function BandNotificationSettingsScreen({
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
+    gap: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    backgroundColor: colors.white,
   },
   bandCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: colors.secondary100,
-    borderColor: colors.secondary200,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: colors.secondary300,
+    borderRadius: 12,
+    backgroundColor: colors.secondary0,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   bandText: {
     flex: 1,
-    gap: spacing.xs,
+    minWidth: 0,
   },
   bandName: {
     color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "900",
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
   },
   bandDescription: {
     color: colors.neutral600,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
   },
   list: {
-    gap: spacing.md,
+    gap: 16,
   },
   settingCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    justifyContent: "space-between",
+    gap: 16,
+    paddingHorizontal: 12,
   },
   settingText: {
     flex: 1,
-    gap: spacing.xs,
+    minWidth: 0,
+    gap: 4,
   },
   settingLabel: {
     color: colors.neutral900,
-    fontSize: 16,
-    fontWeight: "900",
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   settingDescription: {
     color: colors.neutral600,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
   },
   switchTrack: {
     width: 48,
     height: 28,
-    borderRadius: radius.pill,
+    borderRadius: 999,
     backgroundColor: colors.neutral400,
     padding: 3,
     justifyContent: "center",
@@ -212,7 +228,7 @@ const styles = StyleSheet.create({
   switchThumb: {
     width: 22,
     height: 22,
-    borderRadius: radius.pill,
+    borderRadius: 999,
     backgroundColor: colors.white,
   },
   switchThumbOn: {
@@ -220,5 +236,10 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.5,
+  },
+  settingDivider: {
+    height: 2,
+    backgroundColor: colors.neutral300,
+    marginTop: 16,
   },
 });
