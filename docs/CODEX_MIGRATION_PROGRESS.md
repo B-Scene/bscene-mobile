@@ -37,7 +37,8 @@
 - Phase 32 팬 콘텐츠 댓글 UX: 수정/삭제/페이지네이션/에러 상태 보강 완료
 - Phase 33 Band home Native 업로드 UX: 콘텐츠 이미지/썸네일, 공연 포스터 선택 및 업로드 완료
 - Phase 34 팬 프로필 수정: 저장 UX 및 웹 parity 보강 완료
-- 전체 기준 대략 70%
+- Phase 35 앱 재실행 user hydrate: SecureStore user 부재 시 `/users/me`, onboarding status 기반 복구 완료
+- 전체 기준 대략 71%
 
 ## 완료된 작업
 
@@ -121,15 +122,16 @@
 - 밴드 콘텐츠 등록/수정 폼에 갤러리/카메라 이미지 선택, 미리보기, 제거, `POST`/`POST_THUMBNAIL` presigned upload 연동을 추가했다.
 - 밴드 공연 등록/수정 폼에 갤러리/카메라 포스터 선택, 미리보기, 선택 취소, `PERFORMANCE_POSTER` presigned upload 연동을 추가했다.
 - 팬 프로필 수정 화면에 저장 버튼 disabled 상태, 저장/업로드 진행 라벨, 화면 내 실패 메시지를 추가해 웹 프로필 수정 흐름과 UX를 맞췄다.
+- 앱 재실행 시 access token은 있지만 SecureStore user가 없는 경우 `/users/me`, `/users/me/onboarding/status`를 조회해 최소 AuthUser를 복구하고 mode/onboarding 분기를 유지하도록 보강했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 앱 재실행 user hydrate와 Auth/Mode route guard 보강이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Auth/Mode route guard 보강이다.
 
 ## 다음에 해야 할 작업
 
-1. 앱 재실행 user hydrate와 Auth/Mode route guard를 보강한다.
+1. Auth/Mode route guard를 보강한다.
 2. 팬 홈 미구현 interaction을 보강한다.
 3. 공연 상세 공유/남은 interaction을 보강한다.
 
@@ -316,7 +318,7 @@
 ## 미해결 문제
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
-- token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
+- Auth/Mode route guard는 상세 route 직접 진입, Android hardware back, guest 접근 차단 QA가 필요하다.
 - Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
 - Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회와 콘텐츠/공연 상세/등록/수정/삭제, 콘텐츠 이미지/썸네일 및 공연 포스터 네이티브 업로드 UX를 연결했다. 실제 기기에서 갤러리/카메라 권한과 presigned upload QA가 필요하다.
 - 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
@@ -390,11 +392,11 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `db65dd1`
+- 최근 완료 커밋: `6fb346e`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-앱 재실행 user hydrate와 Auth/Mode route guard를 보강한다.
+Auth/Mode route guard를 보강한다.
 
 ## MEDIUM 전환 메모
 
