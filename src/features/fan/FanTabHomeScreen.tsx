@@ -723,7 +723,7 @@ function BandRecommendationStrip({
               onPress={() => {
                 if (band.bandId == null) return;
                 router.push(
-                  `/fan/explore/bands/${band.bandId}` as Parameters<
+                  `/fan/bands/${band.bandId}` as Parameters<
                     typeof router.push
                   >[0],
                 );
