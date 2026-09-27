@@ -1,7 +1,9 @@
 import { router, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
   Alert,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +12,7 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import { uploadMediaAsset } from "@/api/media/media";
 import {
   useBandPostQuery,
   useCreateBandPost,
@@ -64,6 +67,12 @@ const splitTags = (value: string) =>
 const joinLines = (items?: string[]) => items?.join("\n") ?? "";
 
 const DESCRIPTION_MAX_LENGTH = 500;
+
+type SelectedMediaAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
 
 export function BandContentFormScreen() {
   const params = useLocalSearchParams<{ postId?: string }>();
@@ -137,27 +146,100 @@ function ContentForm({
   const [thumbnailUrl, setThumbnailUrl] = useState(
     initialPost?.thumbnailUrl ?? "",
   );
+  const [selectedImages, setSelectedImages] = useState<SelectedMediaAsset[]>([]);
+  const [selectedThumbnail, setSelectedThumbnail] =
+    useState<SelectedMediaAsset | null>(null);
   const [tags, setTags] = useState(initialPost?.tags?.join(", ") ?? "");
   const [showErrors, setShowErrors] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const titleError = showErrors && !title.trim();
-  const isSubmitting = createPost.isPending || updatePost.isPending;
+  const isSubmitting = createPost.isPending || updatePost.isPending || uploading;
+
+  const requestImagePermission = async (camera: boolean) => {
+    const permission = camera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "권한 필요",
+        camera ? "카메라 권한이 필요해요." : "사진 접근 권한이 필요해요.",
+      );
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const pickImages = async (camera: boolean) => {
+    if (!(await requestImagePermission(camera))) {
+      return;
+    }
+
+    const result = camera
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: ["images"],
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.85,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsMultipleSelection: true,
+          selectionLimit: 6,
+          quality: 0.85,
+        });
+
+    if (result.canceled || result.assets.length === 0) {
+      return;
+    }
+
+    const assets = result.assets.map((asset) => ({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+    }));
+
+    setSelectedImages((previous) => [...previous, ...assets].slice(0, 6));
+  };
+
+  const pickThumbnail = async () => {
+    if (!(await requestImagePermission(false))) {
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+
+    if (result.canceled || !result.assets[0]) {
+      return;
+    }
+
+    const asset = result.assets[0];
+
+    setSelectedThumbnail({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+    });
+  };
+
+  const removeSelectedImage = (uri: string) => {
+    setSelectedImages((previous) =>
+      previous.filter((asset) => asset.uri !== uri),
+    );
+  };
 
   const submit = async () => {
     if (!title.trim()) {
       setShowErrors(true);
       return;
     }
-
-    const nextMediaUrls = type === "TEXT" ? [] : splitLines(mediaUrls);
-    const nextTags = splitTags(tags);
-    const nextThumbnailUrl = thumbnailUrl.trim();
-    const commonPayload = {
-      title: title.trim(),
-      description: description.trim() || undefined,
-      mediaUrls: nextMediaUrls.length > 0 ? nextMediaUrls : undefined,
-      tags: nextTags.length > 0 ? nextTags : undefined,
-      thumbnailUrl: nextThumbnailUrl || undefined,
-    };
 
     const onSuccess = (nextPostId: number) => {
       router.replace(
@@ -168,6 +250,49 @@ function ContentForm({
     };
 
     try {
+      setUploading(true);
+
+      const uploadedMediaUrls =
+        type === "TEXT"
+          ? []
+          : await Promise.all(
+              selectedImages.map((asset) =>
+                uploadMediaAsset({
+                  category: "POST",
+                  uri: asset.uri,
+                  fileName: asset.fileName,
+                  mimeType: asset.mimeType,
+                }),
+              ),
+            );
+
+      const uploadedThumbnailUrl = selectedThumbnail
+        ? await uploadMediaAsset({
+            category: "POST_THUMBNAIL",
+            uri: selectedThumbnail.uri,
+            fileName: selectedThumbnail.fileName,
+            mimeType: selectedThumbnail.mimeType,
+          })
+        : "";
+
+      const nextMediaUrls =
+        type === "TEXT"
+          ? []
+          : [...splitLines(mediaUrls), ...uploadedMediaUrls];
+      const nextTags = splitTags(tags);
+      const nextThumbnailUrl =
+        uploadedThumbnailUrl ||
+        thumbnailUrl.trim() ||
+        uploadedMediaUrls[0] ||
+        "";
+      const commonPayload = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        mediaUrls: nextMediaUrls.length > 0 ? nextMediaUrls : undefined,
+        tags: nextTags.length > 0 ? nextTags : undefined,
+        thumbnailUrl: nextThumbnailUrl || undefined,
+      };
+
       if (isEditMode && postId) {
         const result = await updatePost.mutateAsync(
           commonPayload satisfies UpdatePostRequest,
@@ -186,6 +311,8 @@ function ContentForm({
         isEditMode ? "콘텐츠 수정" : "콘텐츠 등록",
         "콘텐츠를 저장하지 못했어요.",
       );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -198,12 +325,53 @@ function ContentForm({
           <View style={styles.uploadPanel}>
             <UploadIcon />
             <Text style={styles.uploadTitle}>
-              {type === "VIDEO" ? "영상 URL 입력" : "이미지 URL 입력"}
+              {type === "VIDEO" ? "영상 URL 입력" : "이미지 업로드"}
             </Text>
             <Text style={styles.uploadDescription}>
-              현재 모바일에서는 기존 업로드 API 계약을 유지하며{"\n"}
-              URL 입력 방식으로 저장해요
+              {type === "VIDEO"
+                ? "영상은 URL 입력 방식으로 저장해요"
+                : "갤러리 또는 카메라로 이미지를 추가해요"}
             </Text>
+
+            {type === "PHOTO" ? (
+              <>
+                <View style={styles.uploadActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.uploadActionButton}
+                    onPress={() => void pickImages(false)}
+                  >
+                    <Text style={styles.uploadActionText}>갤러리</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.uploadActionButton}
+                    onPress={() => void pickImages(true)}
+                  >
+                    <Text style={styles.uploadActionText}>카메라</Text>
+                  </Pressable>
+                </View>
+
+                {selectedImages.length > 0 ? (
+                  <View style={styles.previewGrid}>
+                    {selectedImages.map((asset) => (
+                      <View key={asset.uri} style={styles.previewItem}>
+                        <Image source={{ uri: asset.uri }} style={styles.previewImage} />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="선택 이미지 제거"
+                          style={styles.previewRemove}
+                          onPress={() => removeSelectedImage(asset.uri)}
+                        >
+                          <Text style={styles.previewRemoveText}>×</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </>
+            ) : null}
           </View>
         ) : null}
 
@@ -273,17 +441,49 @@ function ContentForm({
               <Field label="미디어 URL">
                 <NativeInput
                   value={mediaUrls}
-                  placeholder="한 줄에 하나씩 입력"
+                  placeholder={
+                    type === "PHOTO"
+                      ? "외부 이미지 URL이 있다면 한 줄에 하나씩 입력"
+                      : "한 줄에 하나씩 입력"
+                  }
                   multiline
                   autoCapitalize="none"
                   onChangeText={setMediaUrls}
                 />
               </Field>
 
-              <Field label="썸네일 URL">
+              <Field label="썸네일">
+                {selectedThumbnail ? (
+                  <View style={styles.thumbnailPreviewRow}>
+                    <Image
+                      source={{ uri: selectedThumbnail.uri }}
+                      style={styles.thumbnailPreview}
+                    />
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.thumbnailRemoveButton}
+                      onPress={() => setSelectedThumbnail(null)}
+                    >
+                      <Text style={styles.thumbnailRemoveText}>선택 취소</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {type === "PHOTO" ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.thumbnailPickerButton}
+                    onPress={() => void pickThumbnail()}
+                  >
+                    <Text style={styles.thumbnailPickerText}>
+                      대표 이미지 선택
+                    </Text>
+                  </Pressable>
+                ) : null}
+
                 <NativeInput
                   value={thumbnailUrl}
-                  placeholder="대표 이미지 URL"
+                  placeholder="대표 이미지 URL 직접 입력"
                   autoCapitalize="none"
                   onChangeText={setThumbnailUrl}
                 />
@@ -433,6 +633,99 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 18,
     textAlign: "center",
+  },
+  uploadActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  uploadActionButton: {
+    minWidth: 78,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary500,
+    paddingHorizontal: 14,
+  },
+  uploadActionText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  previewGrid: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  previewItem: {
+    width: 72,
+    height: 72,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: colors.neutral300,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  previewRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.neutral900,
+  },
+  previewRemoveText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  thumbnailPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  thumbnailPreview: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    backgroundColor: colors.neutral300,
+  },
+  thumbnailRemoveButton: {
+    minHeight: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.neutral300,
+    paddingHorizontal: 12,
+  },
+  thumbnailRemoveText: {
+    color: colors.neutral700,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  thumbnailPickerButton: {
+    minHeight: 38,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.secondary400,
+    backgroundColor: colors.secondary0,
+  },
+  thumbnailPickerText: {
+    color: colors.secondary600,
+    fontSize: 12,
+    fontWeight: "700",
   },
   formFields: {
     gap: 16,
