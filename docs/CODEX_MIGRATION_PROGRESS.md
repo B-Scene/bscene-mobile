@@ -40,7 +40,8 @@
 - Phase 35 앱 재실행 user hydrate: SecureStore user 부재 시 `/users/me`, onboarding status 기반 복구 완료
 - Phase 36 Auth/Mode route guard: fan/band 직접 진입 인증, onboarding, mode 접근 제어 완료
 - Phase 37 팬 홈 주요 interaction: 모드 전환, 추천 밴드 팔로우/언팔로우 보강 완료
-- 전체 기준 대략 73%
+- Phase 38 팬 공연 상세 남은 interaction: Native 공유, 알림 성공 피드백, 캐스팅 밴드 이동 완료
+- 전체 기준 대략 74%
 
 ## 완료된 작업
 
@@ -127,17 +128,19 @@
 - 앱 재실행 시 access token은 있지만 SecureStore user가 없는 경우 `/users/me`, `/users/me/onboarding/status`를 조회해 최소 AuthUser를 복구하고 mode/onboarding 분기를 유지하도록 보강했다.
 - fan/band route layout에 보호 guard를 추가해 guest 직접 진입은 로그인으로, onboarding 미완료는 약관 단계로, 미보유 mode 접근은 사용 가능한 홈으로 이동하도록 보강했다.
 - 팬 홈 헤더 모드 전환 버튼을 실제 BAND 가능 여부 확인 후 전환하도록 연결하고, 추천 밴드 팔로우/언팔로우 mutation과 optimistic UI, 실패 복구를 적용했다.
+- 팬 홈 추천 밴드 상세 이동 경로를 실제 모바일 route인 `/fan/bands/{bandId}`로 수정했다.
+- 팬 공연 상세에 Native Share 기반 공유 버튼, 공연 알림 설정/해제 성공 피드백, 캐스팅 밴드 프로필 이동을 추가했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 공연 상세 공유/남은 interaction 보강이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 공연 상세 공유/캐스팅 이동, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Live Home parity 작업이다.
 
 ## 다음에 해야 할 작업
 
-1. 공연 상세 공유/남은 interaction을 보강한다.
+1. Live Home parity 작업을 시작한다.
 2. 팬 홈 알림 목록/참여 여부 모달 parity를 별도 Work Unit으로 검토한다.
-3. Live Home parity 작업을 시작한다.
+3. Native notification tap navigation/Deep Link QA를 진행한다.
 
 ## 변경한 주요 파일
 
@@ -326,7 +329,7 @@
 - Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
 - Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회와 콘텐츠/공연 상세/등록/수정/삭제, 콘텐츠 이미지/썸네일 및 공연 포스터 네이티브 업로드 UX를 연결했다. 실제 기기에서 갤러리/카메라 권한과 presigned upload QA가 필요하다.
 - 팬 홈은 1차 API 연동과 추천 밴드 팔로우/모드 전환을 완료했다. 알림 목록 화면과 공연 참여 여부 모달은 별도 API/화면 parity가 필요하다.
-- 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
+- 공연 목록/상세는 조회, 관심/알림 mutation, Native 공유, 캐스팅 밴드 이동을 완료했다. 실제 기기에서 공유 sheet와 외부 예매 링크 QA가 필요하다.
 - 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 콘텐츠 상세/좋아요/댓글/댓글 UX, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 상세 이미지/영상 네이티브 미디어 표시 고도화는 추가 QA가 필요하다.
 - 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정, 프로필 수정 화면을 완료했다.
 - 밴드 마이페이지는 요약, 메뉴, 밴드 알림 설정을 완료했다. 밴드 프로필/멤버/모집/지원 관리 화면은 아직 웹 parity 전이다.
@@ -396,11 +399,11 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `d9a35ed`
+- 최근 완료 커밋: `fde68c1`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-공연 상세 공유/남은 interaction을 보강한다.
+Live Home parity 작업을 시작한다.
 
 ## MEDIUM 전환 메모
 
