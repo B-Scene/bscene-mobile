@@ -23,6 +23,7 @@ import type {
     LiveNowListResponse,
     ReplayListFilter,
     ReplayListResponse,
+    ReplayPlaybackResponse,
     ReplaySort,
     ScheduledLiveListResponse,
     ToggleLiveAlarmResponse,
@@ -477,6 +478,22 @@ export const getReplayList =
           result,
         ),
     };
+  };
+
+export const getReplayPlayback =
+  async (
+    liveId: number,
+  ) => {
+    const response =
+      await axiosInstance.get<
+        LiveApiResponse<ReplayPlaybackResponse>
+      >(
+        `/lives/${liveId}/replay`,
+      );
+
+    return assertSuccess(
+      response,
+    );
   };
 
 export const resolveLiveMediaUrl =

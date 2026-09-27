@@ -12,6 +12,7 @@ import {
     enterLive,
     getLiveNowList,
     getReplayList,
+    getReplayPlayback,
     getScheduledLiveList,
     getLiveHome,
     leaveLive,
@@ -69,6 +70,14 @@ export const liveKeys = {
     "replays",
     filter,
     sort,
+  ] as const,
+
+  replayPlayback: (
+    liveId: number,
+  ) => [
+    ...liveKeys.all,
+    "replayPlayback",
+    liveId,
   ] as const,
 };
 
@@ -220,6 +229,26 @@ export const useReplayListInfiniteQuery =
               .nextCursor ??
             undefined
           : undefined,
+    });
+  };
+
+export const useReplayPlaybackQuery =
+  (
+    liveId: number,
+  ) => {
+    return useQuery({
+      queryKey:
+        liveKeys.replayPlayback(
+          liveId,
+        ),
+
+      queryFn: () =>
+        getReplayPlayback(
+          liveId,
+        ),
+
+      enabled:
+        liveId > 0,
     });
   };
 

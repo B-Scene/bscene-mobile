@@ -126,6 +126,44 @@ export interface ReplayListResponse {
   pageInfo: LivePageInfo;
 }
 
+export interface ReplayPlaybackResponse {
+  title: string;
+
+  bandName: string;
+
+  bandProfileImageUrl?:
+    | string
+    | null;
+
+  thumbnailImageUrl?:
+    | string
+    | null;
+
+  thumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailImageUrl?:
+    | string
+    | null;
+
+  imageUrl?:
+    | string
+    | null;
+
+  viewCount: number;
+
+  durationSec: number;
+
+  durationSeconds?: number;
+
+  playbackUrl: string;
+}
+
 export type PlaybackRole =
   | "BROADCASTER"
   | "LISTENER"

@@ -503,7 +503,7 @@ function ReplayPreviewCard({ replay }: { replay: LiveReplayItem }) {
       ]}
       onPress={() =>
         router.push(
-          `/fan/live/room/${replay.liveId}` as Parameters<typeof router.push>[0],
+          `/fan/live/replays/${replay.liveId}` as Parameters<typeof router.push>[0],
         )
       }
     >

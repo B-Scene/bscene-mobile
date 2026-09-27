@@ -618,7 +618,7 @@ function ReplayListCard({
       style={styles.liveCard}
       onPress={() =>
         router.push(
-          `/fan/live/room/${replay.liveId}` as Parameters<
+          `/fan/live/replays/${replay.liveId}` as Parameters<
             typeof router.push
           >[0],
         )
