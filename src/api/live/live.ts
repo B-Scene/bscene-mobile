@@ -19,6 +19,7 @@ import type {
     LiveApiResponse,
     LiveChatTicketResponse,
     LiveHomeResponse,
+    ToggleLiveAlarmResponse,
 } from "@/types/live/live";
 
 const assertSuccess = <T>(
@@ -236,6 +237,22 @@ export const getLiveChatTicket =
         LiveApiResponse<LiveChatTicketResponse>
       >(
         `/lives/${liveId}/chat/ws-ticket`,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
+export const toggleLiveAlarm =
+  async (
+    liveId: number,
+  ) => {
+    const response =
+      await axiosInstance.post<
+        LiveApiResponse<ToggleLiveAlarmResponse>
+      >(
+        `/lives/${liveId}/alarm`,
       );
 
     return assertSuccess(

@@ -47,6 +47,10 @@ export interface ScheduledLiveItem {
 
   notificationEnabled?: boolean;
 
+  isAlarmSet?: boolean;
+
+  alarmSet?: boolean;
+
   isMine?: boolean;
 }
 
@@ -81,6 +85,10 @@ export interface LiveHomeResponse {
   myProfileImageUrl?:
     | string
     | null;
+}
+
+export interface ToggleLiveAlarmResponse {
+  alarmSet: boolean;
 }
 
 export type PlaybackRole =

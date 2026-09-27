@@ -1,5 +1,7 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
+  Alert,
   Image,
   Pressable,
   StyleSheet,
@@ -8,7 +10,10 @@ import {
 } from "react-native";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 
-import { useLiveHomeQuery } from "@/hooks/api/live/useLive";
+import {
+  useLiveHomeQuery,
+  useToggleLiveAlarmMutation,
+} from "@/hooks/api/live/useLive";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
 import { Screen } from "@/shared/components/Screen";
@@ -157,6 +162,80 @@ function FanLiveHome({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const toggleAlarmMutation =
+    useToggleLiveAlarmMutation();
+  const [
+    notificationOverrides,
+    setNotificationOverrides,
+  ] =
+    useState<
+      Record<number, boolean>
+    >({});
+
+  const handleMorePress = (
+    title: string,
+  ) => {
+    Alert.alert(
+      title,
+      "전체 목록 화면은 다음 Live list parity 단계에서 연결할게요.",
+    );
+  };
+
+  const toggleNotification =
+    async (
+      live: ScheduledLiveItem,
+    ) => {
+      if (
+        toggleAlarmMutation.isPending
+      ) {
+        return;
+      }
+
+      const previousValue =
+        notificationOverrides[
+          live.liveId
+        ] ??
+        live.isAlarmSet ??
+        live.alarmSet ??
+        live.notificationEnabled ??
+        false;
+
+      setNotificationOverrides(
+        (current) => ({
+          ...current,
+          [live.liveId]:
+            !previousValue,
+        }),
+      );
+
+      try {
+        const result =
+          await toggleAlarmMutation.mutateAsync(
+            live.liveId,
+          );
+
+        setNotificationOverrides(
+          (current) => ({
+            ...current,
+            [live.liveId]:
+              result.alarmSet,
+          }),
+        );
+      } catch {
+        setNotificationOverrides(
+          (current) => ({
+            ...current,
+            [live.liveId]:
+              previousValue,
+          }),
+        );
+        Alert.alert(
+          "라이브 알림",
+          "라이브 알림을 변경하지 못했어요.",
+        );
+      }
+    };
+
   return (
     <Screen contentStyle={styles.fanContainer}>
       <View style={styles.fanHeader}>
@@ -178,7 +257,14 @@ function FanLiveHome({
       ) : (
         <View style={styles.fanContent}>
           <View style={styles.fanSection}>
-            <FanSectionHeader title="진행 중인 라이브" />
+            <FanSectionHeader
+              title="진행 중인 라이브"
+              onMorePress={() =>
+                handleMorePress(
+                  "진행 중인 라이브",
+                )
+              }
+            />
             <View style={styles.fanCardList}>
               {data.liveNow.length === 0 ? (
                 <Text style={styles.fanEmpty}>진행 중인 라이브가 없어요.</Text>
@@ -191,7 +277,14 @@ function FanLiveHome({
           </View>
 
           <View style={styles.fanSection}>
-            <FanSectionHeader title="다시보기" />
+            <FanSectionHeader
+              title="다시보기"
+              onMorePress={() =>
+                handleMorePress(
+                  "다시보기",
+                )
+              }
+            />
             {data.replays.length > 0 ? (
               <View style={styles.replayRow}>
                 {data.replays.slice(0, 3).map((replay) => (
@@ -204,14 +297,46 @@ function FanLiveHome({
           </View>
 
           <View style={styles.fanSection}>
-            <FanSectionHeader title="예정된 라이브" />
+            <FanSectionHeader
+              title="예정된 라이브"
+              onMorePress={() =>
+                handleMorePress(
+                  "예정된 라이브",
+                )
+              }
+            />
             <View style={styles.fanCardList}>
               {data.scheduled.length === 0 ? (
                 <Text style={styles.fanEmpty}>예정된 라이브가 없어요.</Text>
               ) : (
-                data.scheduled.map((live) => (
-                  <FanScheduledLiveCard key={live.liveId} live={live} />
-                ))
+                data.scheduled.map((live) => {
+                  const notified =
+                    notificationOverrides[
+                      live.liveId
+                    ] ??
+                    live.isAlarmSet ??
+                    live.alarmSet ??
+                    live.notificationEnabled ??
+                    false;
+
+                  return (
+                    <FanScheduledLiveCard
+                      key={live.liveId}
+                      live={live}
+                      notified={
+                        notified
+                      }
+                      disabled={
+                        toggleAlarmMutation.isPending
+                      }
+                      onToggleNotification={() =>
+                        void toggleNotification(
+                          live,
+                        )
+                      }
+                    />
+                  );
+                })
               )}
             </View>
           </View>
@@ -233,14 +358,24 @@ function BandSectionHeader({ title }: { title: string }) {
   );
 }
 
-function FanSectionHeader({ title }: { title: string }) {
+function FanSectionHeader({
+  title,
+  onMorePress,
+}: {
+  title: string;
+  onMorePress?: () => void;
+}) {
   return (
     <View style={styles.fanSectionHeader}>
       <Text style={styles.fanSectionTitle}>{title}</Text>
-      <View style={styles.fanMoreButton} accessibilityRole="button">
+      <Pressable
+        style={styles.fanMoreButton}
+        accessibilityRole="button"
+        onPress={onMorePress}
+      >
         <Text style={styles.fanMoreText}>더보기</Text>
         <Text style={styles.fanMoreIcon}>›</Text>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -406,9 +541,17 @@ function ReplayPreviewCard({ replay }: { replay: LiveReplayItem }) {
   );
 }
 
-function FanScheduledLiveCard({ live }: { live: ScheduledLiveItem }) {
-  const notified = live.notificationEnabled ?? false;
-
+function FanScheduledLiveCard({
+  live,
+  notified,
+  disabled,
+  onToggleNotification,
+}: {
+  live: ScheduledLiveItem;
+  notified: boolean;
+  disabled: boolean;
+  onToggleNotification: () => void;
+}) {
   return (
     <View style={styles.fanScheduledCard}>
       <Avatar
@@ -423,11 +566,19 @@ function FanScheduledLiveCard({ live }: { live: ScheduledLiveItem }) {
           {formatScheduledAt(live.scheduledAt)}
         </Text>
       </View>
-      <View
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{
+          disabled,
+          selected: notified,
+        }}
+        disabled={disabled}
         style={[
           styles.fanAlarmButton,
           notified ? styles.fanAlarmButtonSoft : styles.fanAlarmButtonOutline,
+          disabled && styles.fanAlarmButtonDisabled,
         ]}
+        onPress={onToggleNotification}
       >
         <NotificationIcon />
         <Text
@@ -438,7 +589,7 @@ function FanScheduledLiveCard({ live }: { live: ScheduledLiveItem }) {
         >
           {notified ? "알림 받는 중" : "알림 받기"}
         </Text>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -1101,6 +1252,9 @@ const styles = StyleSheet.create({
   fanAlarmButtonOutline: {
     borderColor: colors.primary400,
     backgroundColor: colors.white,
+  },
+  fanAlarmButtonDisabled: {
+    opacity: 0.6,
   },
   fanAlarmButtonText: {
     fontSize: 10,

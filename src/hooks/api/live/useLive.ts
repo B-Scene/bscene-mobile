@@ -13,6 +13,7 @@ import {
     leaveLive,
     requestCoHostUpgrade,
     respondCoHostInvitation,
+    toggleLiveAlarm,
 } from "@/api/live/live";
 
 import type {
@@ -158,5 +159,23 @@ export const useRespondCoHostInvitationMutation =
           liveId,
           isAccepted,
         ),
+    });
+  };
+
+export const useToggleLiveAlarmMutation =
+  () => {
+    const queryClient =
+      useQueryClient();
+
+    return useMutation({
+      mutationFn:
+        toggleLiveAlarm,
+
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey:
+            liveKeys.home(),
+        });
+      },
     });
   };
