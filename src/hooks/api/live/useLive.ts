@@ -1,4 +1,5 @@
 import {
+    useInfiniteQuery,
     useMutation,
     useQuery,
     useQueryClient,
@@ -9,6 +10,9 @@ import {
     closeLive,
     createLive,
     enterLive,
+    getLiveNowList,
+    getReplayList,
+    getScheduledLiveList,
     getLiveHome,
     leaveLive,
     requestCoHostUpgrade,
@@ -18,6 +22,9 @@ import {
 
 import type {
     CreateLiveRequest,
+    LiveNowListFilter,
+    ReplayListFilter,
+    ReplaySort,
 } from "@/types/live/live";
 
 export const liveKeys = {
@@ -36,6 +43,32 @@ export const liveKeys = {
     ...liveKeys.all,
     "room",
     liveId,
+  ] as const,
+
+  liveNow: (
+    filter: LiveNowListFilter,
+  ) => [
+    ...liveKeys.all,
+    "liveNow",
+    filter,
+  ] as const,
+
+  scheduled: (
+    following: boolean,
+  ) => [
+    ...liveKeys.all,
+    "scheduled",
+    following,
+  ] as const,
+
+  replays: (
+    filter: ReplayListFilter,
+    sort: ReplaySort,
+  ) => [
+    ...liveKeys.all,
+    "replays",
+    filter,
+    sort,
   ] as const,
 };
 
@@ -73,6 +106,120 @@ export const useCreateLiveMutation =
             liveKeys.home(),
         });
       },
+    });
+  };
+
+export const useLiveNowInfiniteQuery =
+  (
+    filter: LiveNowListFilter =
+      "all",
+  ) => {
+    return useInfiniteQuery({
+      queryKey:
+        liveKeys.liveNow(
+          filter,
+        ),
+
+      queryFn: ({
+        pageParam,
+      }) =>
+        getLiveNowList({
+          filter,
+          cursor:
+            pageParam,
+        }),
+
+      initialPageParam:
+        undefined as
+          | number
+          | undefined,
+
+      getNextPageParam: (
+        lastPage,
+      ) =>
+        lastPage.pageInfo
+          .hasNext
+          ? lastPage.pageInfo
+              .nextCursor ??
+            undefined
+          : undefined,
+    });
+  };
+
+export const useScheduledLiveInfiniteQuery =
+  (
+    following = false,
+  ) => {
+    return useInfiniteQuery({
+      queryKey:
+        liveKeys.scheduled(
+          following,
+        ),
+
+      queryFn: ({
+        pageParam,
+      }) =>
+        getScheduledLiveList({
+          following,
+          cursor:
+            pageParam,
+        }),
+
+      initialPageParam:
+        undefined as
+          | number
+          | undefined,
+
+      getNextPageParam: (
+        lastPage,
+      ) =>
+        lastPage.pageInfo
+          .hasNext
+          ? lastPage.pageInfo
+              .nextCursor ??
+            undefined
+          : undefined,
+    });
+  };
+
+export const useReplayListInfiniteQuery =
+  (
+    filter: ReplayListFilter =
+      "all",
+    sort: ReplaySort =
+      "LATEST",
+  ) => {
+    return useInfiniteQuery({
+      queryKey:
+        liveKeys.replays(
+          filter,
+          sort,
+        ),
+
+      queryFn: ({
+        pageParam,
+      }) =>
+        getReplayList({
+          filter,
+          sort,
+          cursor:
+            pageParam,
+        }),
+
+      initialPageParam:
+        undefined as
+          | number
+          | undefined,
+
+      getNextPageParam: (
+        lastPage,
+      ) =>
+        lastPage.pageInfo
+          .hasNext
+          ? lastPage.pageInfo
+              .nextCursor ??
+            undefined
+          : undefined,
     });
   };
 

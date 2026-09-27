@@ -19,8 +19,17 @@ import type {
     LiveApiResponse,
     LiveChatTicketResponse,
     LiveHomeResponse,
+    LiveNowListFilter,
+    LiveNowListResponse,
+    ReplayListFilter,
+    ReplayListResponse,
+    ReplaySort,
+    ScheduledLiveListResponse,
     ToggleLiveAlarmResponse,
 } from "@/types/live/live";
+
+type RawRecord =
+  Record<string, unknown>;
 
 const assertSuccess = <T>(
   response: AxiosResponse<
@@ -66,6 +75,92 @@ const assertNullableSuccess =
     }
 
     return data.result;
+  };
+
+const isRecord =
+  (
+    value: unknown,
+  ): value is RawRecord =>
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value);
+
+const toNumberOrNull =
+  (
+    value: unknown,
+  ) => {
+    if (
+      typeof value === "number" &&
+      Number.isFinite(value)
+    ) {
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const parsed =
+        Number(value);
+
+      return Number.isFinite(parsed)
+        ? parsed
+        : null;
+    }
+
+    return null;
+  };
+
+const getPaginatedItems =
+  <T>(
+    result: unknown,
+  ): T[] => {
+    if (Array.isArray(result)) {
+      return result as T[];
+    }
+
+    if (!isRecord(result)) {
+      return [];
+    }
+
+    const source =
+      result.items ??
+      result.content ??
+      result.data ??
+      result.list ??
+      result.lives ??
+      result.replays ??
+      result.scheduled;
+
+    return Array.isArray(source)
+      ? source as T[]
+      : [];
+  };
+
+const getPageInfo =
+  (
+    result: unknown,
+  ) => {
+    if (!isRecord(result)) {
+      return {
+        nextCursor:
+          null,
+        hasNext:
+          false,
+      };
+    }
+
+    return {
+      nextCursor:
+        toNumberOrNull(
+          result.nextCursor ??
+            result.nextPage ??
+            result.cursor,
+        ),
+      hasNext:
+        typeof result.hasNext === "boolean"
+          ? result.hasNext
+          : typeof result.last === "boolean"
+            ? !result.last
+            : false,
+    };
   };
 
 export const getLiveHome =
@@ -258,6 +353,130 @@ export const toggleLiveAlarm =
     return assertSuccess(
       response,
     );
+  };
+
+export const getLiveNowList =
+  async ({
+    filter,
+    cursor,
+    size = 10,
+  }: {
+    filter: LiveNowListFilter;
+    cursor?: number;
+    size?: number;
+  }): Promise<LiveNowListResponse> => {
+    const response =
+      await axiosInstance.get<
+        LiveApiResponse<unknown>
+      >(
+        `/lives/live-now/${filter}`,
+        {
+          params: {
+            cursor,
+            size,
+          },
+        },
+      );
+
+    const result =
+      assertSuccess(
+        response,
+      );
+
+    return {
+      items:
+        getPaginatedItems(
+          result,
+        ),
+      pageInfo:
+        getPageInfo(
+          result,
+        ),
+    };
+  };
+
+export const getScheduledLiveList =
+  async ({
+    following,
+    cursor,
+    size = 10,
+  }: {
+    following: boolean;
+    cursor?: number;
+    size?: number;
+  }): Promise<ScheduledLiveListResponse> => {
+    const response =
+      await axiosInstance.get<
+        LiveApiResponse<unknown>
+      >(
+        "/lives/scheduled",
+        {
+          params: {
+            following,
+            cursor,
+            size,
+          },
+        },
+      );
+
+    const result =
+      assertSuccess(
+        response,
+      );
+
+    return {
+      items:
+        getPaginatedItems(
+          result,
+        ),
+      pageInfo:
+        getPageInfo(
+          result,
+        ),
+    };
+  };
+
+export const getReplayList =
+  async ({
+    filter,
+    sort,
+    cursor,
+    size = 10,
+  }: {
+    filter: ReplayListFilter;
+    sort: ReplaySort;
+    cursor?: number;
+    size?: number;
+  }): Promise<ReplayListResponse> => {
+    const response =
+      await axiosInstance.get<
+        LiveApiResponse<unknown>
+      >(
+        `/lives/replays/${filter}`,
+        {
+          params: {
+            sort,
+            cursor,
+            size,
+          },
+        },
+      );
+
+    const result =
+      assertSuccess(
+        response,
+      );
+
+    return {
+      items:
+        getPaginatedItems(
+          result,
+        ),
+      pageInfo:
+        getPageInfo(
+          result,
+        ),
+    };
   };
 
 export const resolveLiveMediaUrl =

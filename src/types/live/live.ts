@@ -91,6 +91,41 @@ export interface ToggleLiveAlarmResponse {
   alarmSet: boolean;
 }
 
+export type LiveNowListFilter =
+  | "following"
+  | "all";
+
+export type ReplayListFilter =
+  | "following"
+  | "all";
+
+export type ReplaySort =
+  | "LATEST"
+  | "POPULAR";
+
+export interface LivePageInfo {
+  nextCursor:
+    | number
+    | null;
+
+  hasNext: boolean;
+}
+
+export interface LiveNowListResponse {
+  items: LiveNowItem[];
+  pageInfo: LivePageInfo;
+}
+
+export interface ScheduledLiveListResponse {
+  items: ScheduledLiveItem[];
+  pageInfo: LivePageInfo;
+}
+
+export interface ReplayListResponse {
+  items: LiveReplayItem[];
+  pageInfo: LivePageInfo;
+}
+
 export type PlaybackRole =
   | "BROADCASTER"
   | "LISTENER"

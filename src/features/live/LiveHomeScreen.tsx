@@ -172,15 +172,6 @@ function FanLiveHome({
       Record<number, boolean>
     >({});
 
-  const handleMorePress = (
-    title: string,
-  ) => {
-    Alert.alert(
-      title,
-      "전체 목록 화면은 다음 Live list parity 단계에서 연결할게요.",
-    );
-  };
-
   const toggleNotification =
     async (
       live: ScheduledLiveItem,
@@ -260,8 +251,10 @@ function FanLiveHome({
             <FanSectionHeader
               title="진행 중인 라이브"
               onMorePress={() =>
-                handleMorePress(
-                  "진행 중인 라이브",
+                router.push(
+                  "/fan/live/now" as Parameters<
+                    typeof router.push
+                  >[0],
                 )
               }
             />
@@ -280,8 +273,10 @@ function FanLiveHome({
             <FanSectionHeader
               title="다시보기"
               onMorePress={() =>
-                handleMorePress(
-                  "다시보기",
+                router.push(
+                  "/fan/live/replays" as Parameters<
+                    typeof router.push
+                  >[0],
                 )
               }
             />
@@ -300,8 +295,10 @@ function FanLiveHome({
             <FanSectionHeader
               title="예정된 라이브"
               onMorePress={() =>
-                handleMorePress(
-                  "예정된 라이브",
+                router.push(
+                  "/fan/live/scheduled" as Parameters<
+                    typeof router.push
+                  >[0],
                 )
               }
             />
