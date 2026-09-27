@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { router } from "expo-router";
 import {
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -13,6 +15,11 @@ import {
   useFanHomeQuery,
   useUpcomingPerformancesInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
+import {
+  useFollowExploreBand,
+  useUnfollowExploreBand,
+} from "@/hooks/api/fan/useFanExplore";
+import { useOnboardingStatus } from "@/hooks/api/onboarding/useOnboarding";
 import { BSceneLogo } from "@/features/onboarding/BSceneBrandAssets";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
@@ -325,6 +332,7 @@ const mapHomeResponse = (data?: FanHomeResponse) => {
 
 export function FanTabHomeScreen() {
   const fanHomeQuery = useFanHomeQuery();
+  const onboardingStatusQuery = useOnboardingStatus();
   const upcomingQuery = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
   const home = mapHomeResponse(fanHomeQuery.data);
   const upcomingConcerts =
@@ -340,9 +348,51 @@ export function FanTabHomeScreen() {
     void upcomingQuery.refetch();
   };
 
+  const handleModeSwitch = () => {
+    const canUseBandMode =
+      onboardingStatusQuery.data?.availableModes.includes("BAND") ?? false;
+
+    if (onboardingStatusQuery.isLoading) {
+      Alert.alert("모드 전환", "사용 가능한 모드를 확인하는 중이에요.");
+      return;
+    }
+
+    if (!canUseBandMode) {
+      Alert.alert(
+        "모드 전환",
+        "밴드 모드가 아직 활성화되어 있지 않아요. 온보딩에서 밴드 모드를 추가한 뒤 이용해 주세요.",
+      );
+      return;
+    }
+
+    Alert.alert("모드 전환", "밴드 모드로 이동할까요?", [
+      {
+        text: "취소",
+        style: "cancel",
+      },
+      {
+        text: "전환",
+        onPress: () => {
+          router.replace("/band/home");
+        },
+      },
+    ]);
+  };
+
+  const handleNotificationPress = () => {
+    Alert.alert(
+      "알림",
+      "알림 목록 화면은 다음 알림 navigation parity 단계에서 연결할게요.",
+    );
+  };
+
   return (
     <Screen contentStyle={styles.container}>
-      <HomeHeader hasUnreadNotification={home.hasUnreadNotification} />
+      <HomeHeader
+        hasUnreadNotification={home.hasUnreadNotification}
+        onModeSwitch={handleModeSwitch}
+        onNotificationPress={handleNotificationPress}
+      />
 
       {isLoading ? (
         <AppState loading title="팬 홈을 불러오는 중이에요" />
@@ -375,7 +425,12 @@ export function FanTabHomeScreen() {
                 router.push("/fan/explore" as Parameters<typeof router.push>[0])
               }
             >
-              <BandRecommendationStrip bands={home.recommendedBands} />
+              <BandRecommendationStrip
+                bands={home.recommendedBands}
+                onFollowChanged={() => {
+                  void fanHomeQuery.refetch();
+                }}
+              />
             </Section>
           ) : null}
 
@@ -408,8 +463,12 @@ export function FanTabHomeScreen() {
 
 function HomeHeader({
   hasUnreadNotification,
+  onModeSwitch,
+  onNotificationPress,
 }: {
   hasUnreadNotification: boolean;
+  onModeSwitch: () => void;
+  onNotificationPress: () => void;
 }) {
   return (
     <View style={styles.header}>
@@ -418,6 +477,7 @@ function HomeHeader({
         accessibilityLabel="모드 전환"
         hitSlop={12}
         style={styles.headerIconButton}
+        onPress={onModeSwitch}
       >
         <SwapIcon />
       </Pressable>
@@ -439,13 +499,15 @@ function HomeHeader({
           <CalendarIcon />
         </Pressable>
 
-        <View
+        <Pressable
           accessibilityRole="button"
           accessibilityLabel="알림"
+          hitSlop={12}
           style={styles.headerIconButton}
+          onPress={onNotificationPress}
         >
           <NotificationBellIcon hasUnread={hasUnreadNotification} />
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -572,40 +634,132 @@ function NewsCard({ item }: { item: NewsCardItem }) {
   );
 }
 
-function BandRecommendationStrip({ bands }: { bands: BandCardItem[] }) {
+function BandRecommendationStrip({
+  bands,
+  onFollowChanged,
+}: {
+  bands: BandCardItem[];
+  onFollowChanged: () => void;
+}) {
+  const followMutation = useFollowExploreBand();
+  const unfollowMutation = useUnfollowExploreBand();
+  const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [pendingBandId, setPendingBandId] = useState<number | null>(null);
+  const isFollowPending = followMutation.isPending || unfollowMutation.isPending;
+
+  const toggleFollow = (band: BandCardItem) => {
+    const bandId = band.bandId;
+
+    if (bandId == null || pendingBandId === bandId) return;
+
+    const isFollowing = followOverrides[band.id] ?? band.isFollowing;
+    const previousIsFollowing = isFollowing;
+    const nextIsFollowing = !isFollowing;
+
+    const runMutation = () => {
+      setPendingBandId(bandId);
+      setFollowOverrides((currentOverrides) => ({
+        ...currentOverrides,
+        [band.id]: nextIsFollowing,
+      }));
+
+      const mutation = nextIsFollowing ? followMutation : unfollowMutation;
+
+      mutation.mutate(bandId, {
+        onSuccess: onFollowChanged,
+        onError: () => {
+          setFollowOverrides((currentOverrides) => ({
+            ...currentOverrides,
+            [band.id]: previousIsFollowing,
+          }));
+          Alert.alert("밴드 팔로우", "팔로우 상태를 변경하지 못했어요.");
+        },
+        onSettled: () => {
+          setPendingBandId(null);
+        },
+      });
+    };
+
+    if (isFollowing) {
+      Alert.alert(
+        "팔로우를 취소할까요?",
+        "이 밴드의 소식이 홈피드에서 사라져요.",
+        [
+          {
+            text: "취소",
+            style: "cancel",
+          },
+          {
+            text: "확인",
+            style: "destructive",
+            onPress: runMutation,
+          },
+        ],
+      );
+      return;
+    }
+
+    runMutation();
+  };
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.bandStrip}
     >
-      {bands.map((band) => (
-        <Pressable
-          key={band.id}
-          accessibilityRole="button"
-          disabled={band.bandId == null}
-          style={styles.recommendBand}
-          onPress={() => {
-            if (band.bandId == null) return;
-            router.push(
-              `/fan/explore/bands/${band.bandId}` as Parameters<typeof router.push>[0],
-            );
-          }}
-        >
-          <Avatar imageUrl={band.imageUrl} label={band.name} size={52} />
-          <Text numberOfLines={1} style={styles.recommendBandName}>
-            {band.name}
-          </Text>
-          <Text numberOfLines={1} style={styles.recommendBandMeta}>
-            {band.meta}
-          </Text>
-          <View style={styles.followButton}>
-            <Text style={styles.followButtonText}>
-              {band.isFollowing ? "팔로잉" : "팔로우"}
-            </Text>
+      {bands.map((band) => {
+        const isFollowing = followOverrides[band.id] ?? band.isFollowing;
+        const isBandPending = isFollowPending && pendingBandId === band.bandId;
+
+        return (
+          <View key={band.id} style={styles.recommendBand}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={band.bandId == null}
+              style={styles.recommendBandLink}
+              onPress={() => {
+                if (band.bandId == null) return;
+                router.push(
+                  `/fan/explore/bands/${band.bandId}` as Parameters<
+                    typeof router.push
+                  >[0],
+                );
+              }}
+            >
+              <Avatar imageUrl={band.imageUrl} label={band.name} size={52} />
+              <Text numberOfLines={1} style={styles.recommendBandName}>
+                {band.name}
+              </Text>
+              <Text numberOfLines={1} style={styles.recommendBandMeta}>
+                {band.meta}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={band.bandId == null || isBandPending}
+              style={[
+                styles.followButton,
+                isFollowing && styles.followButtonActive,
+                isBandPending && styles.followButtonDisabled,
+              ]}
+              onPress={() => toggleFollow(band)}
+            >
+              <Text
+                style={[
+                  styles.followButtonText,
+                  isFollowing && styles.followButtonTextActive,
+                ]}
+              >
+                {isBandPending ? "처리중" : isFollowing ? "팔로잉" : "팔로우"}
+              </Text>
+            </Pressable>
           </View>
-        </Pressable>
-      ))}
+        );
+      })}
     </ScrollView>
   );
 }
@@ -942,6 +1096,10 @@ const styles = StyleSheet.create({
     width: 76,
     alignItems: "center",
   },
+  recommendBandLink: {
+    alignItems: "center",
+    alignSelf: "stretch",
+  },
   recommendBandName: {
     color: colors.neutral900,
     fontSize: 15,
@@ -968,11 +1126,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  followButtonActive: {
+    backgroundColor: colors.primary400,
+  },
+  followButtonDisabled: {
+    opacity: 0.6,
+  },
   followButtonText: {
     color: colors.primary400,
     fontSize: 11,
     fontWeight: "700",
     lineHeight: 14,
+  },
+  followButtonTextActive: {
+    color: colors.white,
   },
   concertList: {
     gap: 12,
