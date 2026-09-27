@@ -106,6 +106,10 @@ export interface FanPerformanceCastingBand {
   bandInfo?: FanPerformanceCastingBand;
   bandId?: number | string;
   targetBandId?: number | string;
+  followingBandId?: number | string;
+  followedBandId?: number | string;
+  castingBandId?: number | string;
+  performanceBandId?: number | string;
   id?: number | string;
   bandName?: string;
   name?: string;
@@ -114,6 +118,8 @@ export interface FanPerformanceCastingBand {
   bandImageUrl?: string | null;
   imageUrl?: string | null;
   thumbnailUrl?: string | null;
+  avatarUrl?: string | null;
+  logoUrl?: string | null;
   genre?: string | null;
   bandGenre?: string | null;
   region?: string | null;
@@ -121,6 +127,16 @@ export interface FanPerformanceCastingBand {
   description?: string | null;
   bandDescription?: string | null;
   introduction?: string | null;
+  introduce?: string | null;
+  followerCount?: number;
+  followersCount?: number;
+  followerCnt?: number;
+  followCount?: number;
+  followers?: number;
+  isFollowing?: boolean;
+  isFollowed?: boolean;
+  following?: boolean;
+  followed?: boolean;
 }
 
 export interface FanPerformanceDetailResponse {

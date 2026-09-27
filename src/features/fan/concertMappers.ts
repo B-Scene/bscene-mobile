@@ -152,3 +152,57 @@ export const getDetailPosterImageUrl = (detail?: FanPerformanceDetailResponse) =
 export const getCastingBandInfo = (band: FanPerformanceCastingBand) => {
   return band.band ?? band.profile ?? band.bandProfile ?? band.bandInfo ?? band;
 };
+
+const toNumericId = (value?: number | string | null) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+export const getCastingBandId = (band: FanPerformanceCastingBand) => {
+  const bandInfo = getCastingBandInfo(band);
+
+  return (
+    toNumericId(bandInfo.bandId) ??
+    toNumericId(band.bandId) ??
+    toNumericId(bandInfo.targetBandId) ??
+    toNumericId(band.targetBandId) ??
+    toNumericId(bandInfo.followingBandId) ??
+    toNumericId(band.followingBandId) ??
+    toNumericId(bandInfo.followedBandId) ??
+    toNumericId(band.followedBandId) ??
+    toNumericId(bandInfo.castingBandId) ??
+    toNumericId(band.castingBandId) ??
+    toNumericId(bandInfo.performanceBandId) ??
+    toNumericId(band.performanceBandId) ??
+    toNumericId(bandInfo.id) ??
+    toNumericId(band.id)
+  );
+};
+
+export const getCastingBandImageUrl = (band: FanPerformanceCastingBand) => {
+  const bandInfo = getCastingBandInfo(band);
+
+  return firstString(
+    bandInfo.profileImageUrl,
+    bandInfo.bandProfileImageUrl,
+    bandInfo.bandImageUrl,
+    bandInfo.imageUrl,
+    bandInfo.thumbnailUrl,
+    bandInfo.avatarUrl,
+    bandInfo.logoUrl,
+    band.profileImageUrl,
+    band.bandProfileImageUrl,
+    band.bandImageUrl,
+    band.imageUrl,
+    band.thumbnailUrl,
+    band.avatarUrl,
+    band.logoUrl,
+  );
+};
