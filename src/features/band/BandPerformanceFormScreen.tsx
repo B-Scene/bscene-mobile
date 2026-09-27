@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
   Alert,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 
+import { uploadMediaAsset } from "@/api/media/media";
 import {
   useBandPerformanceQuery,
   useCreateBandPerformance,
@@ -52,6 +54,12 @@ const splitTags = (value: string) =>
     .split(",")
     .map((item) => item.trim().replace(/^#/, ""))
     .filter(Boolean);
+
+type SelectedPosterAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
 
 export function BandPerformanceFormScreen() {
   const params = useLocalSearchParams<{ performanceId?: string }>();
@@ -139,12 +147,16 @@ function PerformanceForm({
   const [posterImageUrl, setPosterImageUrl] = useState(
     initialPerformance?.posterImageUrl ?? "",
   );
+  const [selectedPoster, setSelectedPoster] =
+    useState<SelectedPosterAsset | null>(null);
   const [ageRating, setAgeRating] = useState<PerformanceAgeRating>(
     initialPerformance?.ageRating ?? "ALL",
   );
   const [tags, setTags] = useState(initialPerformance?.tags?.join(", ") ?? "");
   const [showErrors, setShowErrors] = useState(false);
-  const isSubmitting = createPerformance.isPending || updatePerformance.isPending;
+  const [uploading, setUploading] = useState(false);
+  const isSubmitting =
+    createPerformance.isPending || updatePerformance.isPending || uploading;
   const hasStep1Error = [title, genre, region, description].some(
     (value) => !value.trim(),
   );
@@ -152,27 +164,60 @@ function PerformanceForm({
     (value) => !value.trim(),
   );
 
+  const requestPosterPermission = async (camera: boolean) => {
+    const permission = camera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert(
+        "권한 필요",
+        camera ? "카메라 권한이 필요해요." : "사진 접근 권한이 필요해요.",
+      );
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const pickPoster = async (camera: boolean) => {
+    if (!(await requestPosterPermission(camera))) {
+      return;
+    }
+
+    const result = camera
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: ["images"],
+          allowsEditing: true,
+          aspect: [3, 4],
+          quality: 0.85,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsEditing: true,
+          aspect: [3, 4],
+          quality: 0.85,
+        });
+
+    if (result.canceled || !result.assets[0]) {
+      return;
+    }
+
+    const asset = result.assets[0];
+
+    setSelectedPoster({
+      uri: asset.uri,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+    });
+  };
+
   const submit = async () => {
     if (hasStep1Error || hasStep2Error) {
       setShowErrors(true);
       return;
     }
-
-    const nextTags = splitTags(tags);
-    const commonPayload = {
-      title: title.trim(),
-      genre: genre.trim(),
-      performanceDate: performanceDate.trim(),
-      startTime: startTime.trim(),
-      region: region.trim(),
-      venue: venue.trim(),
-      description: description.trim(),
-      ticketPrice: ticketPrice.trim(),
-      ticketLink: ticketLink.trim() || undefined,
-      posterImageUrl: posterImageUrl.trim() || undefined,
-      ageRating,
-      tags: nextTags.length > 0 ? nextTags : undefined,
-    };
 
     const onSuccess = (nextPerformanceId: number) => {
       router.replace(
@@ -183,6 +228,34 @@ function PerformanceForm({
     };
 
     try {
+      setUploading(true);
+
+      const uploadedPosterUrl = selectedPoster
+        ? await uploadMediaAsset({
+            category: "PERFORMANCE_POSTER",
+            uri: selectedPoster.uri,
+            fileName: selectedPoster.fileName,
+            mimeType: selectedPoster.mimeType,
+          })
+        : "";
+
+      const nextTags = splitTags(tags);
+      const commonPayload = {
+        title: title.trim(),
+        genre: genre.trim(),
+        performanceDate: performanceDate.trim(),
+        startTime: startTime.trim(),
+        region: region.trim(),
+        venue: venue.trim(),
+        description: description.trim(),
+        ticketPrice: ticketPrice.trim(),
+        ticketLink: ticketLink.trim() || undefined,
+        posterImageUrl:
+          uploadedPosterUrl || posterImageUrl.trim() || undefined,
+        ageRating,
+        tags: nextTags.length > 0 ? nextTags : undefined,
+      };
+
       if (isEditMode && performanceId) {
         const result = await updatePerformance.mutateAsync(
           commonPayload satisfies UpdatePerformanceRequest,
@@ -200,6 +273,8 @@ function PerformanceForm({
         isEditMode ? "공연 수정" : "공연 등록",
         "공연 정보를 저장하지 못했어요.",
       );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -280,7 +355,12 @@ function PerformanceForm({
 
               <Field label="공연 포스터">
                 <View style={styles.posterBox}>
-                  {posterImageUrl.trim() ? (
+                  {selectedPoster ? (
+                    <Image
+                      source={{ uri: selectedPoster.uri }}
+                      style={styles.posterPreview}
+                    />
+                  ) : posterImageUrl.trim() ? (
                     <Image
                       source={{ uri: posterImageUrl.trim() }}
                       style={styles.posterPreview}
@@ -294,9 +374,38 @@ function PerformanceForm({
                     </View>
                   )}
                 </View>
+
+                <View style={styles.posterActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.posterActionButton}
+                    onPress={() => void pickPoster(false)}
+                  >
+                    <Text style={styles.posterActionText}>갤러리</Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.posterActionButton}
+                    onPress={() => void pickPoster(true)}
+                  >
+                    <Text style={styles.posterActionText}>카메라</Text>
+                  </Pressable>
+
+                  {selectedPoster ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={styles.posterClearButton}
+                      onPress={() => setSelectedPoster(null)}
+                    >
+                      <Text style={styles.posterClearText}>선택 취소</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+
                 <NativeInput
                   value={posterImageUrl}
-                  placeholder="포스터 이미지 URL"
+                  placeholder="포스터 이미지 URL 직접 입력"
                   autoCapitalize="none"
                   onChangeText={setPosterImageUrl}
                 />
@@ -718,6 +827,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
+  },
+  posterActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  posterActionButton: {
+    minHeight: 34,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary500,
+    paddingHorizontal: 14,
+  },
+  posterActionText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  posterClearButton: {
+    minHeight: 34,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.neutral300,
+    paddingHorizontal: 14,
+  },
+  posterClearText: {
+    color: colors.neutral700,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
   },
   countText: {
     alignSelf: "flex-end",
