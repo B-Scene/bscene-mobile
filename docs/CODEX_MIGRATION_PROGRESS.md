@@ -47,7 +47,8 @@
 - Phase 42 Band Live Home parity: 진행 중/예정 라이브 전체보기 route 및 예약 액션 보강 완료
 - Phase 43 Band Live 예약/생성 parity: 즉시 시작/예약 생성/예약 수정/취소 1차 연동 완료
 - Phase 44 팬 홈 알림/참여 모달 parity: 알림 목록, 읽음 처리, 참여 여부 모달 1차 연동 완료
-- 전체 기준 대략 80%
+- Phase 45 Notification tap navigation hardening: 알림 payload deep link route mapping 보강 완료
+- 전체 기준 대략 81%
 
 ## 완료된 작업
 
@@ -142,11 +143,12 @@
 - Band Live Home의 진행 중/예정 라이브 전체보기를 `/band/live/now`, `/band/live/scheduled` route로 연결하고, 내 예정 라이브의 시간이 지난 경우 바로 라이브 room으로 진입할 수 있도록 예약 액션을 보강했다.
 - Band Live 생성 화면에 즉시 시작/예약 선택, 예약 날짜/시간 입력, `/lives` 예약 생성, `/lives/{liveId}/reservation` 조회/수정/취소 API를 연결했다.
 - 팬 홈 알림 버튼을 `/fan/home/notifications`로 연결하고 `/notifications` 목록, `/notifications/{notificationId}/read` 읽음 처리, 공연 참여 pending/complete/delete 모달을 연결했다.
+- Native notification tap deep link에서 query 유지를 보강하고 공연/콘텐츠/밴드/라이브/채팅/세션 모집/지원서 payload를 모바일 route로 매핑하도록 확장했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 공연 상세 공유/캐스팅 이동, 팬 Live Home/목록/다시보기 재생, 팬 홈 알림 목록/참여 여부 모달, Band Live Home 전체보기/예약 액션, Band Live 즉시 시작/예약 생성/수정/취소, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Live room 실제 기기 오디오/RTC QA 또는 남은 Release hardening 검토다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 공연 상세 공유/캐스팅 이동, 팬 Live Home/목록/다시보기 재생, 팬 홈 알림 목록/참여 여부 모달, notification tap route mapping, Band Live Home 전체보기/예약 액션, Band Live 즉시 시작/예약 생성/수정/취소, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Live room 실제 기기 오디오/RTC QA 또는 남은 Release hardening 검토다.
 
 ## 다음에 해야 할 작업
 
@@ -341,7 +343,7 @@
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
 - Auth/Mode route guard는 실제 기기에서 deep link 직접 진입, Android hardware back, onboarding 미완료 계정 분기 QA가 필요하다.
-- Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
+- Push notification permission과 notification tap route mapping은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 및 payload별 tap navigation 검증이 필요하다.
 - Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회와 콘텐츠/공연 상세/등록/수정/삭제, 콘텐츠 이미지/썸네일 및 공연 포스터 네이티브 업로드 UX를 연결했다. 실제 기기에서 갤러리/카메라 권한과 presigned upload QA가 필요하다.
 - 팬 홈은 1차 API 연동, 추천 밴드 팔로우/모드 전환, 알림 목록 route, 공연 참여 여부 모달을 완료했다. 알림 deep link mapping은 실제 payload별 QA가 필요하다.
 - 공연 목록/상세는 조회, 관심/알림 mutation, Native 공유, 캐스팅 밴드 이동을 완료했다. 실제 기기에서 공유 sheet와 외부 예매 링크 QA가 필요하다.
@@ -377,6 +379,7 @@
 - Fan/Band mode route group 이동
 - 팬 홈 `/home`, `/performances/upcoming` 실제 API 응답 렌더링
 - 팬 홈 알림 목록 `/notifications`, 읽음 처리 `/notifications/{notificationId}/read`, 공연 참여 pending/complete/delete 실제 API 상태 동기화
+- Notification tap payload의 공연/콘텐츠/밴드/라이브/채팅/세션 모집/지원서 deep link 실제 기기 이동 검증
 - 공연 목록 `/performances/upcoming` pagination
 - 공연 상세 `/performances/{performanceId}/detail` 실제 API 응답 렌더링
 - 공연 관심 등록/해제 `/performances/{performanceId}/interest` 실제 API 상태 동기화
@@ -419,7 +422,7 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `a5f24e8`
+- 최근 완료 커밋: `7cbd96b`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
