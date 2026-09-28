@@ -45,7 +45,8 @@
 - Phase 40 팬 Live list parity: 진행 중/예정/다시보기 목록, 검색, 필터, pagination, 알림 토글 완료
 - Phase 41 팬 Live replay playback: 다시보기 playback API 및 재생 route 연결 완료
 - Phase 42 Band Live Home parity: 진행 중/예정 라이브 전체보기 route 및 예약 액션 보강 완료
-- 전체 기준 대략 78%
+- Phase 43 Band Live 예약/생성 parity: 즉시 시작/예약 생성/예약 수정/취소 1차 연동 완료
+- 전체 기준 대략 79%
 
 ## 완료된 작업
 
@@ -138,17 +139,18 @@
 - 팬 Live Home 더보기에서 `/fan/live/now`, `/fan/live/scheduled`, `/fan/live/replays`로 이동하도록 연결하고, 각 목록 API와 검색/필터/pagination UI를 추가했다.
 - 팬 Live 다시보기 목록/홈 카드에서 `/fan/live/replays/{liveId}`로 이동하고, `/lives/{liveId}/replay` playback URL을 Expo Audio로 재생하는 화면을 추가했다.
 - Band Live Home의 진행 중/예정 라이브 전체보기를 `/band/live/now`, `/band/live/scheduled` route로 연결하고, 내 예정 라이브의 시간이 지난 경우 바로 라이브 room으로 진입할 수 있도록 예약 액션을 보강했다.
+- Band Live 생성 화면에 즉시 시작/예약 선택, 예약 날짜/시간 입력, `/lives` 예약 생성, `/lives/{liveId}/reservation` 조회/수정/취소 API를 연결했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 공연 상세 공유/캐스팅 이동, 팬 Live Home/목록/다시보기 재생, Band Live Home 전체보기/예약 액션, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Band Live 예약/생성 parity 보강이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 공연 상세 공유/캐스팅 이동, 팬 Live Home/목록/다시보기 재생, Band Live Home 전체보기/예약 액션, Band Live 즉시 시작/예약 생성/수정/취소, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Live room 실제 기기 오디오/RTC QA 또는 팬 홈 알림 목록/참여 여부 모달 parity 검토다.
 
 ## 다음에 해야 할 작업
 
-1. Band Live 예약/생성 parity를 보강한다.
-2. Live room 실제 기기 오디오/RTC QA를 진행한다.
-3. 팬 홈 알림 목록/참여 여부 모달 parity를 별도 Work Unit으로 검토한다.
+1. Live room 실제 기기 오디오/RTC QA를 진행한다.
+2. 팬 홈 알림 목록/참여 여부 모달 parity를 별도 Work Unit으로 검토한다.
+3. 밴드 Live 공동 진행/참여자 상태는 Native SDK/RTC 범위로 MEDIUM 전환 후보인지 확인한다.
 
 ## 변경한 주요 파일
 
@@ -341,7 +343,7 @@
 - 팬 홈은 1차 API 연동과 추천 밴드 팔로우/모드 전환을 완료했다. 알림 목록 화면과 공연 참여 여부 모달은 별도 API/화면 parity가 필요하다.
 - 공연 목록/상세는 조회, 관심/알림 mutation, Native 공유, 캐스팅 밴드 이동을 완료했다. 실제 기기에서 공유 sheet와 외부 예매 링크 QA가 필요하다.
 - 팬 Live Home/목록/다시보기는 홈 조회, 입장 route, 예정 라이브 알림 토글, 진행 중/예약/다시보기 전체 목록, 검색/필터/pagination, replay playback route를 완료했다. 실제 API pagination cursor와 HLS playback QA가 필요하다.
-- Band Live Home은 진행 중/예정 라이브 홈 조회, 전체보기 route, 시간이 지난 내 예정 라이브 room 진입 액션을 완료했다. 예약 생성/수정/취소 parity는 다음 Work Unit으로 남아 있다.
+- Band Live Home은 진행 중/예정 라이브 홈 조회, 전체보기 route, 시간이 지난 내 예정 라이브 room 진입 액션을 완료했다. Live 생성 화면은 즉시 시작, 예약 생성, 예약 수정, 예약 취소 1차 연동을 완료했다.
 - 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 콘텐츠 상세/좋아요/댓글/댓글 UX, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 상세 이미지/영상 네이티브 미디어 표시 고도화는 추가 QA가 필요하다.
 - 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정, 프로필 수정 화면을 완료했다.
 - 밴드 마이페이지는 요약, 메뉴, 밴드 알림 설정을 완료했다. 밴드 프로필/멤버/모집/지원 관리 화면은 아직 웹 parity 전이다.
@@ -404,6 +406,7 @@
 - 밴드 세션 지원 상태 `/sessions/applications/submissions`, 지원 취소, 참여 확정 실제 API 상태 동기화
 - 밴드 세션 쪽지함 `/chat/rooms` pagination, 쪽지방 상세 `/chat/rooms/{chatRoomId}`, WebSocket `/api/ws/chat` 실제 기기 송수신/읽음/재연결 상태 동기화
 - 밴드 라이브 홈 `/band/live`, 진행 중 목록 `/band/live/now`, 예정 목록 `/band/live/scheduled`, 시작 가능한 예정 라이브 room 이동 실제 API 상태 동기화
+- 밴드 라이브 생성 `/band/live/create`, 예약 생성, 예약 수정 query `/band/live/create?reservationLiveId=...`, 예약 취소 실제 API 상태 동기화
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
@@ -412,11 +415,11 @@
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `9b98bb3`
+- 최근 완료 커밋: `59c7885`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-Band Live 예약/생성 parity를 보강한다.
+Live room 실제 기기 오디오/RTC QA 또는 팬 홈 알림 목록/참여 여부 모달 parity를 별도 Work Unit으로 검토한다.
 
 ## MEDIUM 전환 메모
 
