@@ -18,10 +18,12 @@ import {
     useMemo,
     useRef,
     useState,
+    useCallback,
 } from "react";
 
 import {
     Alert,
+    BackHandler,
     StyleSheet,
     Text,
     View,
@@ -435,7 +437,7 @@ export function LiveRoomScreen({
     };
 
   const exitLive =
-    async () => {
+    useCallback(async () => {
       if (!liveId) {
         router.back();
 
@@ -473,7 +475,81 @@ export function LiveRoomScreen({
           typeof router.replace
         >[0],
       );
+    }, [
+      audioPlayer,
+      closeMutation,
+      isOwner,
+      leaveMutation,
+      liveId,
+      mode,
+    ]);
+
+  const confirmExitLive =
+    useCallback(() => {
+      if (
+        leaveMutation.isPending ||
+        closeMutation.isPending
+      ) {
+        return;
+      }
+
+      Alert.alert(
+        isOwner
+          ? "라이브 종료"
+          : "라이브 나가기",
+
+        isOwner
+          ? "라이브를 종료할까요?"
+          : "라이브에서 나갈까요?",
+
+        [
+          {
+            text: "취소",
+            style: "cancel",
+          },
+
+          {
+            text:
+              isOwner
+                ? "종료"
+                : "나가기",
+
+            style:
+              "destructive",
+
+            onPress: () =>
+              void exitLive(),
+          },
+        ],
+      );
+    }, [
+      closeMutation.isPending,
+      exitLive,
+      isOwner,
+      leaveMutation.isPending,
+    ]);
+
+  useEffect(() => {
+    const subscription =
+      BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          if (!live) {
+            return false;
+          }
+
+          confirmExitLive();
+          return true;
+        },
+      );
+
+    return () => {
+      subscription.remove();
     };
+  }, [
+    confirmExitLive,
+    live,
+  ]);
 
   const requestCoHost =
     async () => {
@@ -952,37 +1028,7 @@ export function LiveRoomScreen({
           leaveMutation.isPending ||
           closeMutation.isPending
         }
-        onPress={() => {
-          Alert.alert(
-            isOwner
-              ? "라이브 종료"
-              : "라이브 나가기",
-
-            isOwner
-              ? "라이브를 종료할까요?"
-              : "라이브에서 나갈까요?",
-
-            [
-              {
-                text: "취소",
-                style: "cancel",
-              },
-
-              {
-                text:
-                  isOwner
-                    ? "종료"
-                    : "나가기",
-
-                style:
-                  "destructive",
-
-                onPress: () =>
-                  void exitLive(),
-              },
-            ],
-          );
-        }}
+        onPress={confirmExitLive}
       />
     </Screen>
   );
