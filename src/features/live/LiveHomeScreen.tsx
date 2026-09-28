@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -29,6 +29,8 @@ type LiveMode = "fan" | "band";
 type LiveHomeScreenProps = {
   mode: LiveMode;
 };
+
+type BandLiveListKind = "now" | "scheduled";
 
 export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
   const query = useLiveHomeQuery();
@@ -66,6 +68,28 @@ function BandLiveHome({
   isError: boolean;
   onRetry: () => void;
 }) {
+  const now = useScheduledLiveNow();
+
+  const handleScheduledAction =
+    (live: ScheduledLiveItem) => {
+      if (
+        isScheduledLiveStartable(
+          live.scheduledAt,
+          now,
+        )
+      ) {
+        router.push(
+          `/band/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
+        );
+        return;
+      }
+
+      Alert.alert(
+        "라이브 예약",
+        "예약 수정은 다음 라이브 예약 편집 단계에서 연결할게요.",
+      );
+    };
+
   return (
     <Screen contentStyle={styles.bandContainer}>
       <View style={styles.bandHeader}>
@@ -120,7 +144,14 @@ function BandLiveHome({
         {!isLoading && !isError && data ? (
           <>
             <View style={styles.bandSection}>
-              <BandSectionHeader title="진행 중인 라이브" />
+              <BandSectionHeader
+                title="진행 중인 라이브"
+                onMorePress={() =>
+                  router.push(
+                    "/band/live/now" as Parameters<typeof router.push>[0],
+                  )
+                }
+              />
               <View style={styles.bandCardList}>
                 {data.liveNow.length > 0 ? (
                   data.liveNow.map((live) => (
@@ -133,11 +164,29 @@ function BandLiveHome({
             </View>
 
             <View style={styles.bandSection}>
-              <BandSectionHeader title="예정된 라이브" />
+              <BandSectionHeader
+                title="예정된 라이브"
+                onMorePress={() =>
+                  router.push(
+                    "/band/live/scheduled" as Parameters<
+                      typeof router.push
+                    >[0],
+                  )
+                }
+              />
               <View style={styles.bandCardList}>
                 {data.scheduled.length > 0 ? (
                   data.scheduled.map((live) => (
-                    <BandScheduledLiveCard key={live.liveId} live={live} />
+                    <BandScheduledLiveCard
+                      key={live.liveId}
+                      live={live}
+                      actionLabel={
+                        isScheduledLiveStartable(live.scheduledAt, now)
+                          ? "라이브 시작"
+                          : "수정"
+                      }
+                      onAction={() => handleScheduledAction(live)}
+                    />
                   ))
                 ) : (
                   <Text style={styles.bandEmptyText}>예정된 라이브가 없어요.</Text>
@@ -147,6 +196,127 @@ function BandLiveHome({
           </>
         ) : null}
       </View>
+    </Screen>
+  );
+}
+
+export function BandLiveListScreen({
+  kind,
+}: {
+  kind: BandLiveListKind;
+}) {
+  const query = useLiveHomeQuery();
+  const now = useScheduledLiveNow();
+
+  const title =
+    kind === "now"
+      ? "진행 중인 라이브"
+      : "예정된 라이브";
+
+  const items = useMemo(() => {
+    if (!query.data) {
+      return [];
+    }
+
+    return kind === "now"
+      ? query.data.liveNow
+      : query.data.scheduled;
+  }, [kind, query.data]);
+
+  const handleScheduledAction =
+    (live: ScheduledLiveItem) => {
+      if (
+        isScheduledLiveStartable(
+          live.scheduledAt,
+          now,
+        )
+      ) {
+        router.push(
+          `/band/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
+        );
+        return;
+      }
+
+      Alert.alert(
+        "라이브 예약",
+        "예약 수정은 다음 라이브 예약 편집 단계에서 연결할게요.",
+      );
+    };
+
+  return (
+    <Screen contentStyle={styles.bandListContainer}>
+      <View style={styles.bandListHeader}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="뒤로가기"
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.bandBackButton,
+            pressed && styles.pressed,
+          ]}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.bandBackIcon}>‹</Text>
+        </Pressable>
+        <Text style={styles.bandHeaderTitle}>{title}</Text>
+        <View style={styles.bandHeaderSpacer} />
+      </View>
+
+      {query.isLoading ? (
+        <Text style={styles.bandStateText}>라이브를 불러오는 중이에요.</Text>
+      ) : null}
+
+      {!query.isLoading && query.isError ? (
+        <View style={styles.bandStateCard}>
+          <Text style={styles.bandStateText}>라이브 정보를 불러오지 못했어요.</Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.retryButton}
+            onPress={() => void query.refetch()}
+          >
+            <Text style={styles.retryButtonText}>다시 불러오기</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {!query.isLoading && !query.isError ? (
+        <View style={styles.bandListContent}>
+          {items.length > 0 ? (
+            items.map((live) =>
+              kind === "now" ? (
+                <BandLiveNowCard
+                  key={(live as LiveNowItem).liveId}
+                  live={live as LiveNowItem}
+                />
+              ) : (
+                <BandScheduledLiveCard
+                  key={(live as ScheduledLiveItem).liveId}
+                  live={live as ScheduledLiveItem}
+                  actionLabel={
+                    isScheduledLiveStartable(
+                      (live as ScheduledLiveItem).scheduledAt,
+                      now,
+                    )
+                      ? "라이브 시작"
+                      : "수정"
+                  }
+                  onAction={() =>
+                    handleScheduledAction(
+                      live as ScheduledLiveItem,
+                    )
+                  }
+                />
+              ),
+            )
+          ) : (
+            <Text style={styles.bandEmptyText}>
+              {kind === "now"
+                ? "진행 중인 라이브가 없어요."
+                : "예정된 라이브가 없어요."}
+            </Text>
+          )}
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -343,14 +513,27 @@ function FanLiveHome({
   );
 }
 
-function BandSectionHeader({ title }: { title: string }) {
+function BandSectionHeader({
+  title,
+  onMorePress,
+}: {
+  title: string;
+  onMorePress?: () => void;
+}) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.bandSectionTitle}>{title}</Text>
-      <View style={styles.moreButton} accessibilityRole="button">
+      <Pressable
+        style={({ pressed }) => [
+          styles.moreButton,
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
+        onPress={onMorePress}
+      >
         <Text style={styles.moreText}>전체보기</Text>
         <Text style={styles.moreIcon}>›</Text>
-      </View>
+      </Pressable>
     </View>
   );
 }
@@ -424,7 +607,15 @@ function BandLiveNowCard({ live }: { live: LiveNowItem }) {
   );
 }
 
-function BandScheduledLiveCard({ live }: { live: ScheduledLiveItem }) {
+function BandScheduledLiveCard({
+  live,
+  actionLabel = "수정",
+  onAction,
+}: {
+  live: ScheduledLiveItem;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
     <View style={styles.bandScheduledCard}>
       <Avatar
@@ -446,9 +637,16 @@ function BandScheduledLiveCard({ live }: { live: ScheduledLiveItem }) {
       </View>
 
       {live.isMine ? (
-        <View style={styles.scheduledAction}>
-          <Text style={styles.scheduledActionText}>수정</Text>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.scheduledAction,
+            pressed && styles.pressed,
+          ]}
+          onPress={onAction}
+        >
+          <Text style={styles.scheduledActionText}>{actionLabel}</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -659,6 +857,110 @@ function NotificationIcon() {
   );
 }
 
+const KOREAN_SCHEDULE_PATTERN =
+  /(?:(\d{4})[.\-/년]\s*)?(\d{1,2})[.\-/월]\s*(\d{1,2})(?:[.\-/일])?(?:\s*\([^)]*\))?\s*(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})/i;
+
+function parseScheduledAtTime(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const nativeDate = new Date(
+    trimmedValue.includes("T")
+      ? trimmedValue
+      : trimmedValue.replace(" ", "T"),
+  );
+
+  if (!Number.isNaN(nativeDate.getTime())) {
+    return nativeDate.getTime();
+  }
+
+  const matched =
+    trimmedValue.match(KOREAN_SCHEDULE_PATTERN);
+
+  if (!matched) {
+    return null;
+  }
+
+  const [
+    ,
+    yearValue,
+    monthValue,
+    dayValue,
+    meridiem,
+    hourValue,
+    minuteValue,
+  ] = matched;
+  const year =
+    yearValue
+      ? Number(yearValue)
+      : new Date().getFullYear();
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  let hour = Number(hourValue);
+  const minute = Number(minuteValue);
+  const normalizedMeridiem =
+    meridiem?.toUpperCase();
+
+  if (
+    (normalizedMeridiem === "오후" ||
+      normalizedMeridiem === "PM") &&
+    hour < 12
+  ) {
+    hour += 12;
+  }
+
+  if (
+    (normalizedMeridiem === "오전" ||
+      normalizedMeridiem === "AM") &&
+    hour === 12
+  ) {
+    hour = 0;
+  }
+
+  const parsedDate = new Date(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+  );
+
+  return Number.isNaN(parsedDate.getTime())
+    ? null
+    : parsedDate.getTime();
+}
+
+function isScheduledLiveStartable(
+  scheduledAt: string,
+  now: number,
+) {
+  const scheduledTime =
+    parseScheduledAtTime(scheduledAt);
+
+  return scheduledTime !== null && scheduledTime <= now;
+}
+
+function useScheduledLiveNow() {
+  const [
+    now,
+    setNow,
+  ] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(
+      () => setNow(Date.now()),
+      1000,
+    );
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return now;
+}
+
 function formatScheduledAt(value: string) {
   const date = new Date(value);
 
@@ -694,10 +996,37 @@ const styles = StyleSheet.create({
     paddingBottom: 104,
     backgroundColor: colors.white,
   },
+  bandListContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: 104,
+    backgroundColor: colors.white,
+  },
   bandHeader: {
     height: 48,
     alignItems: "center",
     justifyContent: "center",
+  },
+  bandListHeader: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  bandBackButton: {
+    width: 44,
+    height: 44,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  bandBackIcon: {
+    color: colors.neutral900,
+    fontSize: 32,
+    fontWeight: "400",
+    lineHeight: 36,
+  },
+  bandHeaderSpacer: {
+    width: 44,
   },
   bandHeaderTitle: {
     color: colors.neutral900,
@@ -820,6 +1149,10 @@ const styles = StyleSheet.create({
   bandCardList: {
     gap: 12,
     marginTop: 12,
+  },
+  bandListContent: {
+    gap: 12,
+    paddingTop: 20,
   },
   bandLiveCard: {
     minHeight: 88,
