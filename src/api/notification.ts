@@ -2,8 +2,11 @@ import { AxiosError } from "axios";
 
 import { axiosInstance } from "@/api/axiosInstance";
 import type {
+  GetNotificationsParams,
   GetNotificationSettingsParams,
+  NotificationItem,
   NotificationApiResponse,
+  NotificationsPageResponse,
   NotificationSettingsMode,
   NotificationSettingsResponse,
   UpdateNotificationSettingParams,
@@ -22,6 +25,28 @@ const toNotificationMode = (value: unknown): NotificationSettingsMode | null => 
   return mode === "FAN" || mode === "BAND"
     ? (mode as NotificationSettingsMode)
     : null;
+};
+
+const toNumberOrNull = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const toStringOrEmpty = (value: unknown) =>
+  typeof value === "string" ? value : "";
+
+const toStringOrNull = (value: unknown) =>
+  typeof value === "string" && value.trim().length > 0 ? value : null;
+
+const toBoolean = (value: unknown) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  return false;
 };
 
 const getSettingBoolean = (value: unknown): boolean | null => {
@@ -112,6 +137,68 @@ const normalizeNotificationSettings = (
   };
 };
 
+const normalizeNotificationItem = (
+  value: unknown,
+  index: number,
+): NotificationItem | null => {
+  if (!isRecord(value)) return null;
+
+  const notificationId =
+    toNumberOrNull(value.notificationId) ??
+    toNumberOrNull(value.id) ??
+    toNumberOrNull(value.notification_id);
+
+  if (notificationId == null) return null;
+
+  return {
+    notificationId,
+    type: toStringOrEmpty(value.type ?? value.notificationType),
+    title:
+      toStringOrEmpty(value.title) ||
+      `알림 ${index + 1}`,
+    body: toStringOrEmpty(value.body ?? value.content ?? value.message),
+    isRead: toBoolean(value.isRead ?? value.read ?? value.readStatus),
+    createdAt:
+      toStringOrEmpty(value.createdAt ?? value.createdDate ?? value.timeStamp) ||
+      new Date().toISOString(),
+    mode: toNotificationMode(value.mode ?? value.notificationMode),
+    referenceId:
+      toNumberOrNull(value.referenceId) ??
+      toStringOrNull(value.referenceId),
+    deepLink: toStringOrNull(value.deepLink ?? value.deeplink ?? value.path),
+  };
+};
+
+const normalizeNotificationsPage = (
+  result: unknown,
+): NotificationsPageResponse => {
+  const record = isRecord(result) ? result : {};
+  const source =
+    record.notifications ??
+    record.items ??
+    record.content ??
+    record.data ??
+    result;
+  const rawItems = Array.isArray(source) ? source : [];
+  const items = rawItems
+    .map(normalizeNotificationItem)
+    .filter((item): item is NotificationItem => item !== null);
+  const nextCursor =
+    toNumberOrNull(record.nextCursor) ??
+    toNumberOrNull(record.cursor) ??
+    null;
+  const hasNext =
+    typeof record.hasNext === "boolean"
+      ? record.hasNext
+      : nextCursor !== null;
+
+  return {
+    items,
+    nextCursor,
+    hasNext,
+  };
+};
+
 export const registerPushToken = async (body: RegisterPushTokenRequest) => {
   const response = await axiosInstance.post<NotificationApiResponse<unknown>>(
     "/notifications/tokens",
@@ -127,6 +214,33 @@ export const registerPushToken = async (body: RegisterPushTokenRequest) => {
       response.request,
       response,
     );
+  }
+
+  return data.result;
+};
+
+export const getNotifications = async (
+  params: GetNotificationsParams = {},
+) => {
+  const { data } = await axiosInstance.get<NotificationApiResponse<unknown>>(
+    "/notifications",
+    { params },
+  );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "알림 목록을 불러오지 못했어요.");
+  }
+
+  return normalizeNotificationsPage(data.result);
+};
+
+export const markNotificationAsRead = async (notificationId: number) => {
+  const { data } = await axiosInstance.patch<NotificationApiResponse<unknown>>(
+    `/notifications/${notificationId}/read`,
+  );
+
+  if (data.isSuccess === false) {
+    throw new Error(data.message || "알림을 읽음 처리하지 못했어요.");
   }
 
   return data.result;

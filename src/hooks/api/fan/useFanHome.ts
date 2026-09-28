@@ -8,10 +8,13 @@ import {
 
 import {
   addPerformanceInterest,
+  completePerformanceParticipation,
   deletePerformanceAlarm,
   deletePerformanceInterest,
+  deletePerformanceParticipation,
   getFanHome,
   getFanPerformanceDetail,
+  getPendingPerformanceParticipation,
   getUpcomingPerformances,
   setPerformanceAlarm,
 } from "@/api/fan/home";
@@ -26,6 +29,8 @@ export const fanHomeKeys = {
     [...fanHomeKeys.all, "upcomingPerformances"] as const,
   performanceDetail: (performanceId: number) =>
     [...fanHomeKeys.all, "performanceDetail", performanceId] as const,
+  pendingPerformanceParticipation: () =>
+    [...fanHomeKeys.all, "pendingPerformanceParticipation"] as const,
 };
 
 export const invalidatePerformanceInterestQueries = (
@@ -83,6 +88,16 @@ export const useFanPerformanceDetailQuery = (performanceId: number) => {
   });
 };
 
+export const usePendingPerformanceParticipationQuery = () => {
+  return useQuery({
+    queryKey: fanHomeKeys.pendingPerformanceParticipation(),
+    queryFn: getPendingPerformanceParticipation,
+    refetchOnMount: "always",
+    staleTime: 0,
+    retry: false,
+  });
+};
+
 export const useSetPerformanceAlarm = () => {
   const queryClient = useQueryClient();
 
@@ -118,6 +133,26 @@ export const useDeletePerformanceInterest = () => {
 
   return useMutation({
     mutationFn: deletePerformanceInterest,
+    onSuccess: (_result, performanceId) =>
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
+  });
+};
+
+export const useCompletePerformanceParticipation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: completePerformanceParticipation,
+    onSuccess: (_result, performanceId) =>
+      invalidatePerformanceInterestQueries(queryClient, performanceId),
+  });
+};
+
+export const useDeletePerformanceParticipation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deletePerformanceParticipation,
     onSuccess: (_result, performanceId) =>
       invalidatePerformanceInterestQueries(queryClient, performanceId),
   });

@@ -97,6 +97,28 @@ export interface FanHomeConcert {
   interestCount?: number;
 }
 
+export interface PendingPerformanceParticipationItem {
+  performanceId: number;
+  performanceTitle?: string;
+  performanceName?: string;
+  concertName?: string;
+  showTitle?: string;
+  showName?: string;
+  name?: string;
+  title?: string;
+  location?: string | null;
+  venue?: string | null;
+  startAt?: string | null;
+  startDateTime?: string | null;
+  startDate?: string | null;
+  startTime?: string | null;
+  time?: string | null;
+}
+
+export interface PendingPerformanceParticipationResponse {
+  items: PendingPerformanceParticipationItem[];
+}
+
 export type PerformanceParticipationStatus = "SCHEDULED" | "COMPLETED";
 
 export interface FanPerformanceCastingBand {

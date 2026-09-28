@@ -14,6 +14,29 @@ export interface RegisterPushTokenRequest {
   platform: PushTokenPlatform;
 }
 
+export interface NotificationItem {
+  notificationId: number;
+  type: string;
+  title: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  mode?: NotificationSettingsMode | null;
+  referenceId?: number | string | null;
+  deepLink?: string | null;
+}
+
+export interface GetNotificationsParams {
+  cursor?: number;
+  size?: number;
+}
+
+export interface NotificationsPageResponse {
+  items: NotificationItem[];
+  nextCursor: number | null;
+  hasNext: boolean;
+}
+
 export type NotificationSettingsMode = "FAN" | "BAND";
 
 export type NotificationSettingType =

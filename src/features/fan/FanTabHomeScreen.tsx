@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import {
   Alert,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,9 +13,13 @@ import {
 import Svg, { Circle, Path } from "react-native-svg";
 
 import {
+  useCompletePerformanceParticipation,
   useFanHomeQuery,
+  useDeletePerformanceParticipation,
+  usePendingPerformanceParticipationQuery,
   useUpcomingPerformancesInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
+import { useNotificationsInfiniteQuery } from "@/hooks/api/notification/useNotification";
 import {
   useFollowExploreBand,
   useUnfollowExploreBand,
@@ -30,6 +35,7 @@ import type {
   FanHomeNewsItem,
   FanHomeRecommendedBand,
   FanHomeResponse,
+  PendingPerformanceParticipationItem,
 } from "@/types/fan/home";
 
 type NewsCardItem = {
@@ -330,10 +336,39 @@ const mapHomeResponse = (data?: FanHomeResponse) => {
   };
 };
 
+const getPendingPerformanceTitle = (
+  performance?: PendingPerformanceParticipationItem,
+) => {
+  if (!performance) return null;
+
+  return (
+    performance.performanceTitle ??
+    performance.performanceName ??
+    performance.concertName ??
+    performance.showTitle ??
+    performance.showName ??
+    performance.name ??
+    performance.title ??
+    null
+  );
+};
+
 export function FanTabHomeScreen() {
   const fanHomeQuery = useFanHomeQuery();
   const onboardingStatusQuery = useOnboardingStatus();
   const upcomingQuery = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
+  const notificationsQuery = useNotificationsInfiniteQuery();
+  const pendingParticipationQuery = usePendingPerformanceParticipationQuery();
+  const completeParticipationMutation = useCompletePerformanceParticipation();
+  const deleteParticipationMutation = useDeletePerformanceParticipation();
+  const [answeredPendingIds, setAnsweredPendingIds] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [isParticipationModalDismissed, setIsParticipationModalDismissed] =
+    useState(false);
+  const [participationError, setParticipationError] = useState<string | null>(
+    null,
+  );
   const home = mapHomeResponse(fanHomeQuery.data);
   const upcomingConcerts =
     upcomingQuery.data?.pages
@@ -342,6 +377,26 @@ export function FanTabHomeScreen() {
   const concerts = upcomingConcerts.length > 0 ? upcomingConcerts : home.performances;
   const isLoading = fanHomeQuery.isLoading || upcomingQuery.isLoading;
   const isError = fanHomeQuery.isError || upcomingQuery.isError;
+  const notificationItems =
+    notificationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const hasUnreadNotification =
+    notificationItems.length > 0
+      ? notificationItems.some((notification) => !notification.isRead)
+      : home.hasUnreadNotification;
+  const pendingPerformances = useMemo(
+    () =>
+      (pendingParticipationQuery.data?.items ?? []).filter(
+        (item) => !answeredPendingIds.has(item.performanceId),
+      ),
+    [answeredPendingIds, pendingParticipationQuery.data?.items],
+  );
+  const currentPendingPerformance = pendingPerformances[0];
+  const currentPendingPerformanceTitle = getPendingPerformanceTitle(
+    currentPendingPerformance,
+  );
+  const isParticipationResponding =
+    completeParticipationMutation.isPending ||
+    deleteParticipationMutation.isPending;
 
   const retry = () => {
     void fanHomeQuery.refetch();
@@ -380,16 +435,52 @@ export function FanTabHomeScreen() {
   };
 
   const handleNotificationPress = () => {
-    Alert.alert(
-      "알림",
-      "알림 목록 화면은 다음 알림 navigation parity 단계에서 연결할게요.",
+    router.push(
+      "/fan/home/notifications" as Parameters<typeof router.push>[0],
     );
+  };
+
+  const removeCurrentPendingPerformance = () => {
+    if (!currentPendingPerformance) return;
+
+    setAnsweredPendingIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.add(currentPendingPerformance.performanceId);
+      return nextIds;
+    });
+    setParticipationError(null);
+  };
+
+  const handleParticipationComplete = async () => {
+    if (!currentPendingPerformance || isParticipationResponding) return;
+
+    try {
+      await completeParticipationMutation.mutateAsync(
+        currentPendingPerformance.performanceId,
+      );
+      removeCurrentPendingPerformance();
+    } catch {
+      setParticipationError("참여 여부를 저장하지 못했어요.");
+    }
+  };
+
+  const handleParticipationDelete = async () => {
+    if (!currentPendingPerformance || isParticipationResponding) return;
+
+    try {
+      await deleteParticipationMutation.mutateAsync(
+        currentPendingPerformance.performanceId,
+      );
+      removeCurrentPendingPerformance();
+    } catch {
+      setParticipationError("참여 여부를 저장하지 못했어요.");
+    }
   };
 
   return (
     <Screen contentStyle={styles.container}>
       <HomeHeader
-        hasUnreadNotification={home.hasUnreadNotification}
+        hasUnreadNotification={hasUnreadNotification}
         onModeSwitch={handleModeSwitch}
         onNotificationPress={handleNotificationPress}
       />
@@ -457,6 +548,58 @@ export function FanTabHomeScreen() {
           </Section>
         </View>
       )}
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={Boolean(currentPendingPerformance) && !isParticipationModalDismissed}
+        onRequestClose={() => setIsParticipationModalDismissed(true)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>공연은 재미있게 보셨나요?</Text>
+            <Text style={styles.modalDescription}>
+              {currentPendingPerformanceTitle
+                ? `${currentPendingPerformanceTitle}에 참여했다면\n'참여했어요'를 눌러주세요`
+                : "참여했다면\n'참여했어요'를 눌러주세요"}
+            </Text>
+            {participationError ? (
+              <Text style={styles.modalError}>{participationError}</Text>
+            ) : null}
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isParticipationResponding}
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => void handleParticipationDelete()}
+              >
+                <Text style={styles.modalCancelText}>
+                  {deleteParticipationMutation.isPending ? "처리 중" : "불참했어요"}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isParticipationResponding}
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={() => void handleParticipationComplete()}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {completeParticipationMutation.isPending
+                    ? "처리 중"
+                    : "참여했어요"}
+                </Text>
+              </Pressable>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.modalDismissButton}
+              onPress={() => setIsParticipationModalDismissed(true)}
+            >
+              <Text style={styles.modalDismissText}>나중에 하기</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -1221,5 +1364,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(20, 20, 20, 0.42)",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    padding: 24,
+  },
+  modalTitle: {
+    color: colors.neutral900,
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 26,
+    textAlign: "center",
+  },
+  modalDescription: {
+    color: colors.neutral700,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 22,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  modalError: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: "600",
+    lineHeight: 18,
+    marginTop: 10,
+    textAlign: "center",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 24,
+  },
+  modalButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCancelButton: {
+    backgroundColor: colors.neutral200,
+  },
+  modalConfirmButton: {
+    backgroundColor: colors.primary400,
+  },
+  modalCancelText: {
+    color: colors.neutral700,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  modalConfirmText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  modalDismissButton: {
+    alignItems: "center",
+    marginTop: 14,
+    paddingVertical: 6,
+  },
+  modalDismissText: {
+    color: colors.neutral500,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
   },
 });
