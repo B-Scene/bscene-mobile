@@ -7,9 +7,11 @@ import {
 
 import {
     acceptCoHostUpgrade,
+    cancelLiveReservation,
     closeLive,
     createLive,
     enterLive,
+    getLiveReservation,
     getLiveNowList,
     getReplayList,
     getReplayPlayback,
@@ -19,6 +21,7 @@ import {
     requestCoHostUpgrade,
     respondCoHostInvitation,
     toggleLiveAlarm,
+    updateLiveReservation,
 } from "@/api/live/live";
 
 import type {
@@ -26,6 +29,7 @@ import type {
     LiveNowListFilter,
     ReplayListFilter,
     ReplaySort,
+    UpdateLiveReservationRequest,
 } from "@/types/live/live";
 
 export const liveKeys = {
@@ -77,6 +81,14 @@ export const liveKeys = {
   ) => [
     ...liveKeys.all,
     "replayPlayback",
+    liveId,
+  ] as const,
+
+  reservation: (
+    liveId: number,
+  ) => [
+    ...liveKeys.all,
+    "reservation",
     liveId,
   ] as const,
 };
@@ -252,11 +264,85 @@ export const useReplayPlaybackQuery =
     });
   };
 
+export const useLiveReservationQuery =
+  (
+    liveId: number,
+  ) => {
+    return useQuery({
+      queryKey:
+        liveKeys.reservation(
+          liveId,
+        ),
+
+      queryFn: () =>
+        getLiveReservation(
+          liveId,
+        ),
+
+      enabled:
+        liveId > 0,
+    });
+  };
+
 export const useEnterLiveMutation =
   () => {
     return useMutation({
       mutationFn:
         enterLive,
+    });
+  };
+
+export const useUpdateLiveReservationMutation =
+  () => {
+    const queryClient =
+      useQueryClient();
+
+    return useMutation({
+      mutationFn: ({
+        liveId,
+        body,
+      }: {
+        liveId: number;
+        body: UpdateLiveReservationRequest;
+      }) =>
+        updateLiveReservation({
+          liveId,
+          body,
+        }),
+
+      onSuccess: (
+        _data,
+        variables,
+      ) => {
+        queryClient.invalidateQueries({
+          queryKey:
+            liveKeys.home(),
+        });
+        queryClient.invalidateQueries({
+          queryKey:
+            liveKeys.reservation(
+              variables.liveId,
+            ),
+        });
+      },
+    });
+  };
+
+export const useCancelLiveReservationMutation =
+  () => {
+    const queryClient =
+      useQueryClient();
+
+    return useMutation({
+      mutationFn:
+        cancelLiveReservation,
+
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey:
+            liveKeys.home(),
+        });
+      },
     });
   };
 

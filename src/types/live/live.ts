@@ -275,6 +275,91 @@ export interface CreateLiveResponse {
   playback?: LivePlayback;
 }
 
+export type LiveReservationCoHostStatus =
+  | "OWNER"
+  | "APPROVED"
+  | "INVITED"
+  | "REJECTED"
+  | null;
+
+export interface LiveReservationCoHostCandidate {
+  bandMemberId: number;
+
+  bandMemberProfileId: number;
+
+  bandMemberProfileImageUrl:
+    | string
+    | null;
+
+  nickname: string;
+
+  part: string;
+
+  status:
+    LiveReservationCoHostStatus;
+
+  userId?: number;
+}
+
+export interface LiveReservationResponse {
+  liveId: number;
+
+  title: string;
+
+  description:
+    | string
+    | null;
+
+  thumbnailImageUrl?:
+    | string
+    | null;
+
+  thumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailImageUrl?:
+    | string
+    | null;
+
+  imageUrl?:
+    | string
+    | null;
+
+  scheduledAt: string;
+
+  cohostCandidates?:
+    LiveReservationCoHostCandidate[];
+}
+
+export interface UpdateLiveReservationRequest {
+  title: string;
+
+  description?:
+    | string
+    | null;
+
+  thumbnailImageUrl?:
+    | string
+    | null;
+
+  scheduledAt: string;
+
+  coHost?: number[];
+
+  cohosts?:
+    | number[]
+    | null;
+}
+
+export interface UpdateLiveReservationResponse {
+  liveId?: number;
+}
+
 export interface CloseLiveResponse {
   liveId: string;
 

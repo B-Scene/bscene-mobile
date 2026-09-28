@@ -21,12 +21,15 @@ import type {
     LiveHomeResponse,
     LiveNowListFilter,
     LiveNowListResponse,
+    LiveReservationResponse,
     ReplayListFilter,
     ReplayListResponse,
     ReplayPlaybackResponse,
     ReplaySort,
     ScheduledLiveListResponse,
     ToggleLiveAlarmResponse,
+    UpdateLiveReservationRequest,
+    UpdateLiveReservationResponse,
 } from "@/types/live/live";
 
 type RawRecord =
@@ -217,6 +220,57 @@ export const createLive =
 
     return assertSuccess(
       response,
+    );
+  };
+
+export const getLiveReservation =
+  async (
+    liveId: number,
+  ) => {
+    const response =
+      await axiosInstance.get<
+        LiveApiResponse<LiveReservationResponse>
+      >(
+        `/lives/${liveId}/reservation`,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
+export const updateLiveReservation =
+  async ({
+    liveId,
+    body,
+  }: {
+    liveId: number;
+    body: UpdateLiveReservationRequest;
+  }) => {
+    const response =
+      await axiosInstance.patch<
+        LiveApiResponse<
+          | UpdateLiveReservationResponse
+          | null
+        >
+      >(
+        `/lives/${liveId}/reservation`,
+        body,
+      );
+
+    return assertNullableSuccess(
+      response,
+    );
+  };
+
+export const cancelLiveReservation =
+  async (
+    liveId: number,
+  ) => {
+    await axiosInstance.delete<
+      LiveApiResponse<null>
+    >(
+      `/lives/${liveId}/reservation`,
     );
   };
 

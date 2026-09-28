@@ -84,9 +84,10 @@ function BandLiveHome({
         return;
       }
 
-      Alert.alert(
-        "라이브 예약",
-        "예약 수정은 다음 라이브 예약 편집 단계에서 연결할게요.",
+      router.push(
+        `/band/live/create?reservationLiveId=${live.liveId}` as Parameters<
+          typeof router.push
+        >[0],
       );
     };
 
@@ -237,9 +238,10 @@ export function BandLiveListScreen({
         return;
       }
 
-      Alert.alert(
-        "라이브 예약",
-        "예약 수정은 다음 라이브 예약 편집 단계에서 연결할게요.",
+      router.push(
+        `/band/live/create?reservationLiveId=${live.liveId}` as Parameters<
+          typeof router.push
+        >[0],
       );
     };
 
