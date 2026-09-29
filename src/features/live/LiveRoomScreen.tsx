@@ -79,6 +79,12 @@ import type {
     LiveChatMessage,
 } from "@/types/live/live";
 
+const RTC_RETRY_DELAY_MS =
+  3000;
+
+const MAX_RTC_RETRY_ATTEMPTS =
+  5;
+
 const parseId = (
   value?: string | string[],
 ) => {
@@ -174,6 +180,14 @@ export function LiveRoomScreen({
     setMediaConnected,
   ] = useState(false);
 
+  const [
+    isMicMuted,
+    setIsMicMuted,
+  ] = useState(true);
+
+  const isMicMutedRef =
+    useRef(true);
+
   const rtcRef =
     useRef<LiveRtcHandle | null>(
       null,
@@ -231,10 +245,75 @@ export function LiveRoomScreen({
 
     let active = true;
 
+    let isFirstConnect = true;
+
+    let retryAttempts = 0;
+
+    let retryTimer:
+      | ReturnType<
+          typeof setTimeout
+        >
+      | null = null;
+
+    const scheduleRetry =
+      () => {
+        if (
+          !active ||
+          retryTimer
+        ) {
+          return;
+        }
+
+        if (
+          retryAttempts >=
+          MAX_RTC_RETRY_ATTEMPTS
+        ) {
+          setMediaError(
+            "라이브 오디오 연결에 실패했어요. 나갔다가 다시 입장해 주세요.",
+          );
+
+          return;
+        }
+
+        retryAttempts += 1;
+
+        setMediaError(
+          "오디오 연결이 끊겨 다시 연결하고 있어요.",
+        );
+
+        retryTimer =
+          setTimeout(() => {
+            retryTimer = null;
+
+            void connectMedia();
+          }, RTC_RETRY_DELAY_MS);
+      };
+
+    const handleConnectionLost =
+      () => {
+        if (!active) {
+          return;
+        }
+
+        const rtc =
+          rtcRef.current;
+
+        rtcRef.current =
+          null;
+
+        if (rtc) {
+          void rtc.close();
+        }
+
+        setMediaConnected(
+          false,
+        );
+
+        scheduleRetry();
+      };
+
     const connectMedia =
       async () => {
-        setMediaError("");
-
         try {
           const playback =
             live.playback;
@@ -267,6 +346,8 @@ export function LiveRoomScreen({
             audioPlayer.play();
 
             if (active) {
+              setMediaError("");
+
               setMediaConnected(
                 true,
               );
@@ -282,6 +363,10 @@ export function LiveRoomScreen({
             const handle =
               await startWhipBroadcast(
                 playback.playbackUrl,
+                {
+                  onConnectionLost:
+                    handleConnectionLost,
+                },
               );
 
             if (!active) {
@@ -292,6 +377,25 @@ export function LiveRoomScreen({
 
             rtcRef.current =
               handle;
+
+            if (isFirstConnect) {
+              isMicMutedRef.current =
+                true;
+
+              setIsMicMuted(
+                true,
+              );
+            } else {
+              handle.setMicEnabled(
+                !isMicMutedRef.current,
+              );
+            }
+
+            isFirstConnect = false;
+
+            retryAttempts = 0;
+
+            setMediaError("");
 
             setMediaConnected(
               true,
@@ -307,6 +411,10 @@ export function LiveRoomScreen({
             const handle =
               await startWhepPlayback(
                 playback.playbackUrl,
+                {
+                  onConnectionLost:
+                    handleConnectionLost,
+                },
               );
 
             if (!active) {
@@ -318,12 +426,24 @@ export function LiveRoomScreen({
             rtcRef.current =
               handle;
 
+            isFirstConnect = false;
+
+            retryAttempts = 0;
+
+            setMediaError("");
+
             setMediaConnected(
               true,
             );
           }
         } catch (error) {
           if (!active) {
+            return;
+          }
+
+          if (retryAttempts > 0) {
+            scheduleRetry();
+
             return;
           }
 
@@ -339,6 +459,14 @@ export function LiveRoomScreen({
 
     return () => {
       active = false;
+
+      if (retryTimer) {
+        clearTimeout(
+          retryTimer,
+        );
+
+        retryTimer = null;
+      }
 
       audioPlayer.pause();
 
@@ -424,6 +552,36 @@ export function LiveRoomScreen({
     mode === "band" &&
     live?.playback.role ===
       "LISTENER";
+
+  const isBroadcastProtocol =
+    live?.playback.protocol ===
+    "WHIP";
+
+  const toggleMic = () => {
+    const rtc =
+      rtcRef.current;
+
+    if (
+      !rtc ||
+      !mediaConnected
+    ) {
+      return;
+    }
+
+    const nextMuted =
+      !isMicMuted;
+
+    rtc.setMicEnabled(
+      !nextMuted,
+    );
+
+    isMicMutedRef.current =
+      nextMuted;
+
+    setIsMicMuted(
+      nextMuted,
+    );
+  };
 
   const sendMessage =
     () => {
@@ -784,6 +942,47 @@ export function LiveRoomScreen({
             {mediaError}
           </Text>
         ) : null}
+
+        {isBroadcastProtocol ? (
+          <View
+            style={
+              styles.micControl
+            }
+          >
+            <AppButton
+              label={
+                mediaConnected
+                  ? isMicMuted
+                    ? "마이크 켜기"
+                    : "마이크 끄기"
+                  : "마이크 연결 중"
+              }
+              variant={
+                isMicMuted
+                  ? "primary"
+                  : "secondary"
+              }
+              disabled={
+                !mediaConnected
+              }
+              onPress={
+                toggleMic
+              }
+            />
+
+            {mediaConnected &&
+            isMicMuted ? (
+              <Text
+                style={
+                  styles.micHint
+                }
+              >
+                마이크가 음소거됐어요.
+                다시 누르면 송출돼요.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </AppCard>
 
       {requesterUserId >
@@ -1099,6 +1298,18 @@ const styles =
 
     section: {
       gap: spacing.md,
+    },
+
+    micControl: {
+      width: "100%",
+      gap: spacing.xs,
+    },
+
+    micHint: {
+      color:
+        colors.neutral500,
+      fontSize: 11,
+      textAlign: "center",
     },
 
     sectionTitle: {
