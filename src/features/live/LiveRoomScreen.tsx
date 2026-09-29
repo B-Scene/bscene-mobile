@@ -79,6 +79,12 @@ import type {
     LiveChatMessage,
 } from "@/types/live/live";
 
+const RTC_RETRY_DELAY_MS =
+  3000;
+
+const MAX_RTC_RETRY_ATTEMPTS =
+  5;
+
 const parseId = (
   value?: string | string[],
 ) => {
@@ -179,6 +185,9 @@ export function LiveRoomScreen({
     setIsMicMuted,
   ] = useState(true);
 
+  const isMicMutedRef =
+    useRef(true);
+
   const rtcRef =
     useRef<LiveRtcHandle | null>(
       null,
@@ -236,10 +245,75 @@ export function LiveRoomScreen({
 
     let active = true;
 
+    let isFirstConnect = true;
+
+    let retryAttempts = 0;
+
+    let retryTimer:
+      | ReturnType<
+          typeof setTimeout
+        >
+      | null = null;
+
+    const scheduleRetry =
+      () => {
+        if (
+          !active ||
+          retryTimer
+        ) {
+          return;
+        }
+
+        if (
+          retryAttempts >=
+          MAX_RTC_RETRY_ATTEMPTS
+        ) {
+          setMediaError(
+            "라이브 오디오 연결에 실패했어요. 나갔다가 다시 입장해 주세요.",
+          );
+
+          return;
+        }
+
+        retryAttempts += 1;
+
+        setMediaError(
+          "오디오 연결이 끊겨 다시 연결하고 있어요.",
+        );
+
+        retryTimer =
+          setTimeout(() => {
+            retryTimer = null;
+
+            void connectMedia();
+          }, RTC_RETRY_DELAY_MS);
+      };
+
+    const handleConnectionLost =
+      () => {
+        if (!active) {
+          return;
+        }
+
+        const rtc =
+          rtcRef.current;
+
+        rtcRef.current =
+          null;
+
+        if (rtc) {
+          void rtc.close();
+        }
+
+        setMediaConnected(
+          false,
+        );
+
+        scheduleRetry();
+      };
+
     const connectMedia =
       async () => {
-        setMediaError("");
-
         try {
           const playback =
             live.playback;
@@ -272,6 +346,8 @@ export function LiveRoomScreen({
             audioPlayer.play();
 
             if (active) {
+              setMediaError("");
+
               setMediaConnected(
                 true,
               );
@@ -287,6 +363,10 @@ export function LiveRoomScreen({
             const handle =
               await startWhipBroadcast(
                 playback.playbackUrl,
+                {
+                  onConnectionLost:
+                    handleConnectionLost,
+                },
               );
 
             if (!active) {
@@ -298,9 +378,24 @@ export function LiveRoomScreen({
             rtcRef.current =
               handle;
 
-            setIsMicMuted(
-              true,
-            );
+            if (isFirstConnect) {
+              isMicMutedRef.current =
+                true;
+
+              setIsMicMuted(
+                true,
+              );
+            } else {
+              handle.setMicEnabled(
+                !isMicMutedRef.current,
+              );
+            }
+
+            isFirstConnect = false;
+
+            retryAttempts = 0;
+
+            setMediaError("");
 
             setMediaConnected(
               true,
@@ -316,6 +411,10 @@ export function LiveRoomScreen({
             const handle =
               await startWhepPlayback(
                 playback.playbackUrl,
+                {
+                  onConnectionLost:
+                    handleConnectionLost,
+                },
               );
 
             if (!active) {
@@ -327,12 +426,24 @@ export function LiveRoomScreen({
             rtcRef.current =
               handle;
 
+            isFirstConnect = false;
+
+            retryAttempts = 0;
+
+            setMediaError("");
+
             setMediaConnected(
               true,
             );
           }
         } catch (error) {
           if (!active) {
+            return;
+          }
+
+          if (retryAttempts > 0) {
+            scheduleRetry();
+
             return;
           }
 
@@ -348,6 +459,14 @@ export function LiveRoomScreen({
 
     return () => {
       active = false;
+
+      if (retryTimer) {
+        clearTimeout(
+          retryTimer,
+        );
+
+        retryTimer = null;
+      }
 
       audioPlayer.pause();
 
@@ -455,6 +574,9 @@ export function LiveRoomScreen({
     rtc.setMicEnabled(
       !nextMuted,
     );
+
+    isMicMutedRef.current =
+      nextMuted;
 
     setIsMicMuted(
       nextMuted,

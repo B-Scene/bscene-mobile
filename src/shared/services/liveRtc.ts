@@ -1,3 +1,7 @@
+export type LiveRtcOptions = {
+  onConnectionLost?: () => void;
+};
+
 export type LiveRtcHandle = {
   peerConnection: null;
 
@@ -19,6 +23,7 @@ const createWebRtcUnsupportedError =
 export const startWhipBroadcast =
   async (
     _whipUrl: string,
+    _options?: LiveRtcOptions,
   ): Promise<LiveRtcHandle> => {
     throw createWebRtcUnsupportedError();
   };
@@ -26,6 +31,7 @@ export const startWhipBroadcast =
 export const startWhepPlayback =
   async (
     _whepUrl: string,
+    _options?: LiveRtcOptions,
   ): Promise<LiveRtcHandle> => {
     throw createWebRtcUnsupportedError();
   };

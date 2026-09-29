@@ -250,6 +250,109 @@ const deleteRtcSession =
     }
   };
 
+const DISCONNECT_GRACE_MS =
+  3000;
+
+export type LiveRtcOptions = {
+  onConnectionLost?: () => void;
+};
+
+const watchConnection =
+  (
+    peer:
+      RTCPeerConnectionType,
+    onConnectionLost?: () => void,
+  ) => {
+    let disposed = false;
+
+    let disconnectTimer:
+      | ReturnType<
+          typeof setTimeout
+        >
+      | null = null;
+
+    const clearDisconnectTimer =
+      () => {
+        if (disconnectTimer) {
+          clearTimeout(
+            disconnectTimer,
+          );
+
+          disconnectTimer =
+            null;
+        }
+      };
+
+    const notifyLost = () => {
+      if (disposed) {
+        return;
+      }
+
+      disposed = true;
+
+      clearDisconnectTimer();
+
+      onConnectionLost?.();
+    };
+
+    const handleStateChange =
+      () => {
+        if (disposed) {
+          return;
+        }
+
+        const state =
+          peer.connectionState;
+
+        if (
+          state === "connected"
+        ) {
+          clearDisconnectTimer();
+
+          return;
+        }
+
+        if (
+          state === "failed"
+        ) {
+          notifyLost();
+
+          return;
+        }
+
+        if (
+          state ===
+            "disconnected" &&
+          !disconnectTimer
+        ) {
+          disconnectTimer =
+            setTimeout(() => {
+              disconnectTimer =
+                null;
+
+              if (
+                peer.connectionState ===
+                "disconnected"
+              ) {
+                notifyLost();
+              }
+            }, DISCONNECT_GRACE_MS);
+        }
+      };
+
+    peer.onconnectionstatechange =
+      handleStateChange;
+
+    return () => {
+      disposed = true;
+
+      clearDisconnectTimer();
+
+      peer.onconnectionstatechange =
+        null;
+    };
+  };
+
 export type LiveRtcHandle = {
   peerConnection:
     RTCPeerConnectionType;
@@ -265,6 +368,7 @@ export type LiveRtcHandle = {
 export const startWhipBroadcast =
   async (
     whipUrl: string,
+    options: LiveRtcOptions = {},
   ): Promise<LiveRtcHandle> => {
     const {
       mediaDevices,
@@ -343,12 +447,20 @@ export const startWhipBroadcast =
       },
     );
 
+    const stopWatching =
+      watchConnection(
+        peer,
+        options.onConnectionLost,
+      );
+
     return {
       peerConnection:
         peer,
 
       close:
         async () => {
+          stopWatching();
+
           stream
             .getTracks()
             .forEach(
@@ -382,6 +494,7 @@ export const startWhipBroadcast =
 export const startWhepPlayback =
   async (
     whepUrl: string,
+    options: LiveRtcOptions = {},
   ): Promise<LiveRtcHandle> => {
     const {
       RTCPeerConnection,
@@ -439,12 +552,20 @@ export const startWhepPlayback =
       },
     );
 
+    const stopWatching =
+      watchConnection(
+        peer,
+        options.onConnectionLost,
+      );
+
     return {
       peerConnection:
         peer,
 
       close:
         async () => {
+          stopWatching();
+
           peer.close();
 
           await deleteRtcSession(
