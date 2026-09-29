@@ -3,6 +3,10 @@ export type LiveRtcHandle = {
 
   close:
     () => Promise<void>;
+
+  setMicEnabled: (
+    enabled: boolean,
+  ) => void;
 };
 
 const createWebRtcUnsupportedError =

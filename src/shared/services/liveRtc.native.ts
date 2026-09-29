@@ -256,6 +256,10 @@ export type LiveRtcHandle = {
 
   close:
     () => Promise<void>;
+
+  setMicEnabled: (
+    enabled: boolean,
+  ) => void;
 };
 
 export const startWhipBroadcast =
@@ -283,6 +287,8 @@ export const startWhipBroadcast =
       .getTracks()
       .forEach(
         (track) => {
+          track.enabled = false;
+
           peer.addTrack(
             track,
             stream,
@@ -357,6 +363,19 @@ export const startWhipBroadcast =
             authorization,
           );
         },
+
+      setMicEnabled: (
+        enabled,
+      ) => {
+        stream
+          .getAudioTracks()
+          .forEach(
+            (track) => {
+              track.enabled =
+                enabled;
+            },
+          );
+      },
     };
   };
 
@@ -433,5 +452,7 @@ export const startWhepPlayback =
             authorization,
           );
         },
+
+      setMicEnabled: () => {},
     };
   };

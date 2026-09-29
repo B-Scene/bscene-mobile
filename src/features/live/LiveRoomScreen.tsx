@@ -174,6 +174,11 @@ export function LiveRoomScreen({
     setMediaConnected,
   ] = useState(false);
 
+  const [
+    isMicMuted,
+    setIsMicMuted,
+  ] = useState(true);
+
   const rtcRef =
     useRef<LiveRtcHandle | null>(
       null,
@@ -292,6 +297,10 @@ export function LiveRoomScreen({
 
             rtcRef.current =
               handle;
+
+            setIsMicMuted(
+              true,
+            );
 
             setMediaConnected(
               true,
@@ -424,6 +433,33 @@ export function LiveRoomScreen({
     mode === "band" &&
     live?.playback.role ===
       "LISTENER";
+
+  const isBroadcastProtocol =
+    live?.playback.protocol ===
+    "WHIP";
+
+  const toggleMic = () => {
+    const rtc =
+      rtcRef.current;
+
+    if (
+      !rtc ||
+      !mediaConnected
+    ) {
+      return;
+    }
+
+    const nextMuted =
+      !isMicMuted;
+
+    rtc.setMicEnabled(
+      !nextMuted,
+    );
+
+    setIsMicMuted(
+      nextMuted,
+    );
+  };
 
   const sendMessage =
     () => {
@@ -784,6 +820,47 @@ export function LiveRoomScreen({
             {mediaError}
           </Text>
         ) : null}
+
+        {isBroadcastProtocol ? (
+          <View
+            style={
+              styles.micControl
+            }
+          >
+            <AppButton
+              label={
+                mediaConnected
+                  ? isMicMuted
+                    ? "마이크 켜기"
+                    : "마이크 끄기"
+                  : "마이크 연결 중"
+              }
+              variant={
+                isMicMuted
+                  ? "primary"
+                  : "secondary"
+              }
+              disabled={
+                !mediaConnected
+              }
+              onPress={
+                toggleMic
+              }
+            />
+
+            {mediaConnected &&
+            isMicMuted ? (
+              <Text
+                style={
+                  styles.micHint
+                }
+              >
+                마이크가 음소거됐어요.
+                다시 누르면 송출돼요.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </AppCard>
 
       {requesterUserId >
@@ -1099,6 +1176,18 @@ const styles =
 
     section: {
       gap: spacing.md,
+    },
+
+    micControl: {
+      width: "100%",
+      gap: spacing.xs,
+    },
+
+    micHint: {
+      color:
+        colors.neutral500,
+      fontSize: 11,
+      textAlign: "center",
     },
 
     sectionTitle: {
