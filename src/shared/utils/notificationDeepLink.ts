@@ -51,12 +51,29 @@ const normalizeExplicitPath =
     if (
       schemeMatch?.[1]
     ) {
-      return `/${schemeMatch[1]
-        .replace(
-          /^\/+/,
-          "",
-        )
-        .split("?")[0]}`;
+      return `/${schemeMatch[1].replace(
+        /^\/+/,
+        "",
+      )}`;
+    }
+
+    return null;
+  };
+
+const getReferenceId =
+  (
+    data: NotificationData,
+    ...keys: string[]
+  ) => {
+    for (const key of keys) {
+      const id =
+        toPositiveNumber(
+          data[key],
+        );
+
+      if (id) {
+        return id;
+      }
     }
 
     return null;
@@ -96,9 +113,10 @@ export const getNotificationDeepLink =
       ).toUpperCase();
 
     const liveId =
-      toPositiveNumber(
-        data.liveId ??
-          data.referenceId,
+      getReferenceId(
+        data,
+        "liveId",
+        "referenceId",
       );
 
     if (
@@ -133,21 +151,133 @@ export const getNotificationDeepLink =
     }
 
     const chatRoomId =
-      toPositiveNumber(
-        data.chatRoomId,
+      getReferenceId(
+        data,
+        "chatRoomId",
+        "roomId",
+        "referenceId",
       );
 
-    if (chatRoomId) {
+    if (
+      chatRoomId &&
+      (
+        type.includes(
+          "CHAT",
+        ) ||
+        type.includes(
+          "MESSAGE",
+        ) ||
+        type.includes(
+          "DM",
+        )
+      )
+    ) {
       return `/band/session/messages/${chatRoomId}`;
     }
 
     const recruitmentId =
-      toPositiveNumber(
-        data.sessionRecruitmentId,
+      getReferenceId(
+        data,
+        "sessionRecruitmentId",
+        "recruitmentId",
+        "referenceId",
       );
 
-    if (recruitmentId) {
+    if (
+      recruitmentId &&
+      type.includes(
+        "RECRUIT",
+      )
+    ) {
       return `/band/session/recruitments/${recruitmentId}`;
+    }
+
+    const applicationId =
+      getReferenceId(
+        data,
+        "applicationSubmissionId",
+        "applySubmissionId",
+        "applicationId",
+        "referenceId",
+      );
+
+    if (
+      applicationId &&
+      type.includes(
+        "APPLICATION",
+      )
+    ) {
+      return `/band/my/applications/${applicationId}`;
+    }
+
+    const performanceId =
+      getReferenceId(
+        data,
+        "performanceId",
+        "concertId",
+        "referenceId",
+      );
+
+    if (
+      performanceId &&
+      (
+        type.includes(
+          "PERFORMANCE",
+        ) ||
+        type.includes(
+          "CONCERT",
+        )
+      )
+    ) {
+      return mode === "fan"
+        ? `/fan/home/concerts/${performanceId}`
+        : `/band/home/concerts/${performanceId}`;
+    }
+
+    const postId =
+      getReferenceId(
+        data,
+        "postId",
+        "contentId",
+        "newsId",
+        "referenceId",
+      );
+
+    if (
+      postId &&
+      (
+        type.includes(
+          "POST",
+        ) ||
+        type.includes(
+          "CONTENT",
+        ) ||
+        type.includes(
+          "NEWS",
+        )
+      )
+    ) {
+      return mode === "fan"
+        ? `/fan/explore/contents/${postId}`
+        : `/band/home/contents/${postId}`;
+    }
+
+    const bandId =
+      getReferenceId(
+        data,
+        "bandId",
+        "referenceId",
+      );
+
+    if (
+      bandId &&
+      type.includes(
+        "BAND",
+      )
+    ) {
+      return mode === "fan"
+        ? `/fan/bands/${bandId}`
+        : "/band/home";
     }
 
     return null;

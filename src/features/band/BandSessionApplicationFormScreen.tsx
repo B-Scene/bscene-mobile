@@ -25,18 +25,10 @@ import {
   useMySessionApplicationSummaryQuery,
   useUpdateSessionApplicationMutation,
 } from "@/hooks/api/session/useSessionApplication";
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
-import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
-import {
-  colors,
-  radius,
-  spacing,
-} from "@/shared/constants/theme";
+import { colors } from "@/shared/constants/theme";
 import type {
   CreateSessionApplicationRequest,
   MySessionApplicationDetailResponse,
@@ -788,10 +780,11 @@ function BandSessionApplicationForm({
         }
       />
 
-      <AppTextInput
+      <FormField
         label="지원서 유형"
+        required
         value={purpose}
-        placeholder="예: 기본, 공연 세션용"
+        placeholder="지원서 유형을 입력해 주세요"
         maxLength={20}
         editable={
           !isDefaultPurpose
@@ -810,8 +803,9 @@ function BandSessionApplicationForm({
         </Text>
       ) : null}
 
-      <AppTextInput
+      <FormField
         label="지원서 제목"
+        required
         value={title}
         placeholder="지원서 제목을 입력해 주세요"
         maxLength={50}
@@ -820,24 +814,19 @@ function BandSessionApplicationForm({
         }
       />
 
-      <AppTextInput
+      <FormField
         label="지원서 한줄 소개"
+        required
         value={oneLineIntro}
-        placeholder="짧은 소개를 입력해 주세요"
+        placeholder="지원서 목록에 표시될 짧은 소개를 입력해 주세요 (최대 50자)"
         maxLength={50}
         onChangeText={
           setOneLineIntro
         }
       />
 
-      <View
-        style={styles.field}
-      >
-        <Text
-          style={styles.label}
-        >
-          소개글
-        </Text>
+      <View style={styles.fieldBlock}>
+        <FieldLabel label="소개글" required />
 
         <TextInput
           value={intro}
@@ -909,29 +898,18 @@ function BandSessionApplicationForm({
         }
       />
 
-      <AppCard
-        style={styles.section}
-      >
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
-          가능한 활동
-        </Text>
-
-        <Text
-          style={styles.helper}
-        >
-          복수 선택 가능
-        </Text>
+      <View style={styles.fieldBlock}>
+        <FieldLabel
+          label="가능한 활동 (복수 선택 가능)"
+          required
+        />
 
         <View
           style={styles.chips}
         >
           {ACTIVITY_OPTIONS.map(
             (activity) => (
-              <Chip
+              <OptionPill
                 key={activity}
                 label={activity}
                 selected={
@@ -948,11 +926,9 @@ function BandSessionApplicationForm({
             ),
           )}
         </View>
-      </AppCard>
+      </View>
 
-      <AppCard
-        style={styles.section}
-      >
+      <View style={styles.fieldBlock}>
         <View
           style={
             styles.sectionHeader
@@ -1041,7 +1017,7 @@ function BandSessionApplicationForm({
                   </Pressable>
                 </View>
 
-                <AppTextInput
+                <FormField
                   label="활동명"
                   value={
                     career.name
@@ -1058,7 +1034,7 @@ function BandSessionApplicationForm({
                   }
                 />
 
-                <AppTextInput
+                <FormField
                   label="활동 기간"
                   value={
                     career.period
@@ -1075,7 +1051,7 @@ function BandSessionApplicationForm({
                   }
                 />
 
-                <AppTextInput
+                <FormField
                   label="설명"
                   value={
                     career.description
@@ -1095,11 +1071,9 @@ function BandSessionApplicationForm({
             ),
           )
         )}
-      </AppCard>
+      </View>
 
-      <AppCard
-        style={styles.section}
-      >
+      <View style={styles.fieldBlock}>
         <View
           style={
             styles.sectionHeader
@@ -1155,7 +1129,7 @@ function BandSessionApplicationForm({
                   styles.portfolioInput
                 }
               >
-                <AppTextInput
+                <FormField
                   label={`링크 ${index + 1}`}
                   value={link}
                   placeholder="https://"
@@ -1193,25 +1167,97 @@ function BandSessionApplicationForm({
             </View>
           ),
         )}
-      </AppCard>
+      </View>
 
-      <AppButton
-        label={
-          isEdit
-            ? "지원서 저장"
-            : "지원서 등록"
-        }
+      <Pressable
+        accessibilityRole="button"
         disabled={
-          !isValid
-        }
-        loading={
+          !isValid ||
           isSubmitting
         }
+        style={[
+          styles.submitButton,
+          (!isValid || isSubmitting) &&
+            styles.submitButtonDisabled,
+        ]}
         onPress={() =>
           void submit()
         }
-      />
+      >
+        <Text
+          style={[
+            styles.submitButtonText,
+            (!isValid || isSubmitting) &&
+              styles.submitButtonTextDisabled,
+          ]}
+        >
+          {isSubmitting
+            ? "저장 중..."
+            : isEdit
+              ? "지원서 저장"
+              : "지원서 등록"}
+        </Text>
+      </Pressable>
     </Screen>
+  );
+}
+
+function FormField({
+  label,
+  required = false,
+  value,
+  placeholder,
+  maxLength,
+  editable = true,
+  autoCapitalize,
+  keyboardType,
+  onChangeText,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  placeholder: string;
+  maxLength?: number;
+  editable?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  keyboardType?: "default" | "email-address" | "numeric" | "phone-pad" | "url";
+  onChangeText: (value: string) => void;
+}) {
+  return (
+    <View style={styles.fieldBlock}>
+      <FieldLabel label={label} required={required} />
+      <TextInput
+        value={value}
+        editable={editable}
+        placeholder={placeholder}
+        placeholderTextColor={colors.neutral500}
+        maxLength={maxLength}
+        autoCapitalize={autoCapitalize}
+        keyboardType={keyboardType}
+        style={[
+          styles.input,
+          !editable && styles.inputLocked,
+        ]}
+        onChangeText={onChangeText}
+      />
+    </View>
+  );
+}
+
+function FieldLabel({
+  label,
+  required = false,
+}: {
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <View style={styles.labelRow}>
+      <Text style={styles.label}>{label}</Text>
+      {required ? (
+        <Text style={styles.requiredMark}>*</Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -1229,23 +1275,15 @@ function ChoiceSection({
   ) => void;
 }) {
   return (
-    <AppCard
-      style={styles.section}
-    >
-      <Text
-        style={
-          styles.sectionTitle
-        }
-      >
-        {title}
-      </Text>
+    <View style={styles.fieldBlock}>
+      <FieldLabel label={title} required />
 
       <View
         style={styles.chips}
       >
         {options.map(
           (option) => (
-            <Chip
+            <OptionPill
               key={option}
               label={option}
               selected={
@@ -1265,44 +1303,114 @@ function ChoiceSection({
           ),
         )}
       </View>
-    </AppCard>
+    </View>
+  );
+}
+
+function OptionPill({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={[
+        styles.optionPill,
+        selected
+          ? styles.optionPillSelected
+          : styles.optionPillIdle,
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.optionPillText,
+          selected
+            ? styles.optionPillTextSelected
+            : styles.optionPillTextIdle,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles =
   StyleSheet.create({
     container: {
-      gap: spacing.lg,
-      paddingBottom:
-        spacing.xxl,
+      gap: 12,
+      paddingHorizontal: 32,
+      paddingTop: 12,
+      paddingBottom: 32,
+      backgroundColor: colors.white,
     },
 
-    field: {
-      gap: spacing.sm,
+    fieldBlock: {
+      gap: 6,
+    },
+
+    labelRow: {
+      flexDirection: "row",
+      alignItems: "center",
     },
 
     label: {
       color:
-        colors.neutral800,
-      fontSize: 14,
+        colors.neutral900,
+      fontSize: 15,
       fontWeight: "700",
+      lineHeight: 20,
+    },
+
+    requiredMark: {
+      color: colors.error,
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 20,
+      marginLeft: 4,
+    },
+
+    input: {
+      height: 52,
+      borderWidth: 1,
+      borderColor: colors.neutral400,
+      borderRadius: 5,
+      backgroundColor: colors.white,
+      color: colors.neutral900,
+      fontSize: 13,
+      fontWeight: "500",
+      lineHeight: 18,
+      paddingHorizontal: 16,
+    },
+
+    inputLocked: {
+      backgroundColor: colors.neutral200,
+      color: colors.neutral600,
     },
 
     textArea: {
-      minHeight: 140,
+      height: 72,
       borderWidth: 1,
       borderColor:
-        colors.neutral300,
-      borderRadius:
-        radius.md,
+        colors.neutral400,
+      borderRadius: 5,
       backgroundColor:
         colors.white,
       color:
         colors.neutral900,
-      fontSize: 15,
-      lineHeight: 22,
-      padding:
-        spacing.lg,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+      paddingHorizontal: 16,
+      paddingTop: 6,
+      paddingBottom: 20,
     },
 
     countText: {
@@ -1310,6 +1418,8 @@ const styles =
         colors.neutral500,
       fontSize: 11,
       textAlign: "right",
+      marginTop: -24,
+      marginRight: 12,
     },
 
     helper: {
@@ -1319,15 +1429,12 @@ const styles =
       lineHeight: 18,
     },
 
-    section: {
-      gap: spacing.md,
-    },
-
     sectionTitle: {
       color:
         colors.neutral900,
-      fontSize: 16,
-      fontWeight: "900",
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 20,
     },
 
     sectionHeader: {
@@ -1335,37 +1442,68 @@ const styles =
       alignItems: "center",
       justifyContent:
         "space-between",
+      minHeight: 26,
     },
 
     chips: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: spacing.sm,
+      gap: 8,
+    },
+
+    optionPill: {
+      minHeight: 26,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 15,
+    },
+
+    optionPillSelected: {
+      backgroundColor: colors.secondary500,
+    },
+
+    optionPillIdle: {
+      backgroundColor: colors.neutral300,
+    },
+
+    optionPillText: {
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    optionPillTextSelected: {
+      color: colors.white,
+    },
+
+    optionPillTextIdle: {
+      color: colors.neutral600,
     },
 
     addButton: {
       minHeight: 36,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.xs,
+      gap: 4,
       paddingHorizontal:
-        spacing.sm,
+        8,
     },
 
     addButtonText: {
       color:
-        colors.primary600,
+        colors.secondary500,
       fontSize: 13,
       fontWeight: "800",
     },
 
     repeatCard: {
-      gap: spacing.md,
+      gap: 12,
       borderTopWidth: 1,
       borderTopColor:
         colors.neutral300,
       paddingTop:
-        spacing.md,
+        12,
     },
 
     repeatHeader: {
@@ -1378,14 +1516,14 @@ const styles =
     repeatTitle: {
       color:
         colors.neutral800,
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: "800",
     },
 
     portfolioRow: {
       flexDirection: "row",
       alignItems: "flex-end",
-      gap: spacing.sm,
+      gap: 8,
     },
 
     portfolioInput: {
@@ -1398,5 +1536,29 @@ const styles =
       alignItems: "center",
       justifyContent:
         "center",
+    },
+
+    submitButton: {
+      height: 52,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.secondary500,
+      marginTop: 8,
+    },
+
+    submitButtonDisabled: {
+      backgroundColor: colors.neutral300,
+    },
+
+    submitButtonText: {
+      color: colors.white,
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 20,
+    },
+
+    submitButtonTextDisabled: {
+      color: colors.neutral600,
     },
   });

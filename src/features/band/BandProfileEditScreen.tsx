@@ -41,19 +41,13 @@ import {
     useActiveBandId,
 } from "@/hooks/api/user/useMyProfiles";
 
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
 import { Avatar } from "@/shared/components/Avatar";
-import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
 
 import {
     colors,
-    radius,
-    spacing,
 } from "@/shared/constants/theme";
 
 import type {
@@ -468,7 +462,7 @@ function BandProfileEditForm({
     >
       <AppHeader title="밴드 프로필 관리" />
 
-      <AppCard
+      <View
         style={styles.imageCard}
       >
         <Avatar
@@ -539,12 +533,13 @@ function BandProfileEditForm({
             }}
           />
         </View>
-      </AppCard>
+      </View>
 
-      <AppTextInput
+      <FormField
         label="밴드명"
+        required
         value={name}
-        placeholder="밴드 이름"
+        placeholder="밴드 이름을 입력해주세요"
         onChangeText={
           setName
         }
@@ -568,14 +563,8 @@ function BandProfileEditForm({
         }
       />
 
-      <View
-        style={styles.field}
-      >
-        <Text
-          style={styles.label}
-        >
-          밴드 소개
-        </Text>
+      <View style={styles.field}>
+        <FieldLabel label="밴드 소개" />
 
         <TextInput
           value={
@@ -598,7 +587,7 @@ function BandProfileEditForm({
       </View>
 
       {memberProfileId ? (
-        <AppCard
+        <View
           style={
             styles.section
           }
@@ -608,25 +597,26 @@ function BandProfileEditForm({
               styles.sectionTitle
             }
           >
-            내 밴드 프로필
+            내 프로필 수정
           </Text>
 
-          <AppTextInput
+          <Text style={styles.sectionDescription}>
+            이 밴드에서 표시되는 내 활동명과 파트를 수정합니다
+          </Text>
+
+          <FormField
             label="활동명"
+            required
             value={
               activityName
             }
-            placeholder="활동명"
+            placeholder="활동명을 입력해주세요"
             onChangeText={
               setActivityName
             }
           />
 
-          <Text
-            style={styles.label}
-          >
-            파트
-          </Text>
+          <FieldLabel label="파트" required />
 
           <View
             style={styles.chips}
@@ -636,7 +626,7 @@ function BandProfileEditForm({
                 value,
                 label,
               ]) => (
-                <Chip
+                <Pill
                   key={value}
                   label={label}
                   selected={
@@ -652,25 +642,77 @@ function BandProfileEditForm({
               ),
             )}
           </View>
-        </AppCard>
+        </View>
       ) : null}
 
-      <AppButton
-        label={
-          uploading
-            ? "이미지 업로드 중..."
-            : "밴드 프로필 저장"
-        }
-        loading={
+      <Pressable
+        accessibilityRole="button"
+        disabled={
           uploading ||
           updateBand.isPending ||
           updateMember.isPending
         }
+        style={[
+          styles.submitButton,
+          (
+            uploading ||
+            updateBand.isPending ||
+            updateMember.isPending
+          ) && styles.submitButtonDisabled,
+        ]}
         onPress={() =>
           void save()
         }
-      />
+      >
+        <Text style={styles.submitButtonText}>
+          {uploading ? "업로드 중..." : "밴드 프로필 저장"}
+        </Text>
+      </Pressable>
     </Screen>
+  );
+}
+
+function FormField({
+  label,
+  required = false,
+  value,
+  placeholder,
+  onChangeText,
+}: {
+  label: string;
+  required?: boolean;
+  value: string;
+  placeholder: string;
+  onChangeText: (value: string) => void;
+}) {
+  return (
+    <View style={styles.field}>
+      <FieldLabel label={label} required={required} />
+      <TextInput
+        value={value}
+        placeholder={placeholder}
+        placeholderTextColor={colors.neutral500}
+        style={styles.input}
+        onChangeText={onChangeText}
+      />
+    </View>
+  );
+}
+
+function FieldLabel({
+  label,
+  required = false,
+}: {
+  label: string;
+  required?: boolean;
+}) {
+  return (
+    <View style={styles.labelRow}>
+      <Text style={styles.label}>{label}</Text>
+      {required ? (
+        <Text style={styles.requiredMark}>*</Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -725,16 +767,10 @@ function Selection({
   ) => void;
 }) {
   return (
-    <AppCard
+    <View
       style={styles.section}
     >
-      <Text
-        style={
-          styles.sectionTitle
-        }
-      >
-        {title}
-      </Text>
+      <FieldLabel label={title} />
 
       <View
         style={styles.chips}
@@ -744,7 +780,7 @@ function Selection({
             optionValue,
             label,
           ]) => (
-            <Chip
+            <Pill
               key={
                 optionValue
               }
@@ -762,35 +798,67 @@ function Selection({
           ),
         )}
       </View>
-    </AppCard>
+    </View>
+  );
+}
+
+function Pill({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      style={[
+        styles.pill,
+        selected ? styles.pillSelected : styles.pillIdle,
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.pillText,
+          selected ? styles.pillTextSelected : styles.pillTextIdle,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles =
   StyleSheet.create({
     container: {
-      gap: spacing.lg,
-      paddingBottom:
-        spacing.xxl,
+      gap: 24,
+      paddingHorizontal: 20,
+      paddingBottom: 32,
+      backgroundColor: colors.white,
     },
 
     imageCard: {
       alignItems: "center",
-      gap: spacing.lg,
+      gap: 12,
+      paddingTop: 8,
     },
 
     imageActions: {
       flexDirection: "row",
-      gap: spacing.sm,
+      gap: 8,
     },
 
     iconButton: {
       minHeight: 40,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.xs,
-      paddingHorizontal:
-        spacing.md,
+      gap: 4,
+      paddingHorizontal: 12,
     },
 
     iconButtonText: {
@@ -801,47 +869,135 @@ const styles =
     },
 
     section: {
-      gap: spacing.md,
+      gap: 12,
     },
 
     sectionTitle: {
       color:
         colors.neutral900,
-      fontSize: 17,
-      fontWeight: "900",
+      fontSize: 15,
+      fontWeight: "700",
+      lineHeight: 20,
+    },
+
+    sectionDescription: {
+      color: colors.neutral600,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+      marginTop: -8,
     },
 
     chips: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: spacing.sm,
+      gap: 8,
     },
 
     field: {
-      gap: spacing.sm,
+      gap: 8,
+    },
+
+    labelRow: {
+      flexDirection: "row",
+      alignItems: "center",
     },
 
     label: {
       color:
-        colors.neutral800,
-      fontSize: 14,
-      fontWeight: "700",
+        colors.neutral900,
+      fontSize: 15,
+      fontWeight: "500",
+      lineHeight: 20,
+    },
+
+    requiredMark: {
+      color: colors.error,
+      fontSize: 15,
+      fontWeight: "500",
+      lineHeight: 20,
+      marginLeft: 4,
+    },
+
+    input: {
+      height: 52,
+      borderWidth: 1,
+      borderColor: colors.neutral400,
+      borderRadius: 5,
+      backgroundColor: colors.white,
+      color: colors.neutral900,
+      fontSize: 13,
+      fontWeight: "500",
+      lineHeight: 18,
+      paddingHorizontal: 16,
     },
 
     textArea: {
-      minHeight: 120,
+      height: 96,
       borderWidth: 1,
       borderColor:
-        colors.neutral300,
-      borderRadius:
-        radius.md,
+        colors.neutral400,
+      borderRadius: 5,
       backgroundColor:
         colors.white,
-      padding:
-        spacing.lg,
+      paddingHorizontal: 16,
+      paddingTop: 9,
+      paddingBottom: 20,
       color:
         colors.neutral900,
-      fontSize: 15,
-      lineHeight: 22,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    pill: {
+      minHeight: 26,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 15,
+      paddingVertical: 4,
+    },
+
+    pillSelected: {
+      backgroundColor: colors.secondary500,
+    },
+
+    pillIdle: {
+      backgroundColor: colors.neutral300,
+    },
+
+    pillText: {
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    pillTextSelected: {
+      color: colors.white,
+    },
+
+    pillTextIdle: {
+      color: colors.neutral600,
+    },
+
+    submitButton: {
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: colors.secondary500,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 8,
+    },
+
+    submitButtonDisabled: {
+      backgroundColor: colors.neutral300,
+    },
+
+    submitButtonText: {
+      color: colors.white,
+      fontSize: 18,
+      fontWeight: "700",
+      lineHeight: 20,
     },
   });

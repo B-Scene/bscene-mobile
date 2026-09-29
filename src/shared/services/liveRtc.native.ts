@@ -1,9 +1,18 @@
+<<<<<<< HEAD
 import {
     resolveLiveMediaUrl,
+=======
+import type {
+  RTCPeerConnection as RTCPeerConnectionType,
+} from "react-native-webrtc";
+
+import {
+  resolveLiveMediaUrl,
+>>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
 } from "@/api/live/live";
 
 import {
-    secureTokenStorage,
+  secureTokenStorage,
 } from "@/shared/utils/secureTokenStorage";
 
 type WebRtcModule =
@@ -11,11 +20,14 @@ type WebRtcModule =
     "react-native-webrtc"
   );
 
+<<<<<<< HEAD
 type NativePeerConnection =
   InstanceType<
     WebRtcModule["RTCPeerConnection"]
   >;
 
+=======
+>>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
 let webRtcModulePromise:
   | Promise<WebRtcModule>
   | null = null;
@@ -33,8 +45,12 @@ const loadWebRtcModule =
             return module;
           })
           .catch((error) => {
+<<<<<<< HEAD
             webRtcModulePromise =
               null;
+=======
+            webRtcModulePromise = null;
+>>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
 
             throw error;
           });
@@ -130,7 +146,11 @@ const getRtcAuthorization =
 const waitForIceGatheringComplete =
   (
     peer:
+<<<<<<< HEAD
       NativePeerConnection,
+=======
+      RTCPeerConnectionType,
+>>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
   ) => {
     return new Promise<void>(
       (resolve) => {
@@ -255,7 +275,11 @@ const deleteRtcSession =
 
 export type LiveRtcHandle = {
   peerConnection:
+<<<<<<< HEAD
     NativePeerConnection;
+=======
+    RTCPeerConnectionType;
+>>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
 
   close:
     () => Promise<void>;

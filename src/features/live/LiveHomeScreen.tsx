@@ -1,358 +1,1613 @@
+import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
-    router,
-} from "expo-router";
-
-import {
-    Radio,
-} from "lucide-react-native";
-
-import {
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 import {
-    useLiveHomeQuery,
+  useLiveHomeQuery,
+  useToggleLiveAlarmMutation,
 } from "@/hooks/api/live/useLive";
-
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
-import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
-
-import {
-    colors,
-    spacing,
-} from "@/shared/constants/theme";
-
+import { colors } from "@/shared/constants/theme";
 import type {
-    LiveNowItem,
+  LiveNowItem,
+  LiveReplayItem,
+  ScheduledLiveItem,
 } from "@/types/live/live";
 
-export function LiveHomeScreen({
-  mode,
-}: {
-  mode: "fan" | "band";
-}) {
-  const query =
-    useLiveHomeQuery();
+type LiveMode = "fan" | "band";
 
-  const data =
-    query.data;
+type LiveHomeScreenProps = {
+  mode: LiveMode;
+};
+
+type BandLiveListKind = "now" | "scheduled";
+
+export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
+  const query = useLiveHomeQuery();
+  const data = query.data;
+
+  if (mode === "band") {
+    return (
+      <BandLiveHome
+        data={data}
+        isLoading={query.isLoading}
+        isError={query.isError || !data}
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
 
   return (
-    <Screen
-      contentStyle={
-        styles.container
+    <FanLiveHome
+      data={data}
+      isLoading={query.isLoading}
+      isError={query.isError || !data}
+      onRetry={() => void query.refetch()}
+    />
+  );
+}
+
+function BandLiveHome({
+  data,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  data: ReturnType<typeof useLiveHomeQuery>["data"];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  const now = useScheduledLiveNow();
+
+  const handleScheduledAction =
+    (live: ScheduledLiveItem) => {
+      if (
+        isScheduledLiveStartable(
+          live.scheduledAt,
+          now,
+        )
+      ) {
+        router.push(
+          `/band/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
+        );
+        return;
       }
-    >
-      <AppHeader
-        title="라이브"
-        showBack={false}
-      />
 
-      {mode ===
-      "band" ? (
-        <AppButton
-          label="라이브 시작하기"
-          onPress={() =>
-            router.push(
-              "/band/live/create" as Parameters<
-                typeof router.push
-              >[0],
-            )
-          }
-        />
-      ) : null}
+      router.push(
+        `/band/live/create?reservationLiveId=${live.liveId}` as Parameters<
+          typeof router.push
+        >[0],
+      );
+    };
 
-      {query.isLoading ? (
-        <AppState
-          loading
-          title="라이브를 불러오는 중이에요"
-        />
-      ) : query.isError ||
-        !data ? (
-        <AppState
-          title="라이브를 불러오지 못했어요"
-          actionLabel="다시 시도"
-          onAction={() =>
-            void query.refetch()
-          }
-        />
-      ) : (
-        <>
-          <View
-            style={
-              styles.sectionHeader
-            }
-          >
-            <Radio
-              size={20}
-              color={
-                mode ===
-                "band"
-                  ? colors.secondary600
-                  : colors.primary600
-              }
-            />
+  return (
+    <Screen contentStyle={styles.bandContainer}>
+      <View style={styles.bandHeader}>
+        <Text style={styles.bandHeaderTitle}>라이브</Text>
+      </View>
 
-            <Text
-              style={
-                styles.sectionTitle
+      <View style={styles.bandContent}>
+        <View style={styles.bandHero}>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroTitle}>
+              지금, 오디오 라이브를{"\n"}시작 해보세요!
+            </Text>
+            <Text style={styles.heroDescription}>
+              목소리만으로 팬들과 실시간 소통,{"\n"}팔로워가 없어도 바로 시작할 수 있어요.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.heroButton,
+                pressed && styles.pressed,
+              ]}
+              onPress={() =>
+                router.push(
+                  "/band/live/create" as Parameters<typeof router.push>[0],
+                )
               }
             >
-              지금 라이브
-            </Text>
+              <Text style={styles.heroButtonText}>라이브 시작하기</Text>
+            </Pressable>
           </View>
 
-          {data.liveNow
-            .length === 0 ? (
-            <AppCard>
-              <Text
-                style={
-                  styles.empty
+          <LiveIllustration />
+        </View>
+
+        {isLoading ? (
+          <Text style={styles.bandStateText}>라이브를 불러오는 중이에요.</Text>
+        ) : null}
+
+        {!isLoading && isError ? (
+          <View style={styles.bandStateCard}>
+            <Text style={styles.bandStateText}>라이브 정보를 불러오지 못했어요.</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.retryButton}
+              onPress={onRetry}
+            >
+              <Text style={styles.retryButtonText}>다시 불러오기</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {!isLoading && !isError && data ? (
+          <>
+            <View style={styles.bandSection}>
+              <BandSectionHeader
+                title="진행 중인 라이브"
+                onMorePress={() =>
+                  router.push(
+                    "/band/live/now" as Parameters<typeof router.push>[0],
+                  )
                 }
-              >
-                현재 진행 중인
-                라이브가 없어요.
-              </Text>
-            </AppCard>
-          ) : (
-            data.liveNow.map(
-              (live) => (
-                <LiveCard
-                  key={
-                    live.liveId
+              />
+              <View style={styles.bandCardList}>
+                {data.liveNow.length > 0 ? (
+                  data.liveNow.map((live) => (
+                    <BandLiveNowCard key={live.liveId} live={live} />
+                  ))
+                ) : (
+                  <Text style={styles.bandEmptyText}>진행 중인 라이브가 없어요.</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.bandSection}>
+              <BandSectionHeader
+                title="예정된 라이브"
+                onMorePress={() =>
+                  router.push(
+                    "/band/live/scheduled" as Parameters<
+                      typeof router.push
+                    >[0],
+                  )
+                }
+              />
+              <View style={styles.bandCardList}>
+                {data.scheduled.length > 0 ? (
+                  data.scheduled.map((live) => (
+                    <BandScheduledLiveCard
+                      key={live.liveId}
+                      live={live}
+                      actionLabel={
+                        isScheduledLiveStartable(live.scheduledAt, now)
+                          ? "라이브 시작"
+                          : "수정"
+                      }
+                      onAction={() => handleScheduledAction(live)}
+                    />
+                  ))
+                ) : (
+                  <Text style={styles.bandEmptyText}>예정된 라이브가 없어요.</Text>
+                )}
+              </View>
+            </View>
+          </>
+        ) : null}
+      </View>
+    </Screen>
+  );
+}
+
+export function BandLiveListScreen({
+  kind,
+}: {
+  kind: BandLiveListKind;
+}) {
+  const query = useLiveHomeQuery();
+  const now = useScheduledLiveNow();
+
+  const title =
+    kind === "now"
+      ? "진행 중인 라이브"
+      : "예정된 라이브";
+
+  const items = useMemo(() => {
+    if (!query.data) {
+      return [];
+    }
+
+    return kind === "now"
+      ? query.data.liveNow
+      : query.data.scheduled;
+  }, [kind, query.data]);
+
+  const handleScheduledAction =
+    (live: ScheduledLiveItem) => {
+      if (
+        isScheduledLiveStartable(
+          live.scheduledAt,
+          now,
+        )
+      ) {
+        router.push(
+          `/band/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
+        );
+        return;
+      }
+
+      router.push(
+        `/band/live/create?reservationLiveId=${live.liveId}` as Parameters<
+          typeof router.push
+        >[0],
+      );
+    };
+
+  return (
+    <Screen contentStyle={styles.bandListContainer}>
+      <View style={styles.bandListHeader}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="뒤로가기"
+          hitSlop={12}
+          style={({ pressed }) => [
+            styles.bandBackButton,
+            pressed && styles.pressed,
+          ]}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.bandBackIcon}>‹</Text>
+        </Pressable>
+        <Text style={styles.bandHeaderTitle}>{title}</Text>
+        <View style={styles.bandHeaderSpacer} />
+      </View>
+
+      {query.isLoading ? (
+        <Text style={styles.bandStateText}>라이브를 불러오는 중이에요.</Text>
+      ) : null}
+
+      {!query.isLoading && query.isError ? (
+        <View style={styles.bandStateCard}>
+          <Text style={styles.bandStateText}>라이브 정보를 불러오지 못했어요.</Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.retryButton}
+            onPress={() => void query.refetch()}
+          >
+            <Text style={styles.retryButtonText}>다시 불러오기</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {!query.isLoading && !query.isError ? (
+        <View style={styles.bandListContent}>
+          {items.length > 0 ? (
+            items.map((live) =>
+              kind === "now" ? (
+                <BandLiveNowCard
+                  key={(live as LiveNowItem).liveId}
+                  live={live as LiveNowItem}
+                />
+              ) : (
+                <BandScheduledLiveCard
+                  key={(live as ScheduledLiveItem).liveId}
+                  live={live as ScheduledLiveItem}
+                  actionLabel={
+                    isScheduledLiveStartable(
+                      (live as ScheduledLiveItem).scheduledAt,
+                      now,
+                    )
+                      ? "라이브 시작"
+                      : "수정"
                   }
-                  live={live}
-                  mode={mode}
+                  onAction={() =>
+                    handleScheduledAction(
+                      live as ScheduledLiveItem,
+                    )
+                  }
                 />
               ),
             )
-          )}
-
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            예정된 라이브
-          </Text>
-
-          {data.scheduled
-            .length === 0 ? (
-            <Text
-              style={
-                styles.empty
-              }
-            >
-              예정된 라이브가
-              없어요.
-            </Text>
           ) : (
-            data.scheduled.map(
-              (live) => (
-                <AppCard
-                  key={
-                    live.liveId
-                  }
-                  style={
-                    styles.card
-                  }
-                >
-                  <Avatar
-                    imageUrl={
-                      live.bandProfileImageUrl
-                    }
-                    label={
-                      live.bandName
-                    }
-                    size={48}
-                  />
-
-                  <View
-                    style={
-                      styles.cardInfo
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.title
-                      }
-                    >
-                      {live.title}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.meta
-                      }
-                    >
-                      {
-                        live.bandName
-                      }
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.meta
-                      }
-                    >
-                      {new Date(
-                        live.scheduledAt,
-                      ).toLocaleString()}
-                    </Text>
-                  </View>
-                </AppCard>
-              ),
-            )
+            <Text style={styles.bandEmptyText}>
+              {kind === "now"
+                ? "진행 중인 라이브가 없어요."
+                : "예정된 라이브가 없어요."}
+            </Text>
           )}
-        </>
+        </View>
+      ) : null}
+    </Screen>
+  );
+}
+
+function FanLiveHome({
+  data,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  data: ReturnType<typeof useLiveHomeQuery>["data"];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  const toggleAlarmMutation =
+    useToggleLiveAlarmMutation();
+  const [
+    notificationOverrides,
+    setNotificationOverrides,
+  ] =
+    useState<
+      Record<number, boolean>
+    >({});
+
+  const toggleNotification =
+    async (
+      live: ScheduledLiveItem,
+    ) => {
+      if (
+        toggleAlarmMutation.isPending
+      ) {
+        return;
+      }
+
+      const previousValue =
+        notificationOverrides[
+          live.liveId
+        ] ??
+        live.isAlarmSet ??
+        live.alarmSet ??
+        live.notificationEnabled ??
+        false;
+
+      setNotificationOverrides(
+        (current) => ({
+          ...current,
+          [live.liveId]:
+            !previousValue,
+        }),
+      );
+
+      try {
+        const result =
+          await toggleAlarmMutation.mutateAsync(
+            live.liveId,
+          );
+
+        setNotificationOverrides(
+          (current) => ({
+            ...current,
+            [live.liveId]:
+              result.alarmSet,
+          }),
+        );
+      } catch {
+        setNotificationOverrides(
+          (current) => ({
+            ...current,
+            [live.liveId]:
+              previousValue,
+          }),
+        );
+        Alert.alert(
+          "라이브 알림",
+          "라이브 알림을 변경하지 못했어요.",
+        );
+      }
+    };
+
+  return (
+    <Screen contentStyle={styles.fanContainer}>
+      <View style={styles.fanHeader}>
+        <Text style={styles.fanHeaderTitle}>라이브</Text>
+      </View>
+
+      {isLoading ? (
+        <View style={styles.fanStateWrap}>
+          <AppState loading title="라이브를 불러오는 중이에요" />
+        </View>
+      ) : isError || !data ? (
+        <View style={styles.fanStateWrap}>
+          <AppState
+            title="라이브를 불러오지 못했어요"
+            actionLabel="다시 시도"
+            onAction={onRetry}
+          />
+        </View>
+      ) : (
+        <View style={styles.fanContent}>
+          <View style={styles.fanSection}>
+            <FanSectionHeader
+              title="진행 중인 라이브"
+              onMorePress={() =>
+                router.push(
+                  "/fan/live/now" as Parameters<
+                    typeof router.push
+                  >[0],
+                )
+              }
+            />
+            <View style={styles.fanCardList}>
+              {data.liveNow.length === 0 ? (
+                <Text style={styles.fanEmpty}>진행 중인 라이브가 없어요.</Text>
+              ) : (
+                data.liveNow.map((live) => (
+                  <FanLiveNowCard key={live.liveId} live={live} />
+                ))
+              )}
+            </View>
+          </View>
+
+          <View style={styles.fanSection}>
+            <FanSectionHeader
+              title="다시보기"
+              onMorePress={() =>
+                router.push(
+                  "/fan/live/replays" as Parameters<
+                    typeof router.push
+                  >[0],
+                )
+              }
+            />
+            {data.replays.length > 0 ? (
+              <View style={styles.replayRow}>
+                {data.replays.slice(0, 3).map((replay) => (
+                  <ReplayPreviewCard key={replay.liveId} replay={replay} />
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.fanEmpty}>다시보기가 없어요.</Text>
+            )}
+          </View>
+
+          <View style={styles.fanSection}>
+            <FanSectionHeader
+              title="예정된 라이브"
+              onMorePress={() =>
+                router.push(
+                  "/fan/live/scheduled" as Parameters<
+                    typeof router.push
+                  >[0],
+                )
+              }
+            />
+            <View style={styles.fanCardList}>
+              {data.scheduled.length === 0 ? (
+                <Text style={styles.fanEmpty}>예정된 라이브가 없어요.</Text>
+              ) : (
+                data.scheduled.map((live) => {
+                  const notified =
+                    notificationOverrides[
+                      live.liveId
+                    ] ??
+                    live.isAlarmSet ??
+                    live.alarmSet ??
+                    live.notificationEnabled ??
+                    false;
+
+                  return (
+                    <FanScheduledLiveCard
+                      key={live.liveId}
+                      live={live}
+                      notified={
+                        notified
+                      }
+                      disabled={
+                        toggleAlarmMutation.isPending
+                      }
+                      onToggleNotification={() =>
+                        void toggleNotification(
+                          live,
+                        )
+                      }
+                    />
+                  );
+                })
+              )}
+            </View>
+          </View>
+        </View>
       )}
     </Screen>
   );
 }
 
-function LiveCard({
-  live,
-  mode,
+function BandSectionHeader({
+  title,
+  onMorePress,
 }: {
-  live: LiveNowItem;
-
-  mode:
-    | "fan"
-    | "band";
+  title: string;
+  onMorePress?: () => void;
 }) {
   return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.bandSectionTitle}>{title}</Text>
+      <Pressable
+        style={({ pressed }) => [
+          styles.moreButton,
+          pressed && styles.pressed,
+        ]}
+        accessibilityRole="button"
+        onPress={onMorePress}
+      >
+        <Text style={styles.moreText}>전체보기</Text>
+        <Text style={styles.moreIcon}>›</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function FanSectionHeader({
+  title,
+  onMorePress,
+}: {
+  title: string;
+  onMorePress?: () => void;
+}) {
+  return (
+    <View style={styles.fanSectionHeader}>
+      <Text style={styles.fanSectionTitle}>{title}</Text>
+      <Pressable
+        style={styles.fanMoreButton}
+        accessibilityRole="button"
+        onPress={onMorePress}
+      >
+        <Text style={styles.fanMoreText}>더보기</Text>
+        <Text style={styles.fanMoreIcon}>›</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function BandLiveNowCard({ live }: { live: LiveNowItem }) {
+  const listeners = live.viewerCount ?? live.viewCount ?? 0;
+
+  return (
+    <View style={styles.bandLiveCard}>
+      <View style={styles.liveProfileWrap}>
+        <Avatar
+          imageUrl={live.bandProfileImageUrl}
+          label={live.bandName}
+          size={62}
+        />
+        <View style={styles.liveBadge}>
+          <Text style={styles.liveBadgeText}>LIVE</Text>
+        </View>
+      </View>
+
+      <View style={styles.bandCardInfo}>
+        <Text numberOfLines={1} style={styles.bandCardTitle}>
+          {live.isMine ? "내 라이브 진행 중" : live.bandName}
+        </Text>
+        <Text numberOfLines={1} style={styles.bandCardSubtitle}>
+          {live.title}
+        </Text>
+        <View style={styles.listenerRow}>
+          <LiveHeadIcon />
+          <Text style={styles.listenerText}>{listeners}명 청취 중</Text>
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        style={({ pressed }) => [
+          styles.enterButton,
+          pressed && styles.pressed,
+        ]}
+        onPress={() =>
+          router.push(
+            `/band/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
+          )
+        }
+      >
+        <Text style={styles.enterButtonText}>입장</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function BandScheduledLiveCard({
+  live,
+  actionLabel = "수정",
+  onAction,
+}: {
+  live: ScheduledLiveItem;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <View style={styles.bandScheduledCard}>
+      <Avatar
+        imageUrl={live.bandProfileImageUrl}
+        label={live.bandName}
+        size={62}
+      />
+
+      <View style={styles.bandCardInfo}>
+        <Text numberOfLines={1} style={styles.bandCardTitle}>
+          {live.isMine ? "내 예정 라이브" : live.bandName}
+        </Text>
+        <Text numberOfLines={1} style={styles.bandCardSubtitle}>
+          {live.title}
+        </Text>
+        <Text numberOfLines={1} style={styles.scheduleText}>
+          {formatScheduledAt(live.scheduledAt)}
+        </Text>
+      </View>
+
+      {live.isMine ? (
+        <Pressable
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.scheduledAction,
+            pressed && styles.pressed,
+          ]}
+          onPress={onAction}
+        >
+          <Text style={styles.scheduledActionText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function FanLiveNowCard({ live }: { live: LiveNowItem }) {
+  return (
     <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.fanLiveNowCard,
+        pressed && styles.pressed,
+      ]}
       onPress={() =>
         router.push(
-          `/${mode}/live/room/${live.liveId}` as Parameters<
-            typeof router.push
-          >[0],
+          `/fan/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
         )
       }
     >
-      <AppCard
-        style={
-          styles.card
-        }
-      >
-        <Avatar
-          imageUrl={
-            live.bandProfileImageUrl
-          }
-          label={
-            live.bandName
-          }
-          size={54}
-        />
+      <View style={styles.fanLiveProfileWrap}>
+        <Avatar imageUrl={live.bandProfileImageUrl} label={live.bandName} size={62} />
+        <View style={styles.fanLiveBadge}>
+          <Text style={styles.fanLiveBadgeText}>LIVE</Text>
+        </View>
+      </View>
 
-        <View
-          style={
-            styles.cardInfo
-          }
-        >
-          <View
-            style={
-              styles.badges
-            }
-          >
-            <Badge
-              label="LIVE"
-              tone="pink"
-            />
-
-            {live.isMine ? (
-              <Badge
-                label="내 라이브"
-                tone="yellow"
-              />
-            ) : null}
-          </View>
-
-          <Text
-            style={styles.title}
-          >
-            {live.title}
-          </Text>
-
-          <Text
-            style={styles.meta}
-          >
-            {live.bandName} ·{" "}
-            {live.viewerCount ??
-              live.viewCount ??
-              0}
-            명 시청 중
+      <View style={styles.fanLiveInfo}>
+        <Text numberOfLines={1} style={styles.fanLiveTitle}>{live.title}</Text>
+        <Text numberOfLines={1} style={styles.fanLiveBand}>{live.bandName}</Text>
+        <View style={styles.fanListenerRow}>
+          <LiveHeadIcon tone="pink" />
+          <Text numberOfLines={1} style={styles.fanListenerText}>
+            {(live.viewerCount ?? live.viewCount ?? 0).toLocaleString()}명 시청 중
           </Text>
         </View>
-      </AppCard>
+      </View>
+
+      <View style={styles.fanEnterButton}>
+        <Text style={styles.fanEnterButtonText}>입장</Text>
+      </View>
     </Pressable>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    container: {
-      gap: spacing.lg,
-      paddingBottom:
-        spacing.xxl,
-    },
+function ReplayPreviewCard({ replay }: { replay: LiveReplayItem }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.replayCard,
+        pressed && styles.pressed,
+      ]}
+      onPress={() =>
+        router.push(
+          `/fan/live/replays/${replay.liveId}` as Parameters<typeof router.push>[0],
+        )
+      }
+    >
+      <View style={styles.replayThumb}>
+        {replay.thumbnailImageUrl ? (
+          <Image
+            source={{ uri: replay.thumbnailImageUrl }}
+            style={styles.replayImage}
+          />
+        ) : (
+          <View style={styles.replayFallback}>
+            <Text style={styles.replayFallbackText}>
+              {replay.bandName.slice(0, 1)}
+            </Text>
+          </View>
+        )}
+        <View style={styles.replayDuration}>
+          <Text style={styles.replayDurationText}>
+            {formatReplayDuration(replay.durationSeconds)}
+          </Text>
+        </View>
+      </View>
+      <Text numberOfLines={1} style={styles.replayTitle}>{replay.title}</Text>
+      <Text numberOfLines={1} style={styles.replayBand}>{replay.bandName}</Text>
+      <View style={styles.replayMetaRow}>
+        <PlayIcon />
+        <Text style={styles.replayMetaText}>
+          {replay.viewCount.toLocaleString()}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
 
-    sectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.sm,
-    },
+function FanScheduledLiveCard({
+  live,
+  notified,
+  disabled,
+  onToggleNotification,
+}: {
+  live: ScheduledLiveItem;
+  notified: boolean;
+  disabled: boolean;
+  onToggleNotification: () => void;
+}) {
+  return (
+    <View style={styles.fanScheduledCard}>
+      <Avatar
+        imageUrl={live.bandProfileImageUrl ?? live.thumbnailImageUrl}
+        label={live.bandName}
+        size={62}
+      />
+      <View style={styles.fanScheduledInfo}>
+        <Text numberOfLines={1} style={styles.fanLiveTitle}>{live.title}</Text>
+        <Text numberOfLines={1} style={styles.fanLiveBand}>{live.bandName}</Text>
+        <Text numberOfLines={1} style={styles.fanScheduleText}>
+          {formatScheduledAt(live.scheduledAt)}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{
+          disabled,
+          selected: notified,
+        }}
+        disabled={disabled}
+        style={[
+          styles.fanAlarmButton,
+          notified ? styles.fanAlarmButtonSoft : styles.fanAlarmButtonOutline,
+          disabled && styles.fanAlarmButtonDisabled,
+        ]}
+        onPress={onToggleNotification}
+      >
+        <NotificationIcon />
+        <Text
+          style={[
+            styles.fanAlarmButtonText,
+            notified ? styles.fanAlarmButtonTextSoft : styles.fanAlarmButtonTextOutline,
+          ]}
+        >
+          {notified ? "알림 받는 중" : "알림 받기"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
 
-    sectionTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 18,
-      fontWeight: "900",
-    },
+function LiveIllustration() {
+  return (
+    <View style={styles.illustration} pointerEvents="none">
+      <Text style={[styles.note, styles.noteLeftTop]}>♪</Text>
+      <Text style={[styles.note, styles.noteLeftBottom]}>♪</Text>
+      <Text style={[styles.note, styles.noteRightTop]}>♫</Text>
+      <Text style={[styles.note, styles.noteRightBottom]}>♪</Text>
+      <Svg width={94} height={98} viewBox="0 0 94 98" fill="none">
+        <Circle cx="47" cy="49" r="34" fill="#FFE7A9" opacity={0.58} />
+        <Rect x="32" y="14" width="30" height="45" rx="15" fill="#FBB10E" />
+        <Rect x="39" y="20" width="16" height="30" rx="8" fill="#FFF6E5" opacity={0.72} />
+        <Path
+          d="M24 45C24 58.2 34.3 68.5 47 68.5C59.7 68.5 70 58.2 70 45"
+          stroke="#FBB10E"
+          strokeWidth={8}
+          strokeLinecap="round"
+        />
+        <Path
+          d="M47 70V84M34 84H60"
+          stroke="#FBB10E"
+          strokeWidth={8}
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
+  );
+}
 
-    card: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.md,
-    },
+function LiveHeadIcon({ tone = "orange" }: { tone?: "orange" | "pink" }) {
+  return (
+    <Svg width={12} height={13} viewBox="0 0 12 13" fill="none">
+      <Path
+        fill={tone === "pink" ? colors.primary400 : "#FDD272"}
+        d="M5.6.013C2.413.22 0 3.013 0 6.206v4.46c0 1.107.893 2 2 2h.667c.733 0 1.333-.6 1.333-1.333V8.666c0-.733-.6-1.333-1.333-1.333H1.333v-1.14c0-2.56 1.974-4.787 4.527-4.86A4.667 4.667 0 0 1 10.667 6v1.333H9.333C8.6 7.333 8 7.933 8 8.666v2.667c0 .733.6 1.333 1.333 1.333H10c1.107 0 2-.893 2-2V6A6 6 0 0 0 5.6.013Z"
+      />
+    </Svg>
+  );
+}
 
-    cardInfo: {
-      flex: 1,
-      gap: spacing.xs,
-    },
+function PlayIcon() {
+  return (
+    <Svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+      <Path d="M3 2L8 5L3 8V2Z" fill={colors.neutral500} opacity={0.55} />
+    </Svg>
+  );
+}
 
-    badges: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.xs,
-    },
+function NotificationIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M18 8A6 6 0 0 0 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z"
+        stroke={colors.primary400}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M13.73 21A2 2 0 0 1 10.27 21"
+        stroke={colors.primary400}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 
-    title: {
-      color:
-        colors.neutral900,
-      fontSize: 15,
-      fontWeight: "900",
-    },
+const KOREAN_SCHEDULE_PATTERN =
+  /(?:(\d{4})[.\-/년]\s*)?(\d{1,2})[.\-/월]\s*(\d{1,2})(?:[.\-/일])?(?:\s*\([^)]*\))?\s*(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})/i;
 
-    meta: {
-      color:
-        colors.neutral600,
-      fontSize: 12,
-      lineHeight: 18,
-    },
+function parseScheduledAtTime(value: string) {
+  const trimmedValue = value.trim();
 
-    empty: {
-      color:
-        colors.neutral500,
-      fontSize: 13,
-      lineHeight: 20,
-    },
-  });
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const nativeDate = new Date(
+    trimmedValue.includes("T")
+      ? trimmedValue
+      : trimmedValue.replace(" ", "T"),
+  );
+
+  if (!Number.isNaN(nativeDate.getTime())) {
+    return nativeDate.getTime();
+  }
+
+  const matched =
+    trimmedValue.match(KOREAN_SCHEDULE_PATTERN);
+
+  if (!matched) {
+    return null;
+  }
+
+  const [
+    ,
+    yearValue,
+    monthValue,
+    dayValue,
+    meridiem,
+    hourValue,
+    minuteValue,
+  ] = matched;
+  const year =
+    yearValue
+      ? Number(yearValue)
+      : new Date().getFullYear();
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  let hour = Number(hourValue);
+  const minute = Number(minuteValue);
+  const normalizedMeridiem =
+    meridiem?.toUpperCase();
+
+  if (
+    (normalizedMeridiem === "오후" ||
+      normalizedMeridiem === "PM") &&
+    hour < 12
+  ) {
+    hour += 12;
+  }
+
+  if (
+    (normalizedMeridiem === "오전" ||
+      normalizedMeridiem === "AM") &&
+    hour === 12
+  ) {
+    hour = 0;
+  }
+
+  const parsedDate = new Date(
+    year,
+    month - 1,
+    day,
+    hour,
+    minute,
+  );
+
+  return Number.isNaN(parsedDate.getTime())
+    ? null
+    : parsedDate.getTime();
+}
+
+function isScheduledLiveStartable(
+  scheduledAt: string,
+  now: number,
+) {
+  const scheduledTime =
+    parseScheduledAtTime(scheduledAt);
+
+  return scheduledTime !== null && scheduledTime <= now;
+}
+
+function useScheduledLiveNow() {
+  const [
+    now,
+    setNow,
+  ] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(
+      () => setNow(Date.now()),
+      1000,
+    );
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return now;
+}
+
+function formatScheduledAt(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    });
+}
+
+function formatReplayDuration(totalSeconds?: number) {
+  if (totalSeconds === undefined) return "00:00:00";
+
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+}
+
+const styles = StyleSheet.create({
+  bandContainer: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 104,
+    backgroundColor: colors.white,
+  },
+  bandListContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: 104,
+    backgroundColor: colors.white,
+  },
+  bandHeader: {
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bandListHeader: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  bandBackButton: {
+    width: 44,
+    height: 44,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  bandBackIcon: {
+    color: colors.neutral900,
+    fontSize: 32,
+    fontWeight: "400",
+    lineHeight: 36,
+  },
+  bandHeaderSpacer: {
+    width: 44,
+  },
+  bandHeaderTitle: {
+    color: colors.neutral900,
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+  bandContent: {
+    paddingHorizontal: 20,
+  },
+  bandHero: {
+    minHeight: 164,
+    borderRadius: 12,
+    backgroundColor: "#FFF6E5",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 20,
+    padding: 19,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroTitle: {
+    color: colors.neutral900,
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  heroDescription: {
+    color: colors.neutral700,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  heroButton: {
+    width: 91,
+    height: 30,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary500,
+    marginTop: 12,
+  },
+  heroButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  illustration: {
+    width: 118,
+    height: 98,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  note: {
+    position: "absolute",
+    color: colors.secondary500,
+    fontWeight: "700",
+  },
+  noteLeftTop: {
+    top: 21,
+    left: 0,
+    fontSize: 18,
+  },
+  noteLeftBottom: {
+    top: 57,
+    left: 16,
+    fontSize: 13,
+  },
+  noteRightTop: {
+    top: 25,
+    right: 0,
+    fontSize: 17,
+  },
+  noteRightBottom: {
+    top: 58,
+    right: 20,
+    fontSize: 14,
+  },
+  bandSection: {
+    marginTop: 32,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  bandSectionTitle: {
+    color: colors.neutral900,
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 24,
+  },
+  moreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginRight: 20,
+  },
+  moreText: {
+    color: colors.neutral400,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 20,
+  },
+  moreIcon: {
+    color: colors.neutral400,
+    fontSize: 24,
+    lineHeight: 24,
+  },
+  bandCardList: {
+    gap: 12,
+    marginTop: 12,
+  },
+  bandListContent: {
+    gap: 12,
+    paddingTop: 20,
+  },
+  bandLiveCard: {
+    minHeight: 88,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  bandScheduledCard: {
+    minHeight: 88,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.08,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  liveProfileWrap: {
+    position: "relative",
+    shadowColor: colors.secondary500,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  liveBadge: {
+    position: "absolute",
+    left: 17,
+    bottom: -4,
+    width: 27,
+    height: 12,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary500,
+  },
+  liveBadgeText: {
+    color: colors.white,
+    fontSize: 8,
+    fontWeight: "700",
+    lineHeight: 10,
+  },
+  bandCardInfo: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 16,
+    paddingRight: 16,
+  },
+  bandCardTitle: {
+    color: colors.neutral900,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  bandCardSubtitle: {
+    color: colors.neutral700,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  listenerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  listenerText: {
+    color: colors.secondary500,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  enterButton: {
+    width: 51,
+    height: 22,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.secondary500,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+    alignSelf: "flex-end",
+    marginBottom: 12,
+  },
+  enterButtonText: {
+    color: colors.secondary500,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  scheduleText: {
+    color: colors.secondary500,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  scheduledAction: {
+    minWidth: 69,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.secondary0,
+    paddingHorizontal: 8,
+  },
+  scheduledActionText: {
+    color: colors.secondary500,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  bandStateCard: {
+    borderRadius: 12,
+    alignItems: "center",
+    backgroundColor: colors.secondary0,
+    marginTop: 32,
+    padding: 20,
+  },
+  bandStateText: {
+    color: colors.neutral500,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginTop: 32,
+    textAlign: "center",
+  },
+  retryButton: {
+    borderRadius: 8,
+    backgroundColor: colors.secondary500,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  bandEmptyText: {
+    borderRadius: 12,
+    backgroundColor: colors.secondary0,
+    color: colors.neutral500,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    paddingVertical: 24,
+    textAlign: "center",
+  },
+  fanContainer: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 104,
+    backgroundColor: colors.white,
+  },
+  fanHeader: {
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fanHeaderTitle: {
+    color: "#1D1A1A",
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+  fanContent: {
+    paddingHorizontal: 20,
+  },
+  fanStateWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  fanSection: {
+    marginTop: 28,
+  },
+  fanSectionHeader: {
+    height: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  fanSectionTitle: {
+    color: colors.neutral900,
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  fanMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  fanMoreText: {
+    color: colors.neutral400,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 20,
+  },
+  fanMoreIcon: {
+    color: colors.neutral400,
+    fontSize: 24,
+    lineHeight: 24,
+  },
+  fanCardList: {
+    alignItems: "center",
+    gap: 12,
+    marginTop: 12,
+  },
+  fanLiveNowCard: {
+    width: "100%",
+    minHeight: 86,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  fanLiveProfileWrap: {
+    position: "relative",
+    shadowColor: colors.primary400,
+    shadowOpacity: 0.8,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 5,
+  },
+  fanLiveBadge: {
+    position: "absolute",
+    left: 17,
+    bottom: -2,
+    width: 27,
+    height: 12,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary400,
+  },
+  fanLiveBadgeText: {
+    color: colors.white,
+    fontSize: 8,
+    fontWeight: "700",
+    lineHeight: 10,
+  },
+  fanLiveInfo: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 10,
+    paddingRight: 66,
+  },
+  fanLiveTitle: {
+    color: colors.neutral900,
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  fanLiveBand: {
+    color: colors.neutral700,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  fanListenerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  fanListenerText: {
+    color: colors.primary400,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  fanEnterButton: {
+    position: "absolute",
+    right: 16,
+    bottom: 12,
+    width: 51,
+    height: 22,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary400,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  fanEnterButtonText: {
+    color: colors.primary400,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+  },
+  replayRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+  },
+  replayCard: {
+    width: 110,
+    flexShrink: 0,
+  },
+  replayThumb: {
+    width: 110,
+    height: 68,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.neutral200,
+  },
+  replayImage: {
+    width: "100%",
+    height: "100%",
+  },
+  replayFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary0,
+  },
+  replayFallbackText: {
+    color: colors.primary400,
+    fontSize: 22,
+    fontWeight: "700",
+  },
+  replayDuration: {
+    position: "absolute",
+    right: 7,
+    bottom: 5,
+    minWidth: 48,
+    height: 13,
+    borderRadius: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.neutral900,
+    paddingHorizontal: 4,
+  },
+  replayDurationText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: "500",
+    lineHeight: 11,
+  },
+  replayTitle: {
+    color: colors.neutral900,
+    fontSize: 15,
+    fontWeight: "500",
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  replayBand: {
+    color: colors.neutral500,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  replayMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    marginTop: 4,
+  },
+  replayMetaText: {
+    color: colors.neutral500,
+    fontSize: 10,
+    fontWeight: "500",
+    lineHeight: 12,
+  },
+  fanScheduledCard: {
+    width: "100%",
+    minHeight: 86,
+    borderRadius: 16,
+    backgroundColor: colors.white,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  fanScheduledInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  fanScheduleText: {
+    color: colors.primary300,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  fanAlarmButton: {
+    width: 81,
+    height: 32,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  fanAlarmButtonSoft: {
+    borderColor: "transparent",
+    backgroundColor: colors.primary0,
+  },
+  fanAlarmButtonOutline: {
+    borderColor: colors.primary400,
+    backgroundColor: colors.white,
+  },
+  fanAlarmButtonDisabled: {
+    opacity: 0.6,
+  },
+  fanAlarmButtonText: {
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 12,
+  },
+  fanAlarmButtonTextSoft: {
+    color: colors.primary400,
+  },
+  fanAlarmButtonTextOutline: {
+    color: colors.primary400,
+  },
+  fanEmpty: {
+    color: colors.neutral500,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    paddingVertical: 20,
+    textAlign: "center",
+  },
+  pressed: {
+    opacity: 0.72,
+  },
+});

@@ -1,7 +1,9 @@
 import {
     Alert,
+    Pressable,
     StyleSheet,
     Text,
+    TextInput,
     View,
 } from "react-native";
 
@@ -18,18 +20,13 @@ import {
     useActiveBandId,
 } from "@/hooks/api/user/useMyProfiles";
 
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
 import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
 
 import {
     colors,
-    spacing,
 } from "@/shared/constants/theme";
 
 const getStatusLabel = (
@@ -155,25 +152,38 @@ export function BandMemberInviteScreen() {
     >
       <AppHeader title="멤버 초대" />
 
-      <AppTextInput
-        label="사용자 검색"
-        value={search}
-        placeholder="닉네임 검색"
-        returnKeyType="search"
-        onSubmitEditing={
-          searchUser
-        }
-        onChangeText={
-          setSearch
-        }
-      />
-
-      <AppButton
-        label="검색"
-        onPress={
-          searchUser
-        }
-      />
+      <View style={styles.searchBox}>
+        <Text style={styles.searchIcon}>⌕</Text>
+        <TextInput
+          value={search}
+          placeholder="이름 검색"
+          placeholderTextColor={colors.neutral500}
+          returnKeyType="search"
+          style={styles.searchInput}
+          onSubmitEditing={searchUser}
+          onChangeText={setSearch}
+        />
+        {search ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="검색어 지우기"
+            hitSlop={8}
+            onPress={() => {
+              setSearch("");
+              setKeyword("");
+            }}
+          >
+            <Text style={styles.clearText}>×</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          style={styles.searchButton}
+          onPress={searchUser}
+        >
+          <Text style={styles.searchButtonText}>검색</Text>
+        </Pressable>
+      </View>
 
       {!keyword ? (
         <AppState
@@ -202,11 +212,14 @@ export function BandMemberInviteScreen() {
           {(
             query.data ?? []
           ).length === 0 ? (
-            <AppState
-              title="검색 결과가 없어요"
-              description="아직 가입하지 않은 사용자는 마지막 Deep Link 단계에서 초대 링크로 연결할 예정이에요."
-            />
-          ) : (
+          <View style={styles.emptyResult}>
+            <Text style={styles.emptyTitle}>검색 결과가 없어요</Text>
+            <Text style={styles.emptyDescription}>
+              회원가입하지 않았거나 세션 프로필이 없는 경우{"\n"}
+              추후 초대 링크로 멤버를 초대할 수 있어요
+            </Text>
+          </View>
+        ) : (
             query.data?.map(
               (candidate) => {
                 const status =
@@ -216,7 +229,7 @@ export function BandMemberInviteScreen() {
                   );
 
                 return (
-                  <AppCard
+                  <View
                     key={
                       candidate.userId
                     }
@@ -228,7 +241,7 @@ export function BandMemberInviteScreen() {
                       label={
                         candidate.nickname
                       }
-                      size={46}
+                      size={40}
                     />
 
                     <View
@@ -247,11 +260,16 @@ export function BandMemberInviteScreen() {
                       </Text>
 
                       {status ? (
-                        <Badge
-                          label={
-                            status
-                          }
-                        />
+                        <Text
+                          style={[
+                            styles.statusBadge,
+                            status === "멤버" && styles.memberBadge,
+                            status === "초대 대기" && styles.pendingBadge,
+                            status === "초대 불가" && styles.disabledBadge,
+                          ]}
+                        >
+                          {status}
+                        </Text>
                       ) : (
                         <Text
                           style={
@@ -265,12 +283,9 @@ export function BandMemberInviteScreen() {
 
                     {!status &&
                     candidate.inviteAvailable ? (
-                      <AppButton
-                        label="초대"
-                        variant="secondary"
-                        loading={
-                          inviteMutation.isPending
-                        }
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={inviteMutation.isPending}
                         style={
                           styles.inviteButton
                         }
@@ -280,9 +295,11 @@ export function BandMemberInviteScreen() {
                             candidate.nickname,
                           )
                         }
-                      />
+                      >
+                        <Text style={styles.inviteButtonText}>초대</Text>
+                      </Pressable>
                     ) : null}
-                  </AppCard>
+                  </View>
                 );
               },
             )
@@ -296,41 +313,158 @@ export function BandMemberInviteScreen() {
 const styles =
   StyleSheet.create({
     container: {
-      gap: spacing.lg,
+      gap: 24,
+      paddingHorizontal: 24,
+      backgroundColor: colors.white,
+    },
+
+    searchBox: {
+      height: 36,
+      borderWidth: 1,
+      borderColor: colors.neutral500,
+      borderRadius: 999,
+      backgroundColor: colors.white,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 16,
+    },
+
+    searchIcon: {
+      color: colors.neutral500,
+      fontSize: 18,
+      lineHeight: 18,
+    },
+
+    searchInput: {
+      flex: 1,
+      color: colors.neutral900,
+      fontSize: 15,
+      fontWeight: "500",
+      lineHeight: 20,
+      paddingVertical: 0,
+    },
+
+    clearText: {
+      color: colors.neutral400,
+      fontSize: 20,
+      lineHeight: 20,
+    },
+
+    searchButton: {
+      height: 26,
+      borderRadius: 8,
+      backgroundColor: colors.secondary500,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+    },
+
+    searchButtonText: {
+      color: colors.white,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
     },
 
     results: {
-      gap: spacing.md,
+      gap: 16,
+      paddingHorizontal: 16,
     },
 
     candidate: {
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.md,
+      justifyContent: "space-between",
+      gap: 16,
     },
 
     info: {
       flex: 1,
-      gap: spacing.xs,
+      minWidth: 0,
+      gap: 4,
     },
 
     nickname: {
       color:
         colors.neutral900,
       fontSize: 15,
-      fontWeight: "900",
+      fontWeight: "700",
+      lineHeight: 20,
     },
 
     available: {
       color:
         colors.secondary600,
       fontSize: 12,
-      fontWeight: "800",
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    statusBadge: {
+      height: 26,
+      minWidth: 53,
+      borderRadius: 8,
+      textAlign: "center",
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 26,
+      paddingHorizontal: 10,
+    },
+
+    memberBadge: {
+      backgroundColor: colors.secondary400,
+      color: colors.white,
+    },
+
+    pendingBadge: {
+      backgroundColor: colors.secondary100,
+      color: colors.secondary500,
+    },
+
+    disabledBadge: {
+      backgroundColor: colors.neutral300,
+      color: colors.neutral500,
     },
 
     inviteButton: {
-      minHeight: 38,
-      paddingHorizontal:
-        spacing.md,
+      height: 26,
+      minWidth: 53,
+      borderWidth: 1,
+      borderColor: colors.secondary500,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 10,
+    },
+
+    inviteButtonText: {
+      color: colors.secondary500,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    emptyResult: {
+      alignItems: "center",
+      gap: 12,
+      marginTop: 64,
+      paddingHorizontal: 16,
+    },
+
+    emptyTitle: {
+      color: colors.neutral900,
+      fontSize: 18,
+      fontWeight: "700",
+      lineHeight: 22,
+      textAlign: "center",
+    },
+
+    emptyDescription: {
+      color: colors.neutral600,
+      fontSize: 14,
+      fontWeight: "500",
+      lineHeight: 20,
+      textAlign: "center",
     },
   });

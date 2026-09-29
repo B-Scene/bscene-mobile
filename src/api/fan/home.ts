@@ -8,6 +8,7 @@ import type {
   FanHomeResponse,
   FanPerformanceDetailResponse,
   NormalizedUpcomingPerformancesResponse,
+  PendingPerformanceParticipationResponse,
   UpcomingPerformancesParams,
   UpcomingPerformancesResponse,
 } from "@/types/fan/home";
@@ -120,6 +121,27 @@ export const getUpcomingPerformances = async ({
   };
 };
 
+export const getPendingPerformanceParticipation = async () => {
+  const response = await axiosInstance.get<
+    FanApiResponse<PendingPerformanceParticipationResponse | null>
+  >("/performances/participation/pending");
+  const { data } = response;
+
+  if (!data.isSuccess) {
+    throw new AxiosError(
+      data.message,
+      data.code,
+      response.config,
+      response.request,
+      response,
+    );
+  }
+
+  return {
+    items: data.result?.items ?? [],
+  } satisfies PendingPerformanceParticipationResponse;
+};
+
 const unwrapFanMutationResult = <T>(
   response: AxiosResponse<FanApiResponse<T>>,
 ) => {
@@ -165,6 +187,26 @@ export const addPerformanceInterest = async (performanceId: number) => {
 export const deletePerformanceInterest = async (performanceId: number) => {
   const response = await axiosInstance.delete<FanApiResponse<null>>(
     `/performances/${performanceId}/interest`,
+  );
+
+  return unwrapFanMutationResult(response);
+};
+
+export const completePerformanceParticipation = async (
+  performanceId: number,
+) => {
+  const response = await axiosInstance.patch<FanApiResponse<null>>(
+    `/performances/${performanceId}/participation/complete`,
+  );
+
+  return unwrapFanMutationResult(response);
+};
+
+export const deletePerformanceParticipation = async (
+  performanceId: number,
+) => {
+  const response = await axiosInstance.delete<FanApiResponse<null>>(
+    `/performances/${performanceId}/participation`,
   );
 
   return unwrapFanMutationResult(response);

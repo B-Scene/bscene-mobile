@@ -33,7 +33,22 @@
 - Phase 28 밴드 세션 지원자 상세: 1차 API 연동 완료
 - Phase 29 밴드 세션 지원 수락/거절: 1차 API 연동 완료
 - Phase 30 밴드 세션 지원 상태 관리: 1차 API 연동 완료
-- 전체 기준 대략 64%
+- Phase 31 밴드 세션 메시지/채팅: 1차 API/WebSocket 연동 및 쪽지함 pagination 완료
+- Phase 32 팬 콘텐츠 댓글 UX: 수정/삭제/페이지네이션/에러 상태 보강 완료
+- Phase 33 Band home Native 업로드 UX: 콘텐츠 이미지/썸네일, 공연 포스터 선택 및 업로드 완료
+- Phase 34 팬 프로필 수정: 저장 UX 및 웹 parity 보강 완료
+- Phase 35 앱 재실행 user hydrate: SecureStore user 부재 시 `/users/me`, onboarding status 기반 복구 완료
+- Phase 36 Auth/Mode route guard: fan/band 직접 진입 인증, onboarding, mode 접근 제어 완료
+- Phase 37 팬 홈 주요 interaction: 모드 전환, 추천 밴드 팔로우/언팔로우 보강 완료
+- Phase 38 팬 공연 상세 남은 interaction: Native 공유, 알림 성공 피드백, 캐스팅 밴드 이동 완료
+- Phase 39 팬 Live Home interaction: 예정 라이브 알림 토글 및 홈 섹션 더보기 안전 처리 완료
+- Phase 40 팬 Live list parity: 진행 중/예정/다시보기 목록, 검색, 필터, pagination, 알림 토글 완료
+- Phase 41 팬 Live replay playback: 다시보기 playback API 및 재생 route 연결 완료
+- Phase 42 Band Live Home parity: 진행 중/예정 라이브 전체보기 route 및 예약 액션 보강 완료
+- Phase 43 Band Live 예약/생성 parity: 즉시 시작/예약 생성/예약 수정/취소 1차 연동 완료
+- Phase 44 팬 홈 알림/참여 모달 parity: 알림 목록, 읽음 처리, 참여 여부 모달 1차 연동 완료
+- Phase 45 Notification tap navigation hardening: 알림 payload deep link route mapping 보강 완료
+- 전체 기준 대략 81%
 
 ## 완료된 작업
 
@@ -109,17 +124,37 @@
 - 밴드 세션 지원자 상세 route `/band/my/applications/[applySubmissionId]`를 추가하고 `/sessions/recruitments/submissions/{applicationSubmissionId}` API를 연결했다.
 - 밴드 세션 지원자 상세에서 `/users/me/{applySubmissionId}/acceptance` 수락/거절 API를 연결했다.
 - 밴드 세션 내 지원 현황 route `/band/session/applications`를 추가하고 지원 내역 조회, 지원 취소, 참여 확정 API를 연결했다.
+- 밴드 세션 쪽지함 `/band/session/messages`와 쪽지방 `/band/session/messages/[chatRoomId]`를 추가했다.
+- 세션 쪽지방 생성 `/chat/rooms`, 쪽지함 조회 `/chat/rooms`, 쪽지방 상세 `/chat/rooms/{chatRoomId}`, 나가기 `/chat/rooms/{chatRoomId}`, WebSocket ticket `/chat/ws-ticket` API를 연결했다.
+- 세션 쪽지 WebSocket `/api/ws/chat` 연결, ping/pong heartbeat, reconnect, 메시지 송신/수신, 읽음 처리, optimistic message UI를 모바일 패턴으로 이식했다.
+- 밴드 세션 쪽지함에 cursor 기반 pagination을 연결하고 새 메시지 수신 시 쪽지함 infinite query가 갱신되도록 처리했다.
+- 팬 콘텐츠 상세 댓글에 500자 제한/카운트, 등록 버튼 disabled, 수정/삭제 실패 메시지, 댓글 조회 실패 재시도, 내 댓글 판정 보강을 적용했다.
+- 밴드 콘텐츠 등록/수정 폼에 갤러리/카메라 이미지 선택, 미리보기, 제거, `POST`/`POST_THUMBNAIL` presigned upload 연동을 추가했다.
+- 밴드 공연 등록/수정 폼에 갤러리/카메라 포스터 선택, 미리보기, 선택 취소, `PERFORMANCE_POSTER` presigned upload 연동을 추가했다.
+- 팬 프로필 수정 화면에 저장 버튼 disabled 상태, 저장/업로드 진행 라벨, 화면 내 실패 메시지를 추가해 웹 프로필 수정 흐름과 UX를 맞췄다.
+- 앱 재실행 시 access token은 있지만 SecureStore user가 없는 경우 `/users/me`, `/users/me/onboarding/status`를 조회해 최소 AuthUser를 복구하고 mode/onboarding 분기를 유지하도록 보강했다.
+- fan/band route layout에 보호 guard를 추가해 guest 직접 진입은 로그인으로, onboarding 미완료는 약관 단계로, 미보유 mode 접근은 사용 가능한 홈으로 이동하도록 보강했다.
+- 팬 홈 헤더 모드 전환 버튼을 실제 BAND 가능 여부 확인 후 전환하도록 연결하고, 추천 밴드 팔로우/언팔로우 mutation과 optimistic UI, 실패 복구를 적용했다.
+- 팬 홈 추천 밴드 상세 이동 경로를 실제 모바일 route인 `/fan/bands/{bandId}`로 수정했다.
+- 팬 공연 상세에 Native Share 기반 공유 버튼, 공연 알림 설정/해제 성공 피드백, 캐스팅 밴드 프로필 이동을 추가했다.
+- 팬 Live Home 예정 라이브 알림 토글 `/lives/{liveId}/alarm`을 연동하고 optimistic 상태 복구, 더보기 버튼 안전 안내를 추가했다.
+- 팬 Live Home 더보기에서 `/fan/live/now`, `/fan/live/scheduled`, `/fan/live/replays`로 이동하도록 연결하고, 각 목록 API와 검색/필터/pagination UI를 추가했다.
+- 팬 Live 다시보기 목록/홈 카드에서 `/fan/live/replays/{liveId}`로 이동하고, `/lives/{liveId}/replay` playback URL을 Expo Audio로 재생하는 화면을 추가했다.
+- Band Live Home의 진행 중/예정 라이브 전체보기를 `/band/live/now`, `/band/live/scheduled` route로 연결하고, 내 예정 라이브의 시간이 지난 경우 바로 라이브 room으로 진입할 수 있도록 예약 액션을 보강했다.
+- Band Live 생성 화면에 즉시 시작/예약 선택, 예약 날짜/시간 입력, `/lives` 예약 생성, `/lives/{liveId}/reservation` 조회/수정/취소 API를 연결했다.
+- 팬 홈 알림 버튼을 `/fan/home/notifications`로 연결하고 `/notifications` 목록, `/notifications/{notificationId}/read` 읽음 처리, 공연 참여 pending/complete/delete 모달을 연결했다.
+- Native notification tap deep link에서 query 유지를 보강하고 공연/콘텐츠/밴드/라이브/채팅/세션 모집/지원서 payload를 모바일 route로 매핑하도록 확장했다.
 - Expo ESLint 설정을 생성하고 lint/typecheck가 통과하도록 정리했다.
 
 ## 현재 작업 중인 기능
 
-- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 공연 관심/알림 mutation, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록, Onboarding 약관 데이터, Expo Notifications 권한 요청, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리를 구현한 상태. 다음은 세션 메시지/채팅 연동이다.
+- 팬 홈, 공연 목록/상세, 팬 탐색/밴드 프로필, 팬 탐색 팔로우/언팔로우/밴드/공연/콘텐츠 검색/콘텐츠 상세, 콘텐츠 댓글 UX, 공연 관심/알림 mutation, 공연 상세 공유/캐스팅 이동, 팬 Live Home/목록/다시보기 재생, 팬 홈 알림 목록/참여 여부 모달, notification tap route mapping, Band Live Home 전체보기/예약 액션, Band Live 즉시 시작/예약 생성/수정/취소, 팬/밴드 마이페이지 알림 설정, 팬 마이페이지/세부 목록/프로필 수정, Onboarding 약관 데이터, Expo Notifications 권한 요청, 앱 재실행 user hydrate, Auth/Mode route guard, 밴드 홈 세부 조회 API, 콘텐츠/공연 상세/삭제/등록/수정/Native 업로드, 밴드 세션 모집 목록/상세/등록/수정/삭제/지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 관리, 세션 메시지/채팅 1차 연동을 구현한 상태. 다음은 Live room 실제 기기 오디오/RTC QA 또는 남은 Release hardening 검토다.
 
 ## 다음에 해야 할 작업
 
-1. 밴드 세션 메시지/채팅을 연결한다.
-2. 팬 콘텐츠 댓글 수정/페이지네이션 UX를 보강한다.
-3. Band home 네이티브 파일 업로드/이미지 선택 UX를 보강한다.
+1. Live room 실제 기기 오디오/RTC QA를 진행한다.
+2. 남은 Release hardening 항목을 Work Unit 단위로 검토한다.
+3. 밴드 Live 공동 진행/참여자 상태는 Native SDK/RTC 범위로 MEDIUM 전환 후보인지 확인한다.
 
 ## 변경한 주요 파일
 
@@ -259,6 +294,7 @@
 - `/oauth/callback`: OAuth callback exchange
 - `/home`: 임시 authenticated home shell
 - `/fan/home`: 팬 홈 탭
+- `/fan/home/notifications`: 팬 홈 알림 목록
 - `/fan/home/concerts`: 팬 공연 목록
 - `/fan/home/concerts/[concertId]`: 팬 공연 상세
 - `/fan/explore`: 팬 탐색 탭
@@ -285,6 +321,8 @@
 - `/band/session/recruitments/[recruitmentId]`: 밴드 세션 모집 공고 상세
 - `/band/session/recruitments/form`: 밴드 세션 모집 공고 등록/수정
 - `/band/live`: 밴드 라이브 탭
+- `/band/live/now`: 밴드 진행 중인 라이브 전체보기
+- `/band/live/scheduled`: 밴드 예정된 라이브 전체보기
 - `/band/my`: 밴드 마이 탭
 - `/onboarding/agreement`
 - `/onboarding/mode`
@@ -304,15 +342,17 @@
 ## 미해결 문제
 
 - `EXPO_PUBLIC_API_BASE_URL`이 설정되어 있지 않으면 실제 API 요청은 실패한다.
-- token restore 시 user 정보가 없어서 앱 재실행 후 mode/onboarding 분기 정확도가 낮다.
-- Push notification permission은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 검증이 필요하다.
-- Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회와 콘텐츠/공연 상세/등록/수정/삭제를 연결했다. 네이티브 파일 업로드/이미지 선택 UX는 아직 웹 parity 전이다.
-- 팬 홈은 1차 API 연동을 완료했지만, 참여 여부 모달/팔로우 mutation/상세 이동은 아직 웹 parity 전이다.
-- 공연 목록/상세는 조회와 관심/알림 mutation 1차 연동을 완료했다. 공유 mutation은 아직 웹 parity 전이다.
-- 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 콘텐츠 상세/좋아요/댓글, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 댓글 수정/페이지네이션 UX는 아직 웹 parity 전이다.
-- 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정을 완료했다. 프로필 수정 화면은 아직 웹 parity 전이다.
+- Auth/Mode route guard는 실제 기기에서 deep link 직접 진입, Android hardware back, onboarding 미완료 계정 분기 QA가 필요하다.
+- Push notification permission과 notification tap route mapping은 1차 구현했지만, 실제 기기/EAS projectId/백엔드 토큰 수신 및 payload별 tap navigation 검증이 필요하다.
+- Band home은 요약, 프로필 상세, 콘텐츠, 공연, 음원 링크 조회와 콘텐츠/공연 상세/등록/수정/삭제, 콘텐츠 이미지/썸네일 및 공연 포스터 네이티브 업로드 UX를 연결했다. 실제 기기에서 갤러리/카메라 권한과 presigned upload QA가 필요하다.
+- 팬 홈은 1차 API 연동, 추천 밴드 팔로우/모드 전환, 알림 목록 route, 공연 참여 여부 모달을 완료했다. 알림 deep link mapping은 실제 payload별 QA가 필요하다.
+- 공연 목록/상세는 조회, 관심/알림 mutation, Native 공유, 캐스팅 밴드 이동을 완료했다. 실제 기기에서 공유 sheet와 외부 예매 링크 QA가 필요하다.
+- 팬 Live Home/목록/다시보기는 홈 조회, 입장 route, 예정 라이브 알림 토글, 진행 중/예약/다시보기 전체 목록, 검색/필터/pagination, replay playback route를 완료했다. 실제 API pagination cursor와 HLS playback QA가 필요하다.
+- Band Live Home은 진행 중/예정 라이브 홈 조회, 전체보기 route, 시간이 지난 내 예정 라이브 room 진입 액션을 완료했다. Live 생성 화면은 즉시 시작, 예약 생성, 예약 수정, 예약 취소 1차 연동을 완료했다.
+- 팬 탐색/밴드 프로필은 추천 밴드, 밴드/공연/콘텐츠 검색/필터, 콘텐츠 상세/좋아요/댓글/댓글 UX, 팔로우/언팔로우 mutation을 완료했다. 콘텐츠 상세 이미지/영상 네이티브 미디어 표시 고도화는 추가 QA가 필요하다.
+- 팬 마이페이지는 프로필 요약, 카운트, 세부 목록 조회, 팬 알림 설정, 프로필 수정 화면을 완료했다.
 - 밴드 마이페이지는 요약, 메뉴, 밴드 알림 설정을 완료했다. 밴드 프로필/멤버/모집/지원 관리 화면은 아직 웹 parity 전이다.
-- 밴드 세션은 모집 목록/상세/등록/수정/삭제/관심 토글/지원하기/받은 지원 목록/상세/수락/거절/내 지원 상태 관리를 완료했다. 지원서 작성, 세션 찾기, 세션 메시지/채팅, 모집 공고 페이지네이션은 아직 웹 parity 전이다.
+- 밴드 세션은 모집 목록/상세/등록/수정/삭제/관심 토글/지원하기/받은 지원 목록/상세/수락/거절/내 지원 상태 관리, 세션 찾기, 세션 메시지/채팅 1차 연동을 완료했다. 지원서 작성 고도화, 모집 공고 페이지네이션, 실제 기기 WebSocket QA는 아직 웹 parity/QA 전이다.
 - Bottom Navigation은 구현됐지만 detail route, modal route, Android hardware back QA는 추가 확인이 필요하다.
 - OAuth provider URL env와 redirect URI는 실제 운영/개발 값으로 설정해야 한다.
 
@@ -338,6 +378,8 @@
 - Bottom Navigation tab 이동
 - Fan/Band mode route group 이동
 - 팬 홈 `/home`, `/performances/upcoming` 실제 API 응답 렌더링
+- 팬 홈 알림 목록 `/notifications`, 읽음 처리 `/notifications/{notificationId}/read`, 공연 참여 pending/complete/delete 실제 API 상태 동기화
+- Notification tap payload의 공연/콘텐츠/밴드/라이브/채팅/세션 모집/지원서 deep link 실제 기기 이동 검증
 - 공연 목록 `/performances/upcoming` pagination
 - 공연 상세 `/performances/{performanceId}/detail` 실제 API 응답 렌더링
 - 공연 관심 등록/해제 `/performances/{performanceId}/interest` 실제 API 상태 동기화
@@ -358,9 +400,9 @@
 - 밴드 홈 `/users/me` 실제 API 응답 렌더링
 - 밴드 홈 `/users/me/profiles`, `/bands/{bandId}`, 콘텐츠/공연/음원 링크 실제 API 응답 렌더링
 - 밴드 콘텐츠 상세 `/posts/{postId}` 실제 API 응답 렌더링 및 삭제 후 목록 갱신
-- 밴드 콘텐츠 등록/수정 `/bands/{bandId}/posts`, `/posts/{postId}` 실제 API 저장 및 상세 이동
+- 밴드 콘텐츠 등록/수정 `/bands/{bandId}/posts`, `/posts/{postId}` 실제 API 저장, 이미지/썸네일 업로드 및 상세 이동
 - 밴드 공연 상세 `/performances/{performanceId}` 실제 API 응답 렌더링 및 삭제 후 목록 갱신
-- 밴드 공연 등록/수정 `/bands/{bandId}/performances`, `/performances/{performanceId}` 실제 API 저장 및 상세 이동
+- 밴드 공연 등록/수정 `/bands/{bandId}/performances`, `/performances/{performanceId}` 실제 API 저장, 포스터 업로드 및 상세 이동
 - 밴드 세션 모집 목록/상세/관심 `/sessions/recruitments` 실제 API 상태 동기화
 - 밴드 세션 모집 등록/수정/삭제 `/sessions/recruitments` 실제 API 저장, 상세 이동, 목록 갱신
 - 밴드 세션 모집 등록 payload의 `bandMemberId`와 모바일 `bandMemberProfileId` 매핑 검증
@@ -369,30 +411,23 @@
 - 밴드 세션 지원자 상세 `/sessions/recruitments/submissions/{applicationSubmissionId}` 실제 API 렌더링
 - 밴드 세션 지원 수락/거절 `/users/me/{applySubmissionId}/acceptance` 실제 API 상태 동기화
 - 밴드 세션 지원 상태 `/sessions/applications/submissions`, 지원 취소, 참여 확정 실제 API 상태 동기화
+- 밴드 세션 쪽지함 `/chat/rooms` pagination, 쪽지방 상세 `/chat/rooms/{chatRoomId}`, WebSocket `/api/ws/chat` 실제 기기 송수신/읽음/재연결 상태 동기화
+- 밴드 라이브 홈 `/band/live`, 진행 중 목록 `/band/live/now`, 예정 목록 `/band/live/scheduled`, 시작 가능한 예정 라이브 room 이동 실제 API 상태 동기화
+- 밴드 라이브 생성 `/band/live/create`, 예약 생성, 예약 수정 query `/band/live/create?reservationLiveId=...`, 예약 취소 실제 API 상태 동기화
 
 ## 마지막으로 실행한 검증 명령어와 결과
 
 - `npx tsc --noEmit`: 통과
-- `npx expo lint`: 통과
+- `npx expo lint`: 통과, 기존 `src/features/band/BandSessionScreen.tsx` exhaustive-deps warning 1건 유지
 
 ## 마지막 Commit Hash
 
-- 최근 완료 커밋: `668c95f`
+- 최근 완료 커밋: `7cbd96b`
 
 ## 다음 세션이 가장 먼저 해야 할 작업
 
-밴드 세션 메시지/채팅을 연결한다.
+Live room 실제 기기 오디오/RTC QA 또는 남은 Release hardening 항목을 Work Unit 단위로 검토한다.
 
 ## MEDIUM 전환 메모
 
-- 현재까지 완료: 밴드 세션 모집 목록/상세/등록/수정/삭제, 지원하기, 받은 지원 목록/상세/수락/거절, 내 지원 상태 조회/취소/참여 확정까지 LOW 범위에서 구현하고 검증했다.
-- 막힌 문제: 다음 Work Unit인 밴드 세션 메시지/채팅은 웹 기준 `/chat/rooms`, `/chat/rooms/{chatRoomId}`, `/chat/ws-ticket` REST API와 `/api/ws/chat` WebSocket을 함께 사용한다.
-- MEDIUM이 필요한 이유: WebSocket 연결, ticket 발급, ping/pong heartbeat, reconnect, read receipt, 실시간 메시지 동기화가 포함되어 LOW 단순 CRUD 범위를 넘는다.
-- 관련 최소 파일:
-  - `bscene-client/src/api/session/sessionChat.ts`
-  - `bscene-client/src/types/session/sessionChat.ts`
-  - `bscene-client/src/hooks/api/session/useSessionChat.ts`
-  - `bscene-client/src/features/session/chat/SessionChatView.tsx`
-  - `bscene-mobile/src/hooks/api/session/useSessionApplication.ts`
-  - `bscene-mobile/src/features/band/BandSessionApplicationsScreen.tsx`
-- MEDIUM에서 가장 먼저 해야 할 작업: React Native 환경에서 WebSocket URL 생성, 인증 ticket 발급, 채팅방 목록/상세, 메시지 송수신 hook 설계를 모바일 패턴에 맞게 이식한다.
+- 없음.

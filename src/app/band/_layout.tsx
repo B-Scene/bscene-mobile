@@ -1,5 +1,10 @@
 import { ModeTabLayout } from "@/features/navigation/ModeTabLayout";
+import { ProtectedModeRoute } from "@/features/navigation/ProtectedModeRoute";
 
 export default function BandLayout() {
-  return <ModeTabLayout mode="band" />;
+  return (
+    <ProtectedModeRoute mode="band">
+      <ModeTabLayout mode="band" />
+    </ProtectedModeRoute>
+  );
 }

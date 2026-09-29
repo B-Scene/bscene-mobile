@@ -1,17 +1,23 @@
 import { router } from "expo-router";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 
 import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
 import { useFanInformationQuery } from "@/hooks/api/user/useFanInformation";
 import { useFanMyPageQuery } from "@/hooks/api/user/useFanMyPage";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
 import { Screen } from "@/shared/components/Screen";
-import { colors, radius, spacing } from "@/shared/constants/theme";
+import { colors } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { CodeName } from "@/types/onboarding/onboarding";
+
+type MenuItem = {
+  label: string;
+  href?: Parameters<typeof router.push>[0];
+  onPress?: () => void;
+};
 
 const getCodeName = (codeNames: CodeName[] | undefined, code?: string) => {
   if (!code) return "";
@@ -88,213 +94,324 @@ export function FanMyScreen() {
         />
       ) : data ? (
         <>
-          <AppCard style={styles.profileCard}>
-            <Avatar
-              imageUrl={fanInformation?.profileImageUrl}
-              label={data.nickname}
-              size={76}
-            />
-            <View style={styles.profileText}>
-              <Text style={styles.name}>{data.nickname || "팬"}</Text>
-              <Text style={styles.subtitle}>
-                {buildSubtitle({
-                  genre: data.genre,
-                  additionalGenreCount: data.additionalGenreCount,
-                  regions: data.regions,
-                  genreCodes: genres,
-                  regionCodes: regions,
-                }) || "관심 장르와 활동 지역을 설정해 보세요"}
-              </Text>
+          <View style={styles.profileBand}>
+            <View style={styles.profileRow}>
+              <Avatar
+                imageUrl={fanInformation?.profileImageUrl}
+                label={data.nickname || "팬"}
+                size={62}
+              />
+              <View style={styles.profileText}>
+                <Text numberOfLines={1} style={styles.nickname}>
+                  {data.nickname || "팬"}
+                </Text>
+                <Text numberOfLines={1} style={styles.profileSubtitle}>
+                  {buildSubtitle({
+                    genre: data.genre,
+                    additionalGenreCount: data.additionalGenreCount,
+                    regions: data.regions,
+                    genreCodes: genres,
+                    regionCodes: regions,
+                  }) || "관심 장르와 활동 지역을 설정해 보세요"}
+                </Text>
+              </View>
             </View>
-          </AppCard>
 
-          <View style={styles.stats}>
-            <StatItem label="팔로잉" value={data.followingCount} />
-            <StatItem label="관심 공연" value={data.interestedPerformanceCount} />
-            <StatItem label="참여 공연" value={data.participatedPerformanceCount} />
+            <StatRow
+              stats={[
+                {
+                  label: "팔로잉",
+                  value: data.followingCount,
+                  href: "/fan/my/followed-bands" as Parameters<typeof router.push>[0],
+                },
+                {
+                  label: "관심 공연",
+                  value: data.interestedPerformanceCount,
+                  href: "/fan/my/interested-concerts" as Parameters<typeof router.push>[0],
+                },
+                {
+                  label: "참여 공연",
+                  value: data.participatedPerformanceCount,
+                  href: "/fan/my/attended-concerts" as Parameters<typeof router.push>[0],
+                },
+              ]}
+            />
           </View>
 
-          <MenuSection
-            title="탐색 활동"
-            items={[
-              {
-                label: "팔로우한 밴드",
-                href: "/fan/my/followed-bands",
-              },
-              {
-                label: "관심 공연 목록",
-                href: "/fan/my/interested-concerts",
-              },
-              {
-                label: "공연 참여 기록",
-                href: "/fan/my/attended-concerts",
-              },
-            ]}
-          />
-          <MenuSection
-            title="알림"
-            items={[
-              { label: "공연 알림 설정", href: "/fan/my/concert-alert" },
-              { label: "라이브 알림 설정", href: "/fan/my/live-alert" },
-            ]}
-          />
-          <MenuSection
-            title="계정"
-            items={[
-              {
-                label: "내 정보 수정",
-                href: "/fan/my/profile/edit",
-              },
-            ]}
-            footerLabel="로그아웃"
-            onFooterPress={logout}
-          />
+          <View style={styles.menuContent}>
+            <MenuSection
+              title="탐색 활동"
+              items={[
+                {
+                  label: "팔로우한 밴드",
+                  href: "/fan/my/followed-bands" as Parameters<typeof router.push>[0],
+                },
+                {
+                  label: "관심 공연 목록",
+                  href: "/fan/my/interested-concerts" as Parameters<typeof router.push>[0],
+                },
+                {
+                  label: "공연 참여 기록",
+                  href: "/fan/my/attended-concerts" as Parameters<typeof router.push>[0],
+                },
+              ]}
+            />
+
+            <Divider />
+
+            <MenuSection
+              title="알림"
+              items={[
+                {
+                  label: "공연 알림 설정",
+                  href: "/fan/my/concert-alert" as Parameters<typeof router.push>[0],
+                },
+                {
+                  label: "라이브 알림 설정",
+                  href: "/fan/my/live-alert" as Parameters<typeof router.push>[0],
+                },
+              ]}
+            />
+
+            <Divider />
+
+            <MenuSection
+              title="계정"
+              items={[
+                {
+                  label: "내 정보 수정",
+                  href: "/fan/my/profile/edit" as Parameters<typeof router.push>[0],
+                },
+                {
+                  label: "로그아웃",
+                  onPress: logout,
+                },
+              ]}
+            />
+          </View>
         </>
       ) : null}
     </Screen>
   );
 }
 
-function StatItem({ label, value }: { label: string; value: number }) {
+function StatRow({
+  stats,
+}: {
+  stats: { label: string; value: number; href?: Parameters<typeof router.push>[0] }[];
+}) {
   return (
-    <AppCard style={styles.statCard}>
-      <Text style={styles.statValue}>{value.toLocaleString()}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </AppCard>
+    <View style={styles.statRow}>
+      {stats.map((stat, index) => {
+        const content = (
+          <>
+            <Text style={styles.statValue}>{stat.value.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+          </>
+        );
+
+        return (
+          <View key={stat.label} style={styles.statGroup}>
+            {index > 0 ? <View style={styles.statDivider} /> : null}
+            {stat.href ? (
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.statButton,
+                  pressed && styles.pressed,
+                ]}
+                onPress={() => router.push(stat.href!)}
+              >
+                {content}
+              </Pressable>
+            ) : (
+              <View style={styles.statButton}>{content}</View>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
 function MenuSection({
   title,
   items,
-  footerLabel,
-  onFooterPress,
 }: {
   title: string;
-  items: { label: string; href?: string }[];
-  footerLabel?: string;
-  onFooterPress?: () => void;
+  items: MenuItem[];
 }) {
   return (
-    <AppCard style={styles.menuSection}>
+    <View style={styles.menuSection}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {items.map((item) => (
-        <Pressable
-          key={item.label}
-          accessibilityRole={item.href ? "button" : "text"}
-          disabled={!item.href}
-          style={({ pressed }) => [
-            styles.menuRow,
-            pressed && item.href && styles.pressed,
-          ]}
-          onPress={() => {
-            if (!item.href) return;
-            router.push(item.href as Parameters<typeof router.push>[0]);
-          }}
-        >
-          <Text style={styles.menuLabel}>{item.label}</Text>
-          <Text style={styles.menuStatus}>{item.href ? "보기" : "준비 중"}</Text>
-        </Pressable>
-      ))}
-      {footerLabel ? (
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.menuRow,
-            styles.footerRow,
-            pressed && styles.pressed,
-          ]}
-          onPress={onFooterPress}
-        >
-          <Text style={[styles.menuLabel, styles.logoutLabel]}>{footerLabel}</Text>
-        </Pressable>
-      ) : null}
-    </AppCard>
+
+      <View style={styles.menuRows}>
+        {items.map((item) => (
+          <Pressable
+            key={item.label}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.menuRow,
+              pressed && styles.pressed,
+            ]}
+            onPress={() => {
+              if (item.onPress) {
+                item.onPress();
+                return;
+              }
+
+              if (item.href) {
+                router.push(item.href);
+              }
+            }}
+          >
+            <Text style={styles.menuLabel}>{item.label}</Text>
+            <ArrowRightIcon />
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
+}
+
+function ArrowRightIcon() {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M10 17L15 12"
+        stroke={colors.neutral600}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M15 12L10 7"
+        stroke={colors.neutral600}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 104,
+    backgroundColor: colors.white,
   },
-  profileCard: {
+  profileBand: {
+    backgroundColor: colors.primary0,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  profileRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.lg,
-    backgroundColor: colors.primary0,
-    borderColor: colors.primary100,
+    gap: 12,
   },
   profileText: {
     flex: 1,
-    gap: spacing.xs,
+    minWidth: 0,
+    gap: 4,
   },
-  name: {
+  nickname: {
     color: colors.neutral900,
-    fontSize: 22,
-    fontWeight: "900",
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 20,
   },
-  subtitle: {
-    color: colors.neutral600,
-    fontSize: 13,
-    lineHeight: 19,
+  profileSubtitle: {
+    color: colors.neutral700,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
   },
-  stats: {
+  statRow: {
+    minHeight: 76,
+    borderRadius: 16,
+    backgroundColor: colors.white,
     flexDirection: "row",
-    gap: spacing.sm,
+    alignItems: "center",
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    shadowColor: colors.neutral900,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
   },
-  statCard: {
+  statGroup: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statButton: {
     flex: 1,
     alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    gap: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.neutral300,
+    marginRight: 24,
   },
   statValue: {
-    color: colors.primary600,
-    fontSize: 20,
-    fontWeight: "900",
+    color: colors.neutral900,
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   statLabel: {
     color: colors.neutral600,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  menuContent: {
+    gap: 16,
+    paddingTop: 18,
+    paddingBottom: 20,
   },
   menuSection: {
-    gap: spacing.md,
+    gap: 16,
   },
   sectionTitle: {
-    color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "900",
+    color: colors.neutral600,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
+    paddingHorizontal: 20,
+  },
+  menuRows: {
+    gap: 20,
+    paddingHorizontal: 20,
   },
   menuRow: {
-    minHeight: 44,
-    borderRadius: radius.sm,
+    minHeight: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.md,
   },
   menuLabel: {
-    color: colors.neutral800,
+    color: colors.neutral900,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "500",
+    lineHeight: 20,
   },
-  menuStatus: {
-    color: colors.neutral500,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  footerRow: {
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral300,
-    borderRadius: 0,
-    marginTop: spacing.xs,
-    paddingTop: spacing.md,
-  },
-  logoutLabel: {
-    color: colors.error,
+  divider: {
+    height: 1,
+    backgroundColor: colors.neutral400,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.72,
   },
 });

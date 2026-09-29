@@ -47,6 +47,10 @@ export interface ScheduledLiveItem {
 
   notificationEnabled?: boolean;
 
+  isAlarmSet?: boolean;
+
+  alarmSet?: boolean;
+
   isMine?: boolean;
 }
 
@@ -81,6 +85,83 @@ export interface LiveHomeResponse {
   myProfileImageUrl?:
     | string
     | null;
+}
+
+export interface ToggleLiveAlarmResponse {
+  alarmSet: boolean;
+}
+
+export type LiveNowListFilter =
+  | "following"
+  | "all";
+
+export type ReplayListFilter =
+  | "following"
+  | "all";
+
+export type ReplaySort =
+  | "LATEST"
+  | "POPULAR";
+
+export interface LivePageInfo {
+  nextCursor:
+    | number
+    | null;
+
+  hasNext: boolean;
+}
+
+export interface LiveNowListResponse {
+  items: LiveNowItem[];
+  pageInfo: LivePageInfo;
+}
+
+export interface ScheduledLiveListResponse {
+  items: ScheduledLiveItem[];
+  pageInfo: LivePageInfo;
+}
+
+export interface ReplayListResponse {
+  items: LiveReplayItem[];
+  pageInfo: LivePageInfo;
+}
+
+export interface ReplayPlaybackResponse {
+  title: string;
+
+  bandName: string;
+
+  bandProfileImageUrl?:
+    | string
+    | null;
+
+  thumbnailImageUrl?:
+    | string
+    | null;
+
+  thumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailImageUrl?:
+    | string
+    | null;
+
+  imageUrl?:
+    | string
+    | null;
+
+  viewCount: number;
+
+  durationSec: number;
+
+  durationSeconds?: number;
+
+  playbackUrl: string;
 }
 
 export type PlaybackRole =
@@ -192,6 +273,91 @@ export interface CreateLiveResponse {
   startedAt?: string;
 
   playback?: LivePlayback;
+}
+
+export type LiveReservationCoHostStatus =
+  | "OWNER"
+  | "APPROVED"
+  | "INVITED"
+  | "REJECTED"
+  | null;
+
+export interface LiveReservationCoHostCandidate {
+  bandMemberId: number;
+
+  bandMemberProfileId: number;
+
+  bandMemberProfileImageUrl:
+    | string
+    | null;
+
+  nickname: string;
+
+  part: string;
+
+  status:
+    LiveReservationCoHostStatus;
+
+  userId?: number;
+}
+
+export interface LiveReservationResponse {
+  liveId: number;
+
+  title: string;
+
+  description:
+    | string
+    | null;
+
+  thumbnailImageUrl?:
+    | string
+    | null;
+
+  thumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailUrl?:
+    | string
+    | null;
+
+  liveThumbnailImageUrl?:
+    | string
+    | null;
+
+  imageUrl?:
+    | string
+    | null;
+
+  scheduledAt: string;
+
+  cohostCandidates?:
+    LiveReservationCoHostCandidate[];
+}
+
+export interface UpdateLiveReservationRequest {
+  title: string;
+
+  description?:
+    | string
+    | null;
+
+  thumbnailImageUrl?:
+    | string
+    | null;
+
+  scheduledAt: string;
+
+  coHost?: number[];
+
+  cohosts?:
+    | number[]
+    | null;
+}
+
+export interface UpdateLiveReservationResponse {
+  liveId?: number;
 }
 
 export interface CloseLiveResponse {

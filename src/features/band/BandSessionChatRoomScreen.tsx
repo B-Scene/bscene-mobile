@@ -5,8 +5,6 @@ import {
 } from "expo-router";
 import {
   Send,
-  Wifi,
-  WifiOff,
 } from "lucide-react-native";
 import {
   useCallback,
@@ -33,7 +31,6 @@ import {
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
 import {
   colors,
@@ -744,11 +741,7 @@ export function BandSessionChatRoomScreen() {
         />
       ) : (
         <>
-          <View
-            style={
-              styles.opponentCard
-            }
-          >
+          <View style={styles.opponentCard}>
             <Avatar
               imageUrl={
                 room.opponentProfileImageUrl
@@ -788,7 +781,7 @@ export function BandSessionChatRoomScreen() {
             </View>
 
             {!room.canSend ? (
-              <Badge label="대화 종료" />
+              <Text style={styles.closedBadge}>대화 종료</Text>
             ) : null}
           </View>
 
@@ -797,21 +790,14 @@ export function BandSessionChatRoomScreen() {
               styles.connectionRow
             }
           >
-            {socket.isConnected ? (
-              <Wifi
-                size={14}
-                color={
-                  colors.primary500
-                }
-              />
-            ) : (
-              <WifiOff
-                size={14}
-                color={
-                  colors.neutral500
-                }
-              />
-            )}
+            <View
+              style={[
+                styles.connectionDot,
+                socket.isConnected
+                  ? styles.connectionDotOn
+                  : styles.connectionDotOff,
+              ]}
+            />
 
             <Text
               style={[
@@ -1022,76 +1008,51 @@ function MessageBubble({
 }: {
   message: LocalChatMessage;
 }) {
+  if (message.isMine) {
+    return (
+      <View style={[styles.messageRow, styles.mineRow]}>
+        <View style={styles.mineMessageWrap}>
+          <View style={styles.mineSideMeta}>
+            {!message.isRead ? (
+              <Text style={styles.unreadMarker}>1</Text>
+            ) : null}
+            <Text style={styles.messageTime}>
+              {formatMessageTime(message.createdAt)}
+            </Text>
+            {message.pending ? (
+              <Text style={styles.pendingText}>전송 중</Text>
+            ) : null}
+          </View>
+
+          <View style={[styles.messageBubble, styles.mineBubble]}>
+            <Text style={styles.messageText}>{message.content}</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
         styles.messageRow,
-
-        message.isMine
-          ? styles.mineRow
-          : styles.receivedRow,
+        styles.receivedRow,
       ]}
     >
-      <View
-        style={[
-          styles.messageBubble,
+      <Avatar
+        imageUrl={null}
+        label={message.senderName}
+        size={35}
+      />
 
-          message.isMine
-            ? styles.mineBubble
-            : styles.receivedBubble,
-        ]}
-      >
-        {!message.isMine ? (
-          <Text
-            style={
-              styles.senderName
-            }
-          >
-            {message.senderName}
-          </Text>
-        ) : null}
-
-        <Text
-          style={[
-            styles.messageText,
-
-            message.isMine &&
-              styles.mineMessageText,
-          ]}
-        >
-          {message.content}
-        </Text>
-
-        <View
-          style={
-            styles.messageMeta
-          }
-        >
-          {message.isMine ? (
-            <Text
-              style={
-                styles.mineMetaText
-              }
-            >
-              {message.pending
-                ? "전송 중"
-                : message.isRead
-                  ? "읽음"
-                  : "안읽음"}
-            </Text>
-          ) : null}
-
-          <Text
-            style={[
-              styles.messageTime,
-
-              message.isMine &&
-                styles.mineMetaText,
-            ]}
-          >
-            {formatMessageTime(
-              message.createdAt,
-            )}
+      <View style={styles.receivedContent}>
+        <Text style={styles.senderName}>{message.senderName}</Text>
+        <View style={styles.receivedBubbleRow}>
+          <View style={[styles.messageBubble, styles.receivedBubble]}>
+            <Text style={styles.messageText}>{message.content}</Text>
+          </View>
+          <Text style={styles.messageTime}>
+            {formatMessageTime(message.createdAt)}
           </Text>
         </View>
       </View>
@@ -1103,8 +1064,10 @@ const styles =
   StyleSheet.create({
     container: {
       flex: 1,
-      gap: spacing.sm,
+      gap: 0,
       paddingBottom: 0,
+      paddingHorizontal: 0,
+      backgroundColor: colors.white,
     },
 
     leaveText: {
@@ -1116,9 +1079,9 @@ const styles =
     opponentCard: {
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.md,
-      paddingVertical:
-        spacing.sm,
+      gap: 10,
+      paddingHorizontal: 17,
+      paddingVertical: 12,
       borderBottomWidth: 1,
       borderBottomColor:
         colors.neutral300,
@@ -1126,22 +1089,36 @@ const styles =
 
     opponentInfo: {
       flex: 1,
-      gap: spacing.xs,
+      gap: 2,
     },
 
     opponentName: {
       color: colors.neutral900,
-      fontSize: 15,
-      fontWeight: "900",
+      fontSize: 13,
+      fontWeight: "700",
+      lineHeight: 18,
     },
 
     opponentMeta: {
       color: colors.neutral600,
       fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
+    },
+
+    closedBadge: {
+      height: 22,
+      borderRadius: 999,
+      backgroundColor: colors.neutral300,
+      color: colors.neutral600,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 22,
+      paddingHorizontal: 12,
     },
 
     connectionRow: {
-      minHeight: 28,
+      minHeight: 30,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
@@ -1151,14 +1128,29 @@ const styles =
     connectionText: {
       color: colors.neutral500,
       fontSize: 11,
+      fontWeight: "500",
+    },
+
+    connectionDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+    },
+
+    connectionDotOn: {
+      backgroundColor: colors.secondary500,
+    },
+
+    connectionDotOff: {
+      backgroundColor: colors.neutral400,
     },
 
     connectedText: {
-      color: colors.primary600,
+      color: colors.secondary600,
     },
 
     reconnectText: {
-      color: colors.primary600,
+      color: colors.secondary600,
       fontSize: 11,
       fontWeight: "800",
       marginLeft: spacing.xs,
@@ -1171,7 +1163,8 @@ const styles =
     messages: {
       flexGrow: 1,
       paddingVertical:
-        spacing.md,
+        12,
+      paddingHorizontal: 17,
     },
 
     emptyMessages: {
@@ -1195,26 +1188,20 @@ const styles =
 
     dateDivider: {
       alignItems: "center",
-      marginVertical:
-        spacing.md,
+      marginVertical: 4,
     },
 
     dateText: {
-      color: colors.neutral500,
-      fontSize: 11,
-      backgroundColor:
-        colors.neutral100,
-      paddingHorizontal:
-        spacing.md,
-      paddingVertical:
-        spacing.xs,
-      borderRadius: radius.pill,
+      color: colors.neutral600,
+      fontSize: 12,
+      fontWeight: "500",
+      lineHeight: 18,
     },
 
     messageRow: {
       width: "100%",
       marginBottom:
-        spacing.sm,
+        12,
     },
 
     mineRow: {
@@ -1222,98 +1209,126 @@ const styles =
     },
 
     receivedRow: {
+      flexDirection: "row",
       alignItems: "flex-start",
+      gap: 10,
+    },
+
+    mineMessageWrap: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 5,
+    },
+
+    mineSideMeta: {
+      alignItems: "flex-end",
+      marginBottom: 1,
+    },
+
+    receivedContent: {
+      minWidth: 0,
+      flex: 1,
+    },
+
+    receivedBubbleRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: 5,
+      marginTop: 4,
     },
 
     messageBubble: {
-      maxWidth: "82%",
-      paddingHorizontal:
-        spacing.md,
-      paddingVertical:
-        spacing.sm,
-      borderRadius: radius.md,
-      gap: spacing.xs,
+      maxWidth: 208,
+      borderRadius: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
+      paddingLeft: 12,
+      paddingRight: 16,
     },
 
     mineBubble: {
-      backgroundColor:
-        colors.primary500,
+      borderWidth: 1,
+      borderColor: colors.secondary500,
+      backgroundColor: colors.secondary100,
     },
 
     receivedBubble: {
-      backgroundColor:
-        colors.neutral200,
+      borderWidth: 1,
+      borderColor: colors.neutral500,
+      backgroundColor: colors.white,
     },
 
     senderName: {
-      color: colors.neutral700,
-      fontSize: 11,
-      fontWeight: "800",
+      color: colors.neutral900,
+      fontSize: 12,
+      fontWeight: "700",
+      lineHeight: 18,
     },
 
     messageText: {
       color: colors.neutral900,
-      fontSize: 14,
-      lineHeight: 20,
-    },
-
-    mineMessageText: {
-      color: colors.white,
-    },
-
-    messageMeta: {
-      flexDirection: "row",
-      justifyContent: "flex-end",
-      gap: spacing.xs,
+      fontSize: 12,
+      fontWeight: "400",
+      lineHeight: 18,
     },
 
     messageTime: {
       color: colors.neutral500,
-      fontSize: 10,
+      fontSize: 8,
+      fontWeight: "500",
+      lineHeight: 10,
     },
 
-    mineMetaText: {
-      color: colors.primary50,
-      fontSize: 10,
+    unreadMarker: {
+      color: colors.secondary500,
+      fontSize: 9,
+      fontWeight: "500",
+      lineHeight: 10,
+    },
+
+    pendingText: {
+      color: colors.neutral500,
+      fontSize: 8,
+      fontWeight: "500",
+      lineHeight: 10,
     },
 
     composer: {
-      minHeight: 68,
+      minHeight: 65,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.sm,
-      borderTopWidth: 1,
-      borderTopColor:
-        colors.neutral300,
+      gap: 10,
       backgroundColor:
         colors.white,
-      paddingVertical:
-        spacing.sm,
+      paddingHorizontal: 17,
+      paddingTop: 12,
+      paddingBottom: 17,
     },
 
     input: {
       flex: 1,
-      minHeight: 44,
+      height: 36,
+      borderWidth: 1,
+      borderColor: colors.neutral400,
       borderRadius:
         radius.pill,
       backgroundColor:
-        colors.neutral100,
+        colors.white,
       color: colors.neutral900,
-      fontSize: 14,
-      paddingHorizontal:
-        spacing.lg,
-      paddingVertical:
-        spacing.sm,
+      fontSize: 12,
+      lineHeight: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 0,
     },
 
     sendButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor:
-        colors.primary500,
+        colors.secondary500,
     },
 
     sendButtonDisabled: {

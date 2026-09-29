@@ -1,6 +1,18 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
-import { Alert, Linking, StyleSheet, Text, View } from "react-native";
+import {
+  router,
+  useLocalSearchParams,
+} from "expo-router";
+import { Share2 } from "lucide-react-native";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import {
   invalidatePerformanceInterestQueries,
@@ -25,7 +37,9 @@ import { colors, spacing } from "@/shared/constants/theme";
 import {
   formatDateTime,
   formatDday,
+  getCastingBandId,
   getCastingBandInfo,
+  getCastingBandImageUrl,
   getConcertDate,
   getConcertLocation,
   getConcertTitle,
@@ -84,7 +98,31 @@ export function FanConcertDetailScreen() {
 
   const openTicket = async () => {
     if (!detail?.ticketLink) return;
-    await Linking.openURL(detail.ticketLink);
+
+    try {
+      await Linking.openURL(detail.ticketLink);
+    } catch {
+      Alert.alert("예매하기", "예매 링크를 열지 못했어요.");
+    }
+  };
+
+  const shareConcert = async () => {
+    if (!Number.isFinite(performanceId) || performanceId <= 0) {
+      Alert.alert("공유하기", "공연 정보를 확인할 수 없어요.");
+      return;
+    }
+
+    const concertLink = `https://bscene.app/fan/home/concerts/${performanceId}`;
+
+    try {
+      await Share.share({
+        title,
+        message: `${title}\n${location} · ${formatDateTime(date)}\n${concertLink}`,
+        url: concertLink,
+      });
+    } catch {
+      Alert.alert("공유하기", "공연 링크를 공유하지 못했어요.");
+    }
   };
 
   const toggleInterest = async () => {
@@ -116,6 +154,7 @@ export function FanConcertDetailScreen() {
     if (isAlarmSet) {
       try {
         await deleteAlarmMutation.mutateAsync(performanceId);
+        Alert.alert("공연 알림", "공연 알림을 해제했어요.");
       } catch {
         Alert.alert("공연 알림", "공연 알림 해제에 실패했어요.");
       }
@@ -124,9 +163,14 @@ export function FanConcertDetailScreen() {
 
     try {
       await setAlarmMutation.mutateAsync(performanceId);
+      Alert.alert(
+        "공연 알림이 설정됐어요",
+        "공연 시작 전에 알림을 보내드릴게요.",
+      );
     } catch (error) {
       if (isAlreadySetPerformanceAlarmError(error)) {
         await invalidatePerformanceInterestQueries(queryClient, performanceId);
+        Alert.alert("공연 알림", "이미 공연 알림이 설정되어 있어요.");
         return;
       }
       Alert.alert("공연 알림", "공연 알림 설정에 실패했어요.");
@@ -135,7 +179,20 @@ export function FanConcertDetailScreen() {
 
   return (
     <Screen contentStyle={styles.container}>
-      <AppHeader title="공연 상세" />
+      <AppHeader
+        title="공연 상세"
+        rightContent={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="공연 공유하기"
+            hitSlop={12}
+            style={styles.headerIconButton}
+            onPress={() => void shareConcert()}
+          >
+            <Share2 size={22} color={colors.neutral900} />
+          </Pressable>
+        }
+      />
 
       {query.isLoading ? (
         <AppState loading title="공연 정보를 불러오는 중이에요" />
@@ -198,6 +255,7 @@ export function FanConcertDetailScreen() {
               <View style={styles.castingList}>
                 {detail.casting.map((band, index) => {
                   const bandInfo = getCastingBandInfo(band);
+                  const bandId = getCastingBandId(band);
                   const bandName =
                     bandInfo.bandName ?? bandInfo.name ?? band.bandName ?? "밴드명";
                   const bandMeta =
@@ -206,12 +264,26 @@ export function FanConcertDetailScreen() {
                       .join(" · ") || "장르 · 지역";
 
                   return (
-                    <View key={`${bandName}-${index}`} style={styles.castingRow}>
+                    <Pressable
+                      key={`${bandId ?? bandName}-${index}`}
+                      accessibilityRole="button"
+                      disabled={bandId == null}
+                      style={[
+                        styles.castingRow,
+                        bandId == null && styles.castingRowDisabled,
+                      ]}
+                      onPress={() => {
+                        if (bandId == null) return;
+                        router.push(
+                          `/fan/bands/${bandId}` as Parameters<
+                            typeof router.push
+                          >[0],
+                        );
+                      }}
+                    >
                       <Avatar
                         imageUrl={
-                          bandInfo.profileImageUrl ??
-                          bandInfo.bandProfileImageUrl ??
-                          bandInfo.bandImageUrl
+                          getCastingBandImageUrl(band)
                         }
                         label={bandName}
                         size={42}
@@ -220,7 +292,7 @@ export function FanConcertDetailScreen() {
                         <Text style={styles.castingName}>{bandName}</Text>
                         <Text style={styles.meta}>{bandMeta}</Text>
                       </View>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </View>
@@ -264,6 +336,12 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     gap: spacing.md,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   poster: {
     alignItems: "center",
@@ -329,6 +407,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+  },
+  castingRowDisabled: {
+    opacity: 0.75,
   },
   castingText: {
     flex: 1,

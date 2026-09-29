@@ -167,6 +167,16 @@ function FanProfileEditForm({
     setIsUploading,
   ] = useState(false);
 
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  const isValid =
+    Boolean(nickname.trim()) &&
+    selectedGenres.length > 0 &&
+    selectedRegions.length > 0;
+
   const displayedImage =
     selectedImage?.uri ??
     (
@@ -361,6 +371,8 @@ function FanProfileEditForm({
       }
 
       try {
+        setErrorMessage("");
+
         let uploadedUrl:
           | string
           | undefined;
@@ -413,6 +425,10 @@ function FanProfileEditForm({
 
         router.back();
       } catch {
+        setErrorMessage(
+          "저장에 실패했어요. 다시 시도해 주세요.",
+        );
+
         Alert.alert(
           "프로필 저장",
           "프로필을 저장하지 못했어요.",
@@ -542,20 +558,39 @@ function FanProfileEditForm({
         }
       />
 
-      <AppButton
-        label={
-          isUploading
-            ? "이미지 업로드 중..."
-            : "프로필 저장"
-        }
-        loading={
-          isUploading ||
-          updateMutation.isPending
-        }
-        onPress={() =>
-          void save()
-        }
-      />
+      <View style={styles.submitArea}>
+        {errorMessage ? (
+          <Text style={styles.errorMessage}>
+            {errorMessage}
+          </Text>
+        ) : null}
+
+        <AppButton
+          label={
+            isUploading
+              ? "이미지 업로드 중..."
+              : updateMutation.isPending
+                ? "저장 중..."
+                : "프로필 저장"
+          }
+          disabled={
+            !isValid
+          }
+          loading={
+            isUploading ||
+            updateMutation.isPending
+          }
+          style={[
+            styles.submitButton,
+            isValid
+              ? styles.submitButtonActive
+              : styles.submitButtonDisabled,
+          ]}
+          onPress={() =>
+            void save()
+          }
+        />
+      </View>
     </Screen>
   );
 }
@@ -713,5 +748,32 @@ const styles =
       flexDirection: "row",
       flexWrap: "wrap",
       gap: spacing.sm,
+    },
+
+    submitArea: {
+      marginTop: "auto",
+      gap: spacing.sm,
+    },
+
+    errorMessage: {
+      color:
+        colors.error,
+      fontSize: 12,
+      lineHeight: 18,
+      textAlign: "center",
+    },
+
+    submitButton: {
+      minHeight: 52,
+    },
+
+    submitButtonActive: {
+      backgroundColor:
+        colors.primary500,
+    },
+
+    submitButtonDisabled: {
+      backgroundColor:
+        colors.neutral300,
     },
   });

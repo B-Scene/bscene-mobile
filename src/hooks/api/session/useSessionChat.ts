@@ -1,4 +1,5 @@
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -38,6 +39,12 @@ export const sessionChatKeys = {
 
   roomList: (params: ChatRoomsParams) =>
     [...sessionChatKeys.rooms(), params] as const,
+
+  roomInfiniteLists: () =>
+    [...sessionChatKeys.all, "roomInfinite"] as const,
+
+  roomInfiniteList: (params: ChatRoomsParams) =>
+    [...sessionChatKeys.roomInfiniteLists(), params] as const,
 
   details: () => [...sessionChatKeys.all, "detail"] as const,
 
@@ -120,6 +127,33 @@ export const useChatRoomsQuery = (
     queryKey: sessionChatKeys.roomList(params),
     queryFn: () => getChatRooms(params),
     staleTime: 1000 * 15,
+  });
+};
+
+export const useInfiniteChatRoomsQuery = (
+  params: ChatRoomsParams = {},
+) => {
+  return useInfiniteQuery({
+    queryKey:
+      sessionChatKeys.roomInfiniteList(params),
+
+    queryFn: ({ pageParam }) =>
+      getChatRooms({
+        ...params,
+        cursorId:
+          pageParam,
+      }),
+
+    initialPageParam:
+      undefined as number | undefined,
+
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext
+        ? lastPage.nextCursor ?? undefined
+        : undefined,
+
+    staleTime:
+      1000 * 15,
   });
 };
 
@@ -864,6 +898,11 @@ export const useSessionChatRoomListSocket = ({
               sessionChatKeys.rooms(),
           });
         }
+
+        void queryClient.invalidateQueries({
+          queryKey:
+            sessionChatKeys.roomInfiniteLists(),
+        });
       },
       [
         currentUserId,
@@ -876,6 +915,11 @@ export const useSessionChatRoomListSocket = ({
       void queryClient.invalidateQueries({
         queryKey:
           sessionChatKeys.rooms(),
+      });
+
+      void queryClient.invalidateQueries({
+        queryKey:
+          sessionChatKeys.roomInfiniteLists(),
       });
     }, [queryClient]);
 

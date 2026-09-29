@@ -13,10 +13,15 @@ export const onboardingStatusKeys = {
   all: ["onboarding", "status"] as const,
 };
 
-export const useOnboardingStatus = () => {
+export const useOnboardingStatus = (
+  options?: {
+    enabled?: boolean;
+  },
+) => {
   return useQuery({
     queryKey: onboardingStatusKeys.all,
     queryFn: getOnboardingStatus,
+    enabled: options?.enabled,
   });
 };
 
