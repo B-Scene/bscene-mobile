@@ -14,12 +14,21 @@ export interface RegisterPushTokenRequest {
   platform: PushTokenPlatform;
 }
 
+export interface NotificationBandInvite {
+  bandId: number | null;
+  bandName: string;
+  bandProfileImageUrl: string | null;
+  actionable: boolean;
+}
+
 export interface NotificationItem {
   notificationId: number;
   type: string;
   title: string;
   body: string;
   isRead: boolean;
+  actionable?: boolean;
+  bandInvite?: NotificationBandInvite | null;
   createdAt: string;
   mode?: NotificationSettingsMode | null;
   referenceId?: number | string | null;

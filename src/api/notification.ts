@@ -158,6 +158,14 @@ const normalizeNotificationItem = (
       `알림 ${index + 1}`,
     body: toStringOrEmpty(value.body ?? value.content ?? value.message),
     isRead: toBoolean(value.isRead ?? value.read ?? value.readStatus),
+    actionable: toBoolean(value.actionable) ||
+      (isRecord(value.bandInvite) && toBoolean(value.bandInvite.actionable)),
+    bandInvite: isRecord(value.bandInvite) ? {
+      bandId: toNumberOrNull(value.bandInvite.bandId),
+      bandName: toStringOrEmpty(value.bandInvite.bandName),
+      bandProfileImageUrl: toStringOrNull(value.bandInvite.bandProfileImageUrl),
+      actionable: toBoolean(value.bandInvite.actionable),
+    } : null,
     createdAt:
       toStringOrEmpty(value.createdAt ?? value.createdDate ?? value.timeStamp) ||
       new Date().toISOString(),

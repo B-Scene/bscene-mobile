@@ -102,6 +102,21 @@ export const getNotificationDeepLink =
       );
 
     if (explicit) {
+      const pathname = explicit.split(/[?#]/)[0];
+
+      if (pathname === "/band/profile/postings") {
+        const recruitmentId = getReferenceId(
+          data,
+          "sessionRecruitmentId",
+          "recruitmentId",
+          "referenceId",
+        );
+
+        if (recruitmentId) {
+          return `/band/session/recruitments/${recruitmentId}${explicit.slice(pathname.length)}`;
+        }
+      }
+
       return explicit;
     }
 
