@@ -521,6 +521,7 @@ function PhoneVerificationFields({
           onPress={onSendCode}
         >
           <Text
+            numberOfLines={1}
             style={[
               styles.phoneButtonText,
               phone ? styles.phoneButtonTextEnabled : styles.phoneButtonTextDisabled,
@@ -657,9 +658,11 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     flex: 1,
+    minWidth: 0,
   },
   phoneButton: {
     width: 126,
+    flexShrink: 0,
     height: 46,
     borderRadius: 8,
     alignItems: "center",
