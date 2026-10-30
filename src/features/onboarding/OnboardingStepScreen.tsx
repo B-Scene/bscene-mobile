@@ -593,7 +593,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   return (
     <View style={styles.completeRoot}>
       <View style={styles.completeBody}>
-        <BSceneSymbol width={78} height={86} />
+        <BSceneSymbol width={94} height={104} />
         <Text style={styles.completeTitle}>설정이 완료됐어요</Text>
         <Text style={styles.completeDescription}>
           지금 바로 B:Scene을{"\n"}시작해보세요

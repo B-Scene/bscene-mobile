@@ -37,7 +37,14 @@ export function BSceneSymbol({ width = 78, height = 86, ...props }: SvgProps) {
         <Path d="M10.249 58.587C12.706 58.587 14.698 60.577 14.698 63.03V68.651C14.698 71.105 12.706 73.094 10.249 73.094C7.792 73.094 5.8 71.105 5.8 68.651V63.03C5.8 60.576 7.792 58.587 10.249 58.587Z" fill="url(#symbolGradient)" />
       </G>
       <Defs>
-        <LinearGradient id="symbolGradient" x1="5.8" y1="1.8" x2="87.551" y2="94.02">
+        <LinearGradient
+          id="symbolGradient"
+          x1="5.8"
+          y1="1.8"
+          x2="87.551"
+          y2="94.02"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop stopColor="#FFE031" />
           <Stop offset="1" stopColor="#F04579" />
         </LinearGradient>
