@@ -24,6 +24,13 @@ function loadTypeScript(file, modules = {}) {
 
 const { getNotificationDeepLink } = loadTypeScript('src/shared/utils/notificationDeepLink.ts');
 
+test('web bridge renders without importing native notification APIs', () => {
+  const { NativeNotificationBridge } = loadTypeScript(
+    'src/shared/components/NativeNotificationBridge.web.tsx',
+  );
+  assert.equal(NativeNotificationBridge(), null);
+});
+
 function createBridge() {
   const state = {
     status: 'idle', user: null, mode: 'fan', pathname: '/', key: undefined,
