@@ -535,10 +535,7 @@ function HomeHeader({
         style={
           styles.headerIconButton
         }
-        onPress={() => {
-          // 현재 모바일에는 알림 목록 전용 route가 없어서
-          // 디자인만 원본과 동일하게 유지한다.
-        }}
+        onPress={() => router.push("/band/notifications" as Parameters<typeof router.push>[0])}
       >
         <NotificationBellIcon />
       </Pressable>
