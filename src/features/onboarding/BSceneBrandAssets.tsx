@@ -17,7 +17,14 @@ export function BSceneLogo({ width = 119, height = 22, ...props }: SvgProps) {
         fill="url(#logoGradient)"
       />
       <Defs>
-        <LinearGradient id="logoGradient" x1="-2.268" y1="-9.168" x2="115.46" y2="33.593">
+        <LinearGradient
+          id="logoGradient"
+          x1="-2.268"
+          y1="-9.168"
+          x2="115.46"
+          y2="33.593"
+          gradientUnits="userSpaceOnUse"
+        >
           <Stop stopColor="#FFE031" />
           <Stop offset="1" stopColor="#F04579" />
         </LinearGradient>

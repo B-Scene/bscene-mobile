@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { AlertCircle, Check, ChevronLeft, Smartphone } from "lucide-react-native";
+import { AlertCircle, ChevronLeft, Smartphone } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 
 import {
   AGREEMENT_DETAILS,
@@ -260,7 +260,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
           style={styles.allAgreementRow}
           onPress={toggleAllAgreements}
         >
-          <CheckCircle checked={allAgreementsAccepted} large />
+          <AgreementCheckIcon checked={allAgreementsAccepted} circle />
           <Text style={styles.allAgreementText}>모두 동의 (선택 정보 포함)</Text>
         </Pressable>
 
@@ -276,7 +276,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                   style={styles.agreementToggle}
                   onPress={() => toggleAgreement(agreement.key)}
                 >
-                  <CheckCircle checked={checked} />
+                  <AgreementCheckIcon checked={checked} />
                   <Text style={styles.agreementLabel}>
                     [{agreement.required ? "필수" : "선택"}] {agreement.label}
                   </Text>
@@ -693,19 +693,48 @@ function PrimaryButton({
   );
 }
 
-function CheckCircle({ checked, large = false }: { checked: boolean; large?: boolean }) {
-  const size = large ? 24 : 20;
+function AgreementCheckIcon({
+  checked,
+  circle = false,
+}: {
+  checked: boolean;
+  circle?: boolean;
+}) {
+  const stroke = checked ? colors.primary400 : colors.neutral500;
+
+  if (circle) {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+        <Circle
+          cx={12}
+          cy={12}
+          r={9}
+          stroke={stroke}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M15 10L11 14L9 12"
+          stroke={stroke}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
 
   return (
-    <View
-      style={[
-        styles.checkCircle,
-        { width: size, height: size, borderRadius: size / 2 },
-        checked && styles.checkCircleActive,
-      ]}
-    >
-      {checked ? <Check size={large ? 15 : 13} color={colors.white} /> : null}
-    </View>
+    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M18 5L8 15L3 10"
+        stroke={stroke}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
@@ -913,16 +942,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
-  },
-  checkCircle: {
-    borderWidth: 1.5,
-    borderColor: colors.neutral400,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkCircleActive: {
-    borderColor: colors.primary400,
-    backgroundColor: colors.primary400,
   },
   modeList: {
     gap: 10,

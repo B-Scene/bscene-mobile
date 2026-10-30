@@ -10,12 +10,12 @@ export const AGREEMENTS: {
   label: string;
   required: boolean;
 }[] = [
-  { key: "age", label: "만 14세 이상 확인", required: true },
-  { key: "service", label: "서비스 이용약관", required: true },
-  { key: "privacy", label: "개인정보 수집 및 이용 동의", required: true },
+  { key: "age", label: "만 14세 이상입니다.", required: true },
+  { key: "service", label: "서비스 이용약관 동의", required: true },
+  { key: "privacy", label: "개인정보 수집 및 이용에 동의", required: true },
   {
     key: "marketing",
-    label: "광고성 정보 수신 및 마케팅 활용 동의",
+    label: "광고성 정보 수신 및 마케팅 활용에 동의",
     required: false,
   },
 ];
