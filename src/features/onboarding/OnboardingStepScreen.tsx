@@ -425,6 +425,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                   key={genre.code}
                   label={genre.name}
                   selected={draft.genres.includes(genre.code)}
+                  compact
                   onPress={() => toggleGenre(genre.code)}
                 />
               ))}
@@ -688,19 +689,32 @@ function CheckCircle({ checked, large = false }: { checked: boolean; large?: boo
 function Pill({
   label,
   selected,
+  compact = false,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  compact?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      style={[styles.pill, selected ? styles.pillSelected : styles.pillIdle]}
+      style={[
+        styles.pill,
+        compact && styles.compactPill,
+        selected ? styles.pillSelected : styles.pillIdle,
+      ]}
       onPress={onPress}
     >
-      <Text style={[styles.pillText, selected ? styles.pillTextSelected : styles.pillTextIdle]}>
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.pillText,
+          compact && styles.compactPillText,
+          selected ? styles.pillTextSelected : styles.pillTextIdle,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -967,7 +981,6 @@ const styles = StyleSheet.create({
   pillRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 8,
   },
   regionRows: {
@@ -986,6 +999,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 4,
   },
+  compactPill: {
+    flexShrink: 1,
+    paddingHorizontal: 11,
+  },
   pillSelected: {
     backgroundColor: colors.primary400,
   },
@@ -996,6 +1013,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     lineHeight: 20,
+  },
+  compactPillText: {
+    fontSize: 13,
   },
   pillTextSelected: {
     color: colors.white,
