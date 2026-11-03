@@ -198,6 +198,9 @@ export function BandSessionChatRoomScreen() {
       (messageId: number) => boolean
     >(() => false);
 
+  const hasConnectedRef =
+    useRef(false);
+
   const handleSocketMessage =
     useCallback(
       (
@@ -417,6 +420,20 @@ export function BandSessionChatRoomScreen() {
           queryKey:
             sessionChatKeys.rooms(),
         });
+
+        if (
+          hasConnectedRef.current
+        ) {
+          queryClient.invalidateQueries({
+            queryKey: [
+              ...sessionChatKeys.details(),
+              chatRoomId,
+            ],
+          });
+        }
+
+        hasConnectedRef.current =
+          true;
       },
     });
     const socketIsConnected =
@@ -454,13 +471,47 @@ export function BandSessionChatRoomScreen() {
             ),
           );
 
+        const unmatchedServerMine =
+          serverMessages.filter(
+            (message) =>
+              message.isMine &&
+              !previousMessages.some(
+                (previousMessage) =>
+                  previousMessage.chatMessageId ===
+                  message.chatMessageId,
+              ),
+          );
+
         const pendingMessages =
           previousMessages.filter(
-            (message) =>
-              message.pending &&
-              !serverIds.has(
-                message.chatMessageId,
-              ),
+            (message) => {
+              if (
+                !message.pending ||
+                serverIds.has(
+                  message.chatMessageId,
+                )
+              ) {
+                return false;
+              }
+
+              const matchedIndex =
+                unmatchedServerMine.findIndex(
+                  (serverMessage) =>
+                    serverMessage.content ===
+                    message.content,
+                );
+
+              if (matchedIndex < 0) {
+                return true;
+              }
+
+              unmatchedServerMine.splice(
+                matchedIndex,
+                1,
+              );
+
+              return false;
+            },
           );
 
         return [
