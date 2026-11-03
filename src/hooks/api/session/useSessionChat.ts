@@ -10,6 +10,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  AppState,
+  type AppStateStatus,
+} from "react-native";
 
 import {
   createChatRoom,
@@ -685,6 +689,79 @@ export const useSessionDirectMessageSocket = ({
     chatRoomId,
     closeSocket,
     enabled,
+  ]);
+
+  useEffect(() => {
+    if (
+      !enabled ||
+      (chatRoomId !== undefined &&
+        chatRoomId <= 0)
+    ) {
+      return;
+    }
+
+    let previousState: AppStateStatus =
+      AppState.currentState;
+
+    const subscription =
+      AppState.addEventListener(
+        "change",
+        (nextState) => {
+          const becameActive =
+            previousState !== "active" &&
+            nextState === "active";
+
+          previousState = nextState;
+
+          if (
+            !becameActive ||
+            !shouldReconnectRef.current
+          ) {
+            return;
+          }
+
+          const socket =
+            socketRef.current;
+
+          if (
+            socket &&
+            socket.readyState ===
+              WebSocket.OPEN
+          ) {
+            sendPing();
+
+            return;
+          }
+
+          if (
+            socket &&
+            socket.readyState ===
+              WebSocket.CONNECTING
+          ) {
+            return;
+          }
+
+          if (
+            ticketRequestRef.current
+          ) {
+            return;
+          }
+
+          reconnectAttemptRef.current = 0;
+          clearReconnectTimer();
+
+          void connectSocketRef.current();
+        },
+      );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [
+    chatRoomId,
+    clearReconnectTimer,
+    enabled,
+    sendPing,
   ]);
 
   const sendMessage = useCallback(

@@ -128,16 +128,60 @@ export function useLiveChatSocket({
     }
 
     let active = true;
+    let liveEnded = false;
+
+    const scheduleReconnect =
+      () => {
+        if (
+          !active ||
+          liveEnded ||
+          reconnectRef.current
+        ) {
+          return;
+        }
+
+        const delay =
+          Math.min(
+            1000 *
+              2 **
+                attemptsRef.current,
+            MAX_RECONNECT_DELAY,
+          );
+
+        attemptsRef.current +=
+          1;
+
+        reconnectRef.current =
+          setTimeout(
+            () => {
+              reconnectRef.current =
+                null;
+
+              void connect();
+            },
+            delay,
+          );
+      };
 
     const connect =
       async () => {
+        if (
+          !active ||
+          liveEnded
+        ) {
+          return;
+        }
+
         try {
           const ticket =
             await getLiveChatTicket(
               liveId,
             );
 
-          if (!active) {
+          if (
+            !active ||
+            liveEnded
+          ) {
             return;
           }
 
@@ -159,6 +203,10 @@ export function useLiveChatSocket({
 
           socket.onopen =
             () => {
+              if (!active) {
+                return;
+              }
+
               attemptsRef.current =
                 0;
 
@@ -172,6 +220,14 @@ export function useLiveChatSocket({
               setLastError(
                 "",
               );
+
+              if (
+                heartbeatRef.current
+              ) {
+                clearInterval(
+                  heartbeatRef.current,
+                );
+              }
 
               heartbeatRef.current =
                 setInterval(
@@ -244,9 +300,13 @@ export function useLiveChatSocket({
                     .event ===
                     "live-ended"
                 ) {
+                  liveEnded = true;
+
                   callbacksRef.current.onEnded?.();
 
-                  socket.close();
+                  socket.close(1000);
+
+                  return;
                 }
 
                 if (
@@ -274,32 +334,34 @@ export function useLiveChatSocket({
 
           socket.onclose =
             () => {
-              setIsConnected(
-                false,
-              );
+              if (
+                heartbeatRef.current
+              ) {
+                clearInterval(
+                  heartbeatRef.current,
+                );
+
+                heartbeatRef.current =
+                  null;
+              }
+
+              if (
+                socketRef.current ===
+                socket
+              ) {
+                socketRef.current =
+                  null;
+              }
 
               if (!active) {
                 return;
               }
 
-              const delay =
-                Math.min(
-                  1000 *
-                    2 **
-                      attemptsRef.current,
-                  MAX_RECONNECT_DELAY,
-                );
+              setIsConnected(
+                false,
+              );
 
-              attemptsRef.current +=
-                1;
-
-              reconnectRef.current =
-                setTimeout(
-                  () => {
-                    void connect();
-                  },
-                  delay,
-                );
+              scheduleReconnect();
             };
         } catch {
           if (!active) {
@@ -309,6 +371,8 @@ export function useLiveChatSocket({
           setLastError(
             "라이브 채팅 연결에 실패했어요.",
           );
+
+          scheduleReconnect();
         }
       };
 
