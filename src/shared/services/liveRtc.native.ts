@@ -1,119 +1,62 @@
-<<<<<<< HEAD
-import {
-    resolveLiveMediaUrl,
-=======
-import type {
-  RTCPeerConnection as RTCPeerConnectionType,
-} from "react-native-webrtc";
+import type { RTCPeerConnection as RTCPeerConnectionType } from "react-native-webrtc";
 
-import {
-  resolveLiveMediaUrl,
->>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
-} from "@/api/live/live";
+import { resolveLiveMediaUrl } from "@/api/live/live";
+import { secureTokenStorage } from "@/shared/utils/secureTokenStorage";
 
-import {
-  secureTokenStorage,
-} from "@/shared/utils/secureTokenStorage";
+type WebRtcModule = typeof import("react-native-webrtc");
 
-type WebRtcModule =
-  typeof import(
-    "react-native-webrtc"
-  );
+let webRtcModulePromise: Promise<WebRtcModule> | null = null;
 
-<<<<<<< HEAD
-type NativePeerConnection =
-  InstanceType<
-    WebRtcModule["RTCPeerConnection"]
-  >;
+const loadWebRtcModule = async (): Promise<WebRtcModule> => {
+  if (!webRtcModulePromise) {
+    webRtcModulePromise = import("react-native-webrtc")
+      .then((module) => {
+        module.registerGlobals();
 
-=======
->>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
-let webRtcModulePromise:
-  | Promise<WebRtcModule>
-  | null = null;
+        return module;
+      })
+      .catch((error) => {
+        webRtcModulePromise = null;
 
-const loadWebRtcModule =
-  async (): Promise<WebRtcModule> => {
-    if (!webRtcModulePromise) {
-      webRtcModulePromise =
-        import(
-          "react-native-webrtc"
-        )
-          .then((module) => {
-            module.registerGlobals();
+        throw error;
+      });
+  }
 
-            return module;
-          })
-          .catch((error) => {
-<<<<<<< HEAD
-            webRtcModulePromise =
-              null;
-=======
-            webRtcModulePromise = null;
->>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
-
-            throw error;
-          });
-    }
-
-    try {
-      return await webRtcModulePromise;
-    } catch {
-      throw new Error(
-        "Live 송출 및 공동 진행은 Expo Go에서 지원되지 않아요. Development Build에서 테스트해 주세요.",
-      );
-    }
-  };
+  try {
+    return await webRtcModulePromise;
+  } catch {
+    throw new Error(
+      "Live 송출 및 공동 진행은 Expo Go에서 지원되지 않아요. Development Build에서 테스트해 주세요.",
+    );
+  }
+};
 
 const BASE64 =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
-const base64EncodeAscii = (
-  value: string,
-) => {
+const base64EncodeAscii = (value: string) => {
   let output = "";
   let index = 0;
 
-  while (
-    index < value.length
-  ) {
-    const chr1 =
-      value.charCodeAt(
-        index++,
-      );
+  while (index < value.length) {
+    const chr1 = value.charCodeAt(index++);
 
-    const chr2 =
-      value.charCodeAt(
-        index++,
-      );
+    const chr2 = value.charCodeAt(index++);
 
-    const chr3 =
-      value.charCodeAt(
-        index++,
-      );
+    const chr3 = value.charCodeAt(index++);
 
-    const enc1 =
-      chr1 >> 2;
+    const enc1 = chr1 >> 2;
 
-    const enc2 =
-      ((chr1 & 3) << 4) |
-      (chr2 >> 4);
+    const enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
 
-    let enc3 =
-      ((chr2 & 15) << 2) |
-      (chr3 >> 6);
+    let enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
 
-    let enc4 =
-      chr3 & 63;
+    let enc4 = chr3 & 63;
 
-    if (
-      Number.isNaN(chr2)
-    ) {
+    if (Number.isNaN(chr2)) {
       enc3 = 64;
       enc4 = 64;
-    } else if (
-      Number.isNaN(chr3)
-    ) {
+    } else if (Number.isNaN(chr3)) {
       enc4 = 64;
     }
 
@@ -127,338 +70,201 @@ const base64EncodeAscii = (
   return output;
 };
 
-const getRtcAuthorization =
-  async () => {
-    const token =
-      await secureTokenStorage.getAccessToken();
+const getRtcAuthorization = async () => {
+  const token = await secureTokenStorage.getAccessToken();
 
-    if (!token) {
-      throw new Error(
-        "로그인이 필요합니다.",
-      );
-    }
+  if (!token) {
+    throw new Error("로그인이 필요합니다.");
+  }
 
-    return `Basic ${base64EncodeAscii(
-      `bscene:${token}`,
-    )}`;
-  };
+  return `Basic ${base64EncodeAscii(`bscene:${token}`)}`;
+};
 
-const waitForIceGatheringComplete =
-  (
-    peer:
-<<<<<<< HEAD
-      NativePeerConnection,
-=======
-      RTCPeerConnectionType,
->>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
-  ) => {
-    return new Promise<void>(
-      (resolve) => {
-        if (
-          peer.iceGatheringState ===
-          "complete"
-        ) {
-          resolve();
+const waitForIceGatheringComplete = (peer: RTCPeerConnectionType) => {
+  return new Promise<void>((resolve) => {
+    if (peer.iceGatheringState === "complete") {
+      resolve();
 
-          return;
-        }
-
-        const timeout =
-          setTimeout(() => {
-            resolve();
-          }, 3000);
-
-        peer.onicegatheringstatechange =
-          () => {
-            if (
-              peer.iceGatheringState ===
-              "complete"
-            ) {
-              clearTimeout(
-                timeout,
-              );
-
-              resolve();
-            }
-          };
-      },
-    );
-  };
-
-const createRtcSession =
-  async ({
-    url,
-    sdpOffer,
-  }: {
-    url: string;
-    sdpOffer: string;
-  }) => {
-    const authorization =
-      await getRtcAuthorization();
-
-    const response =
-      await fetch(
-        resolveLiveMediaUrl(
-          url,
-        ),
-        {
-          method: "POST",
-
-          headers: {
-            Authorization:
-              authorization,
-
-            "Content-Type":
-              "application/sdp",
-
-            Accept:
-              "application/sdp",
-          },
-
-          body: sdpOffer,
-        },
-      );
-
-    if (!response.ok) {
-      throw new Error(
-        `RTC 연결에 실패했어요. (${response.status})`,
-      );
-    }
-
-    const sdpAnswer =
-      await response.text();
-
-    const sessionUrl =
-      response.headers.get(
-        "Location",
-      ) ??
-      response.headers.get(
-        "location",
-      );
-
-    return {
-      sdpAnswer,
-      sessionUrl,
-      authorization,
-    };
-  };
-
-const deleteRtcSession =
-  async (
-    sessionUrl:
-      | string
-      | null,
-    authorization: string,
-  ) => {
-    if (!sessionUrl) {
       return;
     }
 
-    try {
-      await fetch(
-        resolveLiveMediaUrl(
-          sessionUrl,
-        ),
-        {
-          method: "DELETE",
+    const timeout = setTimeout(() => {
+      resolve();
+    }, 3000);
 
-          headers: {
-            Authorization:
-              authorization,
-          },
-        },
-      );
-    } catch {
-      // RTC 서버 세션 정리는 best effort로 처리한다.
-    }
-  };
+    peer.onicegatheringstatechange = () => {
+      if (peer.iceGatheringState === "complete") {
+        clearTimeout(timeout);
 
-export type LiveRtcHandle = {
-  peerConnection:
-<<<<<<< HEAD
-    NativePeerConnection;
-=======
-    RTCPeerConnectionType;
->>>>>>> af8ef3eacdfc577767505c51b7fb4607b15e071e
-
-  close:
-    () => Promise<void>;
+        resolve();
+      }
+    };
+  });
 };
 
-export const startWhipBroadcast =
-  async (
-    whipUrl: string,
-  ): Promise<LiveRtcHandle> => {
-    const {
-      mediaDevices,
-      RTCPeerConnection,
-    } =
-      await loadWebRtcModule();
+const createRtcSession = async ({
+  url,
+  sdpOffer,
+}: {
+  url: string;
+  sdpOffer: string;
+}) => {
+  const authorization = await getRtcAuthorization();
 
-    const stream =
-      await mediaDevices.getUserMedia(
-        {
-          audio: true,
-          video: false,
-        },
-      );
+  const response = await fetch(resolveLiveMediaUrl(url), {
+    method: "POST",
 
-    const peer =
-      new RTCPeerConnection();
+    headers: {
+      Authorization: authorization,
 
-    stream
-      .getTracks()
-      .forEach(
-        (track) => {
-          peer.addTrack(
-            track,
-            stream,
-          );
-        },
-      );
+      "Content-Type": "application/sdp",
 
-    const offer =
-      await peer.createOffer();
+      Accept: "application/sdp",
+    },
 
-    await peer.setLocalDescription(
-      offer,
-    );
+    body: sdpOffer,
+  });
 
-    await waitForIceGatheringComplete(
-      peer,
-    );
+  if (!response.ok) {
+    throw new Error(`RTC 연결에 실패했어요. (${response.status})`);
+  }
 
-    const sdpOffer =
-      peer.localDescription
-        ?.sdp;
+  const sdpAnswer = await response.text();
 
-    if (!sdpOffer) {
-      stream
-        .getTracks()
-        .forEach(
-          (track) =>
-            track.stop(),
-        );
+  const sessionUrl =
+    response.headers.get("Location") ?? response.headers.get("location");
+
+  return {
+    sdpAnswer,
+    sessionUrl,
+    authorization,
+  };
+};
+
+const deleteRtcSession = async (
+  sessionUrl: string | null,
+  authorization: string,
+) => {
+  if (!sessionUrl) {
+    return;
+  }
+
+  try {
+    await fetch(resolveLiveMediaUrl(sessionUrl), {
+      method: "DELETE",
+
+      headers: {
+        Authorization: authorization,
+      },
+    });
+  } catch {
+    // RTC 서버 세션 정리는 best effort로 처리한다.
+  }
+};
+
+export type LiveRtcHandle = {
+  peerConnection: RTCPeerConnectionType;
+
+  close: () => Promise<void>;
+};
+
+export const startWhipBroadcast = async (
+  whipUrl: string,
+): Promise<LiveRtcHandle> => {
+  const { mediaDevices, RTCPeerConnection } = await loadWebRtcModule();
+
+  const stream = await mediaDevices.getUserMedia({
+    audio: true,
+    video: false,
+  });
+
+  const peer = new RTCPeerConnection();
+
+  stream.getTracks().forEach((track) => {
+    peer.addTrack(track, stream);
+  });
+
+  const offer = await peer.createOffer();
+
+  await peer.setLocalDescription(offer);
+
+  await waitForIceGatheringComplete(peer);
+
+  const sdpOffer = peer.localDescription?.sdp;
+
+  if (!sdpOffer) {
+    stream.getTracks().forEach((track) => track.stop());
+
+    peer.close();
+
+    throw new Error("WHIP SDP Offer 생성에 실패했어요.");
+  }
+
+  const { sdpAnswer, sessionUrl, authorization } = await createRtcSession({
+    url: whipUrl,
+    sdpOffer,
+  });
+
+  await peer.setRemoteDescription({
+    type: "answer",
+    sdp: sdpAnswer,
+  });
+
+  return {
+    peerConnection: peer,
+
+    close: async () => {
+      stream.getTracks().forEach((track) => track.stop());
 
       peer.close();
 
-      throw new Error(
-        "WHIP SDP Offer 생성에 실패했어요.",
-      );
-    }
-
-    const {
-      sdpAnswer,
-      sessionUrl,
-      authorization,
-    } =
-      await createRtcSession({
-        url: whipUrl,
-        sdpOffer,
-      });
-
-    await peer.setRemoteDescription(
-      {
-        type: "answer",
-        sdp: sdpAnswer,
-      },
-    );
-
-    return {
-      peerConnection:
-        peer,
-
-      close:
-        async () => {
-          stream
-            .getTracks()
-            .forEach(
-              (track) =>
-                track.stop(),
-            );
-
-          peer.close();
-
-          await deleteRtcSession(
-            sessionUrl,
-            authorization,
-          );
-        },
-    };
+      await deleteRtcSession(sessionUrl, authorization);
+    },
   };
+};
 
-export const startWhepPlayback =
-  async (
-    whepUrl: string,
-  ): Promise<LiveRtcHandle> => {
-    const {
-      RTCPeerConnection,
-    } =
-      await loadWebRtcModule();
+export const startWhepPlayback = async (
+  whepUrl: string,
+): Promise<LiveRtcHandle> => {
+  const { RTCPeerConnection } = await loadWebRtcModule();
 
-    const peer =
-      new RTCPeerConnection();
+  const peer = new RTCPeerConnection();
 
-    peer.addTransceiver(
-      "audio",
-      {
-        direction:
-          "recvonly",
-      },
-    );
+  peer.addTransceiver("audio", {
+    direction: "recvonly",
+  });
 
-    const offer =
-      await peer.createOffer();
+  const offer = await peer.createOffer();
 
-    await peer.setLocalDescription(
-      offer,
-    );
+  await peer.setLocalDescription(offer);
 
-    await waitForIceGatheringComplete(
-      peer,
-    );
+  await waitForIceGatheringComplete(peer);
 
-    const sdpOffer =
-      peer.localDescription
-        ?.sdp;
+  const sdpOffer = peer.localDescription?.sdp;
 
-    if (!sdpOffer) {
+  if (!sdpOffer) {
+    peer.close();
+
+    throw new Error("WHEP SDP Offer 생성에 실패했어요.");
+  }
+
+  const { sdpAnswer, sessionUrl, authorization } = await createRtcSession({
+    url: whepUrl,
+    sdpOffer,
+  });
+
+  await peer.setRemoteDescription({
+    type: "answer",
+    sdp: sdpAnswer,
+  });
+
+  return {
+    peerConnection: peer,
+
+    close: async () => {
       peer.close();
 
-      throw new Error(
-        "WHEP SDP Offer 생성에 실패했어요.",
-      );
-    }
-
-    const {
-      sdpAnswer,
-      sessionUrl,
-      authorization,
-    } =
-      await createRtcSession({
-        url: whepUrl,
-        sdpOffer,
-      });
-
-    await peer.setRemoteDescription(
-      {
-        type: "answer",
-        sdp: sdpAnswer,
-      },
-    );
-
-    return {
-      peerConnection:
-        peer,
-
-      close:
-        async () => {
-          peer.close();
-
-          await deleteRtcSession(
-            sessionUrl,
-            authorization,
-          );
-        },
-    };
+      await deleteRtcSession(sessionUrl, authorization);
+    },
   };
+};
