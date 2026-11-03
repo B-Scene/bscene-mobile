@@ -1,17 +1,19 @@
 import { router } from "expo-router";
-import { AlertCircle, Bell, Check, ChevronLeft, Smartphone } from "lucide-react-native";
+import { AlertCircle, ChevronLeft, Smartphone } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Alert,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 
 import {
   AGREEMENT_DETAILS,
@@ -74,7 +76,16 @@ const fallbackRegions = [
   { code: "DAEGU", name: "대구" },
   { code: "GWANGJU", name: "광주" },
   { code: "DAEJEON", name: "대전" },
-  { code: "ETC", name: "기타" },
+  { code: "ULSAN", name: "울산" },
+  { code: "SEJONG", name: "세종" },
+  { code: "CHUNGNAM", name: "충남" },
+  { code: "CHUNGBUK", name: "충북" },
+  { code: "JEONNAM", name: "전남" },
+  { code: "JEONBUK", name: "전북" },
+  { code: "GYEONGNAM", name: "경남" },
+  { code: "GYEONGBUK", name: "경북" },
+  { code: "GANGWON", name: "강원" },
+  { code: "JEJU", name: "제주" },
 ];
 
 const genreRows = [
@@ -125,6 +136,7 @@ const getInitialMode = (mode: ModeOption): ModeCode => {
 };
 
 export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
+  const { height: viewportHeight } = useWindowDimensions();
   const draft = useOnboardingDraftStore();
   const setMode = useModeStore((state) => state.setMode);
   const [acceptedAgreements, setAcceptedAgreements] = useState<
@@ -248,7 +260,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
           style={styles.allAgreementRow}
           onPress={toggleAllAgreements}
         >
-          <CheckCircle checked={allAgreementsAccepted} large />
+          <AgreementCheckIcon checked={allAgreementsAccepted} circle />
           <Text style={styles.allAgreementText}>모두 동의 (선택 정보 포함)</Text>
         </Pressable>
 
@@ -264,7 +276,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                   style={styles.agreementToggle}
                   onPress={() => toggleAgreement(agreement.key)}
                 >
-                  <CheckCircle checked={checked} />
+                  <AgreementCheckIcon checked={checked} />
                   <Text style={styles.agreementLabel}>
                     [{agreement.required ? "필수" : "선택"}] {agreement.label}
                   </Text>
@@ -425,6 +437,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                   key={genre.code}
                   label={genre.name}
                   selected={draft.genres.includes(genre.code)}
+                  compact
                   onPress={() => toggleGenre(genre.code)}
                 />
               ))}
@@ -519,11 +532,18 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
     };
 
     return (
-      <View style={styles.notificationRoot}>
+      <ScrollView
+        style={styles.notificationRoot}
+        contentContainerStyle={[
+          styles.notificationContainer,
+          viewportHeight < 760 && styles.notificationContainerCompact,
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.notificationContent}>
-          <GradientCircle>
-            <Bell size={42} color={colors.white} />
-          </GradientCircle>
+          <View style={styles.notificationIconCircle}>
+            <FilledNotificationBell />
+          </View>
           <Text style={styles.notificationTitle}>
             중요한 소식을{"\n"}놓치지 마세요
           </Text>
@@ -534,10 +554,14 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
           <View style={styles.nativeNoticeCard}>
             <View style={styles.nativeNoticeHeader}>
               <Smartphone size={20} color={colors.primary400} />
-              <Text style={styles.nativeNoticeTitle}>모바일 알림 안내</Text>
+              <Text style={styles.nativeNoticeTitle}>
+                {Platform.OS === "web" ? "iPhone 사용자 안내" : "모바일 알림 안내"}
+              </Text>
             </View>
             <Text style={styles.nativeNoticeText}>
-              기기 알림 권한을 허용하면 B:Scene 앱에서 공연, 라이브, 세션 소식을 받을 수 있어요.
+              {Platform.OS === "web"
+                ? "iPhone에서는 B:Scene을 홈 화면에 추가해야 알림을 받을 수 있어요.\nSafari 공유 버튼 → 홈 화면에 추가"
+                : "기기 알림 권한을 허용하면 B:Scene 앱에서 공연, 라이브, 세션 소식을 받을 수 있어요."}
             </Text>
           </View>
         </View>
@@ -562,14 +586,14 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
             알림 설정은 마이페이지에서 언제든 변경할 수 있어요.
           </Text>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   return (
     <View style={styles.completeRoot}>
       <View style={styles.completeBody}>
-        <BSceneSymbol width={78} height={86} />
+        <BSceneSymbol width={94} height={104} />
         <Text style={styles.completeTitle}>설정이 완료됐어요</Text>
         <Text style={styles.completeDescription}>
           지금 바로 B:Scene을{"\n"}시작해보세요
@@ -669,41 +693,94 @@ function PrimaryButton({
   );
 }
 
-function CheckCircle({ checked, large = false }: { checked: boolean; large?: boolean }) {
-  const size = large ? 24 : 20;
+function AgreementCheckIcon({
+  checked,
+  circle = false,
+}: {
+  checked: boolean;
+  circle?: boolean;
+}) {
+  const stroke = checked ? colors.primary400 : colors.neutral500;
+
+  if (circle) {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+        <Circle
+          cx={12}
+          cy={12}
+          r={9}
+          stroke={stroke}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M15 10L11 14L9 12"
+          stroke={stroke}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
 
   return (
-    <View
-      style={[
-        styles.checkCircle,
-        { width: size, height: size, borderRadius: size / 2 },
-        checked && styles.checkCircleActive,
-      ]}
-    >
-      {checked ? <Check size={large ? 15 : 13} color={colors.white} /> : null}
-    </View>
+    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M18 5L8 15L3 10"
+        stroke={stroke}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
   );
 }
 
 function Pill({
   label,
   selected,
+  compact = false,
   onPress,
 }: {
   label: string;
   selected: boolean;
+  compact?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      style={[styles.pill, selected ? styles.pillSelected : styles.pillIdle]}
+      style={[
+        styles.pill,
+        compact && styles.compactPill,
+        selected ? styles.pillSelected : styles.pillIdle,
+      ]}
       onPress={onPress}
     >
-      <Text style={[styles.pillText, selected ? styles.pillTextSelected : styles.pillTextIdle]}>
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.pillText,
+          compact && styles.compactPillText,
+          selected ? styles.pillTextSelected : styles.pillTextIdle,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
+  );
+}
+
+function FilledNotificationBell() {
+  return (
+    <Svg width={36} height={36} viewBox="0 0 24 24">
+      <Path
+        d="M13 21C13.5523 21 14 21.4477 14 22C14 22.5523 13.5523 23 13 23H11C10.4477 23 10 22.5523 10 22C10 21.4477 10.4477 21 11 21H13ZM12 1C13.1046 1 14 1.89543 14 3C14 3.09664 13.9898 3.1912 13.9766 3.28418C16.8799 4.13731 19 6.82054 19 10V18H20C20.5523 18 21 18.4477 21 19C21 19.5523 20.5523 20 20 20H4C3.44772 20 3 19.5523 3 19C3 18.4477 3.44772 18 4 18H5V10C5 6.82087 7.11957 4.1376 10.0225 3.28418C10.0092 3.19125 10 3.09659 10 3C10 1.89543 10.8954 1 12 1Z"
+        fill={colors.white}
+      />
+    </Svg>
   );
 }
 
@@ -734,23 +811,6 @@ function TermModal({
         </Pressable>
       </Pressable>
     </Modal>
-  );
-}
-
-function GradientCircle({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.gradientCircle}>
-      <Svg width={80} height={80} viewBox="0 0 80 80" style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id="notificationGradient" x1="0" y1="0" x2="80" y2="80">
-            <Stop stopColor="#FFE031" />
-            <Stop offset="1" stopColor="#F04579" />
-          </LinearGradient>
-        </Defs>
-        <Rect width={80} height={80} rx={40} fill="url(#notificationGradient)" />
-      </Svg>
-      {children}
-    </View>
   );
 }
 
@@ -806,6 +866,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   primaryButton: {
+    width: "100%",
     height: 52,
     borderRadius: 12,
     alignItems: "center",
@@ -882,16 +943,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 18,
   },
-  checkCircle: {
-    borderWidth: 1.5,
-    borderColor: colors.neutral400,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkCircleActive: {
-    borderColor: colors.primary400,
-    backgroundColor: colors.primary400,
-  },
   modeList: {
     gap: 10,
     marginTop: 40,
@@ -967,7 +1018,6 @@ const styles = StyleSheet.create({
   pillRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 8,
   },
   regionRows: {
@@ -986,6 +1036,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 4,
   },
+  compactPill: {
+    flexShrink: 1,
+    paddingHorizontal: 11,
+  },
   pillSelected: {
     backgroundColor: colors.primary400,
   },
@@ -997,6 +1051,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 20,
   },
+  compactPillText: {
+    fontSize: 13,
+  },
   pillTextSelected: {
     color: colors.white,
   },
@@ -1006,17 +1063,25 @@ const styles = StyleSheet.create({
   notificationRoot: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  notificationContainer: {
+    flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 136,
     paddingBottom: 84,
   },
+  notificationContainerCompact: {
+    paddingTop: 72,
+    paddingBottom: 32,
+  },
   notificationContent: {
     alignItems: "center",
   },
-  gradientCircle: {
+  notificationIconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    backgroundColor: colors.primary400,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: colors.primary400,
@@ -1024,7 +1089,6 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
-    overflow: "hidden",
   },
   notificationTitle: {
     color: colors.neutral900,
@@ -1070,8 +1134,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   notificationFooter: {
+    width: "100%",
     marginTop: "auto",
     alignItems: "center",
+    paddingTop: 32,
   },
   laterButton: {
     height: 40,
