@@ -166,6 +166,10 @@ const normalizeNotificationItem = (
       toNumberOrNull(value.referenceId) ??
       toStringOrNull(value.referenceId),
     deepLink: toStringOrNull(value.deepLink ?? value.deeplink ?? value.path),
+    actionable:
+      toBoolean(value.actionable) ||
+      toBoolean(isRecord(value.bandInvite) ? value.bandInvite.actionable : null),
+    bandInvite: isRecord(value.bandInvite) ? value.bandInvite : null,
   };
 };
 

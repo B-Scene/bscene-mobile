@@ -1,108 +1,59 @@
-import {
-    router,
-} from "expo-router";
+import { router } from "expo-router";
+import { useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import * as ImagePicker from "expo-image-picker";
-
+import { uploadMediaAsset } from "@/api/media/media";
 import {
-    Camera,
-    Image as ImageIcon,
-    Trash2,
-} from "lucide-react-native";
-
+  ChipGroup,
+  FieldLabel,
+  FormInput,
+  ProfileImagePicker,
+  SubmitButton,
+} from "@/features/my/MyFormParts";
+import { MyHeader } from "@/features/my/MyHeader";
+import { useProfileImageSelection } from "@/features/my/useProfileImageSelection";
+import { useGenres, useRegions } from "@/hooks/api/onboarding/useOnboarding";
 import {
-    Alert,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
-
-import {
-    useState,
-} from "react";
-
-import {
-    useGenres,
-    useRegions,
-} from "@/hooks/api/onboarding/useOnboarding";
-
-import {
-    useFanInformationQuery,
-    useUpdateFanInformation,
+  useFanInformationQuery,
+  useUpdateFanInformation,
 } from "@/hooks/api/user/useFanInformation";
-
-import {
-    uploadMediaAsset,
-} from "@/api/media/media";
-
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
-import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
-import { Avatar } from "@/shared/components/Avatar";
-import { Chip } from "@/shared/components/Chip";
 import { Screen } from "@/shared/components/Screen";
+import { colors, textStyles } from "@/shared/constants/theme";
+import type { CodeName } from "@/types/onboarding/onboarding";
 
-import {
-    colors,
-    spacing,
-} from "@/shared/constants/theme";
+const toOptions = (items: CodeName[]) =>
+  items.map((item) => ({ value: item.code, label: item.name }));
 
-import type {
-    CodeName,
-} from "@/types/onboarding/onboarding";
+const toggleWithMax = (selected: string[], code: string, max: number) => {
+  if (selected.includes(code)) {
+    return selected.filter((item) => item !== code);
+  }
 
-type SelectedImage = {
-  uri: string;
-  fileName?: string | null;
-  mimeType?: string | null;
+  return selected.length >= max ? selected : [...selected, code];
 };
 
 export function FanProfileEditScreen() {
-  const query =
-    useFanInformationQuery();
+  const query = useFanInformationQuery();
 
-  if (query.isLoading) {
+  if (query.isLoading || query.isError || !query.data) {
     return (
-      <Screen>
-        <AppHeader title="내 정보 수정" />
-
-        <AppState
-          loading
-          title="내 정보를 불러오는 중이에요"
-        />
+      <Screen contentStyle={styles.container}>
+        <MyHeader title="내 정보 수정" />
+        {query.isLoading ? (
+          <AppState loading title="내 정보를 불러오는 중이에요" />
+        ) : (
+          <AppState
+            title="내 정보를 불러오지 못했어요"
+            actionLabel="다시 시도"
+            onAction={() => void query.refetch()}
+          />
+        )}
       </Screen>
     );
   }
 
-  if (
-    query.isError ||
-    !query.data
-  ) {
-    return (
-      <Screen>
-        <AppHeader title="내 정보 수정" />
-
-        <AppState
-          title="내 정보를 불러오지 못했어요"
-          actionLabel="다시 시도"
-          onAction={() =>
-            void query.refetch()
-          }
-        />
-      </Screen>
-    );
-  }
-
-  return (
-    <FanProfileEditForm
-      initialData={
-        query.data
-      }
-    />
-  );
+  return <FanProfileEditForm initialData={query.data} />;
 }
 
 function FanProfileEditForm({
@@ -110,670 +61,173 @@ function FanProfileEditForm({
 }: {
   initialData: {
     nickname: string;
-    profileImageUrl:
-      | string
-      | null;
+    profileImageUrl: string | null;
     genres: string[];
     regions: string[];
   };
 }) {
-  const {
-    data: genres = [],
-  } = useGenres();
-
-  const {
-    data: regions = [],
-  } = useRegions();
-
-  const updateMutation =
-    useUpdateFanInformation();
-
-  const [
-    nickname,
-    setNickname,
-  ] = useState(
-    initialData.nickname,
-  );
-
-  const [
-    selectedGenres,
-    setSelectedGenres,
-  ] = useState<string[]>(
-    initialData.genres,
-  );
-
-  const [
-    selectedRegions,
-    setSelectedRegions,
-  ] = useState<string[]>(
-    initialData.regions,
-  );
-
-  const [
-    selectedImage,
-    setSelectedImage,
-  ] =
-    useState<SelectedImage | null>(
-      null,
-    );
-
-  const [
-    deleteProfileImage,
-    setDeleteProfileImage,
-  ] = useState(false);
-
-  const [
-    isUploading,
-    setIsUploading,
-  ] = useState(false);
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
+  const { data: genres = [] } = useGenres();
+  const { data: regions = [] } = useRegions();
+  const updateMutation = useUpdateFanInformation();
+  const image = useProfileImageSelection();
+  const [nickname, setNickname] = useState(initialData.nickname);
+  const [selectedGenres, setSelectedGenres] = useState(initialData.genres);
+  const [selectedRegions, setSelectedRegions] = useState(initialData.regions);
+  const [isUploading, setIsUploading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const isValid =
     Boolean(nickname.trim()) &&
     selectedGenres.length > 0 &&
     selectedRegions.length > 0;
-
+  const isSubmitting = isUploading || updateMutation.isPending;
   const displayedImage =
-    selectedImage?.uri ??
-    (
-      deleteProfileImage
-        ? null
-        : initialData.profileImageUrl
-    );
+    image.selectedImage?.uri ??
+    (image.isDeleted ? null : initialData.profileImageUrl);
 
-  const toggleValue = (
-    value: string,
-    selected: string[],
-    max: number,
-    setter: React.Dispatch<
-      React.SetStateAction<
-        string[]
-      >
-    >,
-  ) => {
-    if (
-      selected.includes(
-        value,
-      )
-    ) {
-      setter(
-        selected.filter(
-          (item) =>
-            item !== value,
-        ),
-      );
+  const save = async () => {
+    if (!isValid) return;
 
-      return;
-    }
+    setErrorMessage("");
 
-    if (
-      selected.length >= max
-    ) {
-      return;
-    }
+    let uploadedUrl: string | undefined;
 
-    setter([
-      ...selected,
-      value,
-    ]);
-  };
-
-  const pickFromGallery =
-    async () => {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (
-        !permission.granted
-      ) {
-        Alert.alert(
-          "사진 접근 권한",
-          "프로필 사진을 선택하려면 사진 접근 권한이 필요해요.",
-        );
-
-        return;
-      }
-
-      const result =
-        await ImagePicker.launchImageLibraryAsync(
-          {
-            mediaTypes: [
-              "images",
-            ],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.85,
-          },
-        );
-
-      if (
-        result.canceled ||
-        !result.assets[0]
-      ) {
-        return;
-      }
-
-      const asset =
-        result.assets[0];
-
-      setSelectedImage({
-        uri: asset.uri,
-        fileName:
-          asset.fileName,
-        mimeType:
-          asset.mimeType,
-      });
-
-      setDeleteProfileImage(
-        false,
-      );
-    };
-
-  const takePhoto =
-    async () => {
-      const permission =
-        await ImagePicker.requestCameraPermissionsAsync();
-
-      if (
-        !permission.granted
-      ) {
-        Alert.alert(
-          "카메라 권한",
-          "프로필 사진을 촬영하려면 카메라 권한이 필요해요.",
-        );
-
-        return;
-      }
-
-      const result =
-        await ImagePicker.launchCameraAsync(
-          {
-            mediaTypes: [
-              "images",
-            ],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.85,
-          },
-        );
-
-      if (
-        result.canceled ||
-        !result.assets[0]
-      ) {
-        return;
-      }
-
-      const asset =
-        result.assets[0];
-
-      setSelectedImage({
-        uri: asset.uri,
-        fileName:
-          asset.fileName,
-        mimeType:
-          asset.mimeType,
-      });
-
-      setDeleteProfileImage(
-        false,
-      );
-    };
-
-  const removeImage =
-    () => {
-      setSelectedImage(null);
-
-      setDeleteProfileImage(
-        true,
-      );
-    };
-
-  const save =
-    async () => {
-      if (
-        !nickname.trim()
-      ) {
-        Alert.alert(
-          "프로필",
-          "닉네임을 입력해 주세요.",
-        );
-
-        return;
-      }
-
-      if (
-        selectedGenres.length ===
-        0
-      ) {
-        Alert.alert(
-          "프로필",
-          "관심 장르를 하나 이상 선택해 주세요.",
-        );
-
-        return;
-      }
-
-      if (
-        selectedRegions.length ===
-        0
-      ) {
-        Alert.alert(
-          "프로필",
-          "활동 지역을 하나 이상 선택해 주세요.",
-        );
-
-        return;
-      }
-
+    if (image.selectedImage) {
       try {
-        setErrorMessage("");
-
-        let uploadedUrl:
-          | string
-          | undefined;
-
-        if (selectedImage) {
-          setIsUploading(true);
-
-          uploadedUrl =
-            await uploadMediaAsset(
-              {
-                category:
-                  "USER_PROFILE",
-
-                uri:
-                  selectedImage.uri,
-
-                fileName:
-                  selectedImage.fileName,
-
-                mimeType:
-                  selectedImage.mimeType,
-              },
-            );
-        }
-
-        await updateMutation.mutateAsync(
-          {
-            nickname:
-              nickname.trim(),
-
-            genres:
-              selectedGenres,
-
-            regions:
-              selectedRegions,
-
-            ...(deleteProfileImage
-              ? {
-                  deleteProfileImage:
-                    true,
-                }
-              : uploadedUrl
-                ? {
-                    profileImageUrl:
-                      uploadedUrl,
-                  }
-                : {}),
-          },
-        );
-
-        router.back();
+        setIsUploading(true);
+        uploadedUrl = await uploadMediaAsset({
+          category: "USER_PROFILE",
+          uri: image.selectedImage.uri,
+          fileName: image.selectedImage.fileName,
+          mimeType: image.selectedImage.mimeType,
+        });
       } catch {
-        setErrorMessage(
-          "저장에 실패했어요. 다시 시도해 주세요.",
-        );
-
-        Alert.alert(
-          "프로필 저장",
-          "프로필을 저장하지 못했어요.",
-        );
+        setErrorMessage("이미지 업로드에 실패했어요. 다시 시도해주세요");
+        return;
       } finally {
         setIsUploading(false);
       }
-    };
+    }
+
+    try {
+      await updateMutation.mutateAsync({
+        nickname: nickname.trim(),
+        genres: selectedGenres,
+        regions: selectedRegions,
+        ...(image.isDeleted
+          ? { deleteProfileImage: true }
+          : uploadedUrl
+            ? { profileImageUrl: uploadedUrl }
+            : {}),
+      });
+      router.back();
+    } catch {
+      setErrorMessage("저장에 실패했어요. 다시 시도해주세요");
+    }
+  };
 
   return (
-    <Screen
-      contentStyle={
-        styles.container
-      }
-    >
-      <AppHeader title="내 정보 수정" />
+    <Screen scroll={false} contentStyle={styles.container}>
+      <MyHeader title="내 정보 수정" />
 
-      <AppCard
-        style={
-          styles.imageCard
-        }
+      <ScrollView
+        contentContainerStyle={styles.form}
+        keyboardShouldPersistTaps="handled"
       >
-        <Avatar
-          imageUrl={
-            displayedImage
-          }
-          label={
-            nickname ||
-            "팬"
-          }
-          size={92}
+        <ProfileImagePicker
+          imageUrl={displayedImage}
+          variant="user"
+          tone="primary"
+          label="프로필 이미지 변경"
+          onSelectGallery={() => void image.pickFromGallery()}
+          onSelectCamera={() => void image.takePhoto()}
+          onDelete={image.removeImage}
         />
 
-        <View
-          style={
-            styles.imageActions
-          }
-        >
-          <ImageAction
-            label="앨범"
-            icon={
-              <ImageIcon
-                size={18}
-                color={
-                  colors.primary600
-                }
-              />
-            }
-            onPress={() =>
-              void pickFromGallery()
-            }
+        <View style={styles.field}>
+          <FieldLabel label="닉네임" />
+          <FormInput
+            tone="primary"
+            value={nickname}
+            maxLength={8}
+            placeholder="닉네임을 입력해주세요"
+            onChangeText={setNickname}
           />
+        </View>
 
-          <ImageAction
-            label="카메라"
-            icon={
-              <Camera
-                size={18}
-                color={
-                  colors.primary600
-                }
-              />
-            }
-            onPress={() =>
-              void takePhoto()
-            }
-          />
-
-          <ImageAction
-            label="삭제"
-            icon={
-              <Trash2
-                size={18}
-                color={
-                  colors.error
-                }
-              />
-            }
-            onPress={
-              removeImage
+        <View style={styles.chipField}>
+          <FieldLabel label="관심 장르 (최대 3개)" />
+          <ChipGroup
+            options={toOptions(genres)}
+            tone="primary"
+            isSelected={(code) => selectedGenres.includes(code)}
+            onPress={(code) =>
+              setSelectedGenres((prev) => toggleWithMax(prev, code, 3))
             }
           />
         </View>
-      </AppCard>
 
-      <AppTextInput
-        label="닉네임"
-        value={nickname}
-        maxLength={8}
-        placeholder="닉네임을 입력해 주세요"
-        onChangeText={
-          setNickname
-        }
-      />
+        <View style={styles.chipField}>
+          <FieldLabel label="활동 지역 (최대 2개)" />
+          <ChipGroup
+            options={toOptions(regions)}
+            tone="primary"
+            isSelected={(code) => selectedRegions.includes(code)}
+            onPress={(code) =>
+              setSelectedRegions((prev) => toggleWithMax(prev, code, 2))
+            }
+          />
+        </View>
+      </ScrollView>
 
-      <SelectionSection
-        title="관심 장르"
-        description="최대 3개"
-        options={genres}
-        selected={
-          selectedGenres
-        }
-        onToggle={(code) =>
-          toggleValue(
-            code,
-            selectedGenres,
-            3,
-            setSelectedGenres,
-          )
-        }
-      />
+      <View style={styles.footer}>
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
-      <SelectionSection
-        title="활동 지역"
-        description="최대 2개"
-        options={regions}
-        selected={
-          selectedRegions
-        }
-        onToggle={(code) =>
-          toggleValue(
-            code,
-            selectedRegions,
-            2,
-            setSelectedRegions,
-          )
-        }
-      />
-
-      <View style={styles.submitArea}>
-        {errorMessage ? (
-          <Text style={styles.errorMessage}>
-            {errorMessage}
-          </Text>
-        ) : null}
-
-        <AppButton
+        <SubmitButton
+          tone="primary"
           label={
             isUploading
-              ? "이미지 업로드 중..."
+              ? "업로드 중..."
               : updateMutation.isPending
                 ? "저장 중..."
                 : "프로필 저장"
           }
-          disabled={
-            !isValid
-          }
-          loading={
-            isUploading ||
-            updateMutation.isPending
-          }
-          style={[
-            styles.submitButton,
-            isValid
-              ? styles.submitButtonActive
-              : styles.submitButtonDisabled,
-          ]}
-          onPress={() =>
-            void save()
-          }
+          active={isValid && !isSubmitting}
+          disabled={!isValid || isSubmitting}
+          onPress={() => void save()}
         />
       </View>
     </Screen>
   );
 }
 
-function ImageAction({
-  label,
-  icon,
-  onPress,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      style={
-        styles.imageAction
-      }
-      onPress={onPress}
-    >
-      {icon}
-
-      <Text
-        style={
-          styles.imageActionText
-        }
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function SelectionSection({
-  title,
-  description,
-  options,
-  selected,
-  onToggle,
-}: {
-  title: string;
-  description: string;
-  options: CodeName[];
-  selected: string[];
-  onToggle: (
-    value: string,
-  ) => void;
-}) {
-  return (
-    <AppCard
-      style={styles.section}
-    >
-      <View>
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
-          {title}
-        </Text>
-
-        <Text
-          style={styles.helper}
-        >
-          {description}
-        </Text>
-      </View>
-
-      <View
-        style={styles.chips}
-      >
-        {options.map(
-          (option) => (
-            <Chip
-              key={
-                option.code
-              }
-              label={
-                option.name
-              }
-              selected={selected.includes(
-                option.code,
-              )}
-              onPress={() =>
-                onToggle(
-                  option.code,
-                )
-              }
-            />
-          ),
-        )}
-      </View>
-    </AppCard>
-  );
-}
-
-const styles =
-  StyleSheet.create({
-    container: {
-      gap: spacing.lg,
-      paddingBottom:
-        spacing.xxl,
-    },
-
-    imageCard: {
-      alignItems: "center",
-      gap: spacing.lg,
-    },
-
-    imageActions: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent:
-        "center",
-      gap: spacing.sm,
-    },
-
-    imageAction: {
-      minHeight: 40,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-      paddingHorizontal:
-        spacing.md,
-    },
-
-    imageActionText: {
-      color:
-        colors.neutral700,
-      fontSize: 13,
-      fontWeight: "800",
-    },
-
-    section: {
-      gap: spacing.md,
-    },
-
-    sectionTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 16,
-      fontWeight: "900",
-    },
-
-    helper: {
-      marginTop:
-        spacing.xs,
-      color:
-        colors.neutral500,
-      fontSize: 12,
-    },
-
-    chips: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.sm,
-    },
-
-    submitArea: {
-      marginTop: "auto",
-      gap: spacing.sm,
-    },
-
-    errorMessage: {
-      color:
-        colors.error,
-      fontSize: 12,
-      lineHeight: 18,
-      textAlign: "center",
-    },
-
-    submitButton: {
-      minHeight: 52,
-    },
-
-    submitButtonActive: {
-      backgroundColor:
-        colors.primary500,
-    },
-
-    submitButtonDisabled: {
-      backgroundColor:
-        colors.neutral300,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: colors.white,
+  },
+  form: {
+    gap: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
+  },
+  field: {
+    gap: 8,
+  },
+  chipField: {
+    gap: 12,
+  },
+  footer: {
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+  },
+  error: {
+    ...textStyles.body5,
+    color: colors.error,
+    textAlign: "center",
+  },
+});

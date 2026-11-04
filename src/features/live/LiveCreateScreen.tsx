@@ -29,12 +29,14 @@ import {
 } from "@/hooks/api/live/useLive";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { AppHeader } from "@/shared/components/AppHeader";
+import { AppIcon } from "@/shared/components/AppIcon";
 import { AppState } from "@/shared/components/AppState";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
 import {
   colors,
   radius,
-  spacing,
+  textStyles,
 } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type {
@@ -495,19 +497,26 @@ export function LiveCreateScreen() {
     reservationQuery.data,
   ]);
 
+  const [
+    isCancelConfirmOpen,
+    setIsCancelConfirmOpen,
+  ] = useState(false);
+
+  const closeButton = (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="닫기"
+      hitSlop={12}
+      onPress={() => router.back()}
+    >
+      <AppIcon name="closeHeader" size={28} />
+    </Pressable>
+  );
+
   const titleText =
     isEdit
       ? "라이브 예약 수정"
       : "라이브 시작";
-  const heroTitle =
-    isEdit
-      ? "예약된 라이브를\n수정할까요?"
-      : "라이브 방송을\n시작해볼까요?";
-  const heroDescription =
-    isEdit
-      ? "예약 시간과 라이브 정보를 다시 확인해 주세요"
-      : "밴드의 순간을 팬들과 실시간으로 나눠보세요";
-
   const scheduleError =
     useMemo(() => {
       if (
@@ -680,49 +689,33 @@ export function LiveCreateScreen() {
     };
 
   const cancelReservation =
-    () => {
+    async () => {
       if (!isEdit) {
         return;
       }
 
-      Alert.alert(
-        "라이브 예약 취소",
-        "예약된 라이브를 취소할까요?",
-        [
-          {
-            text: "아니요",
-            style: "cancel",
-          },
-          {
-            text: "취소하기",
-            style: "destructive",
-            onPress: () => {
-              void (async () => {
-                try {
-                  await cancelReservationMutation.mutateAsync(
-                    reservationLiveId,
-                  );
+      setIsCancelConfirmOpen(false);
 
-                  Alert.alert(
-                    "라이브 예약",
-                    "예약을 취소했어요.",
-                  );
-                  router.replace(
-                    "/band/live" as Parameters<
-                      typeof router.replace
-                    >[0],
-                  );
-                } catch {
-                  Alert.alert(
-                    "라이브 예약",
-                    "예약을 취소하지 못했어요.",
-                  );
-                }
-              })();
-            },
-          },
-        ],
-      );
+      try {
+        await cancelReservationMutation.mutateAsync(
+          reservationLiveId,
+        );
+
+        Alert.alert(
+          "라이브 예약",
+          "예약을 취소했어요.",
+        );
+        router.replace(
+          "/band/live" as Parameters<
+            typeof router.replace
+          >[0],
+        );
+      } catch {
+        Alert.alert(
+          "라이브 예약",
+          "예약을 취소하지 못했어요.",
+        );
+      }
     };
 
   if (
@@ -772,222 +765,246 @@ export function LiveCreateScreen() {
 
   return (
     <Screen
+      edges={["top"]}
       contentStyle={
         styles.container
       }
     >
-      <AppHeader title={titleText} />
+      <AppHeader
+        title={titleText}
+        rightContent={closeButton}
+        style={styles.header}
+      />
 
-      <View style={styles.hero}>
-        <Text style={styles.heroTitle}>
-          {heroTitle}
-        </Text>
-        <Text style={styles.heroDescription}>
-          {heroDescription}
-        </Text>
-      </View>
+      <View style={styles.content}>
+        {!isEdit ? (
+          <View style={styles.formCard}>
+            <Text style={styles.cardTitle}>
+              라이브 시간 설정
+            </Text>
 
-      <View style={styles.formCard}>
-        <Text style={styles.cardTitle}>
-          라이브 시간 설정
-        </Text>
-
-        <View style={styles.choiceList}>
-          {!isEdit ? (
-            <ScheduleChoice
-              selected={
-                mode === "instant"
-              }
-              title="지금 바로 시작"
-              description="입력 완료 후 바로 라이브 룸으로 이동해요"
-              onPress={() =>
-                setMode("instant")
-              }
-            />
-          ) : null}
-
-          <ScheduleChoice
-            selected={
-              mode === "reserve"
-            }
-            title="라이브 예약"
-            description="정해둔 시간에 팬들에게 예정 라이브로 보여줘요"
-            onPress={() =>
-              setMode("reserve")
-            }
-          />
-        </View>
-
-        {mode === "reserve" ? (
-          <View style={styles.scheduleFields}>
-            <View style={styles.scheduleInputGroup}>
-              <Text style={styles.smallLabel}>
-                날짜
-              </Text>
-              <TextInput
-                value={reservedDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={
-                  colors.neutral500
+            <View style={styles.choiceList}>
+              <ScheduleChoice
+                selected={
+                  mode === "instant"
                 }
-                style={styles.scheduleInput}
+                title="지금 바로 시작"
+                description="즉시 라이브를 시작합니다"
+                onPress={() =>
+                  setMode("instant")
+                }
+              />
+
+              <ScheduleChoice
+                selected={
+                  mode === "reserve"
+                }
+                title="예약 설정"
+                description={"원하는 시간에\n라이브를 시작합니다"}
+                onPress={() =>
+                  setMode("reserve")
+                }
+              />
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.formCard}>
+          <Text style={styles.cardTitle}>
+            라이브 정보
+          </Text>
+
+          <View style={styles.fields}>
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>
+                라이브 제목
+                <Text style={styles.required}>
+                  {" "}*
+                </Text>
+              </Text>
+
+              <TextInput
+                value={title}
+                maxLength={50}
+                placeholder="라이브 제목을 입력해주세요"
+                placeholderTextColor={
+                  colors.neutral400
+                }
+                style={styles.input}
                 onChangeText={
-                  setReservedDate
+                  setTitle
                 }
               />
             </View>
 
-            <View style={styles.scheduleInputGroup}>
-              <Text style={styles.smallLabel}>
-                시간
+            <View style={styles.fieldRow}>
+              <Text style={styles.fieldLabel}>
+                라이브 소개
               </Text>
+
               <TextInput
-                value={reservedTime}
-                placeholder="HH:mm"
-                placeholderTextColor={
-                  colors.neutral500
+                value={
+                  description
                 }
-                style={styles.scheduleInput}
+                multiline
+                maxLength={100}
+                textAlignVertical="top"
+                placeholder="라이브에 대해 소개해주세요 (선택)"
+                placeholderTextColor={
+                  colors.neutral400
+                }
+                style={
+                  styles.textArea
+                }
                 onChangeText={
-                  setReservedTime
+                  setDescription
                 }
               />
+            </View>
+          </View>
+        </View>
+
+        {mode === "reserve" ? (
+          <View style={styles.formCard}>
+            <Text style={styles.cardTitle}>
+              예약 일시 설정
+            </Text>
+
+            <View style={styles.scheduleBox}>
+              <View style={styles.scheduleRow}>
+                <AppIcon name="calendarDark" />
+                <Text style={styles.scheduleLabel}>
+                  날짜 선택
+                </Text>
+                <TextInput
+                  value={reservedDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={
+                    colors.neutral400
+                  }
+                  style={styles.scheduleInput}
+                  onChangeText={
+                    setReservedDate
+                  }
+                />
+              </View>
+
+              <View style={styles.scheduleDivider} />
+
+              <View style={styles.scheduleRow}>
+                <AppIcon name="clockDark" />
+                <Text style={styles.scheduleLabel}>
+                  시작 시간
+                </Text>
+                <TextInput
+                  value={reservedTime}
+                  placeholder="HH:mm"
+                  placeholderTextColor={
+                    colors.neutral400
+                  }
+                  style={styles.scheduleInput}
+                  onChangeText={
+                    setReservedTime
+                  }
+                />
+              </View>
             </View>
 
             {scheduleError ? (
               <Text style={styles.errorText}>
                 {scheduleError}
               </Text>
-            ) : (
-              <Text style={styles.helperText}>
-                예약 시간은 현재보다 이후여야 해요.
-              </Text>
-            )}
+            ) : null}
           </View>
         ) : null}
-      </View>
 
-      <View style={styles.formCard}>
-        <Text style={styles.cardTitle}>
-          라이브 정보
-        </Text>
+        <LiveCoHostSelector
+          candidates={
+            coHostCandidates
+          }
+          selectedIds={
+            selectedCoHostIds
+          }
+          isLoading={
+            !isEdit &&
+            (activeBandQuery.isLoading ||
+              bandMembersQuery.isLoading)
+          }
+          errorMessage={
+            coHostErrorMessage
+          }
+          onToggle={toggleCoHost}
+        />
 
-        <View style={styles.fields}>
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>
-              라이브 제목
-              <Text style={styles.required}>
-                {" "}*
-              </Text>
-            </Text>
-
-            <TextInput
-              value={title}
-              maxLength={50}
-              placeholder="라이브 제목을 입력해주세요"
-              placeholderTextColor={
-                colors.neutral500
-              }
-              style={styles.input}
-              onChangeText={
-                setTitle
-              }
-            />
-          </View>
-
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>
-              라이브 소개
-            </Text>
-
-            <TextInput
-              value={
-                description
-              }
-              multiline
-              maxLength={100}
-              textAlignVertical="top"
-              placeholder="라이브에 대해 소개해주세요 (선택)"
-              placeholderTextColor={
-                colors.neutral500
-              }
+        <View
+          style={[
+            styles.footer,
+            isEdit && styles.footerRow,
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            disabled={!canSubmit}
+            style={[
+              styles.submitButton,
+              isEdit && styles.footerRowButton,
+              !canSubmit && styles.buttonDisabled,
+            ]}
+            onPress={() =>
+              void submit()
+            }
+          >
+            <Text
               style={
-                styles.textArea
+                mode === "reserve"
+                  ? styles.submitReserveText
+                  : styles.submitButtonText
               }
-              onChangeText={
-                setDescription
+            >
+              {isPending
+                ? "저장 중"
+                : mode === "reserve"
+                  ? "저장"
+                  : "라이브 시작하기"}
+            </Text>
+          </Pressable>
+
+          {isEdit ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={isPending}
+              style={[
+                styles.cancelButton,
+                isPending && styles.buttonDisabled,
+              ]}
+              onPress={() =>
+                setIsCancelConfirmOpen(
+                  true,
+                )
               }
-            />
-          </View>
+            >
+              <Text style={styles.cancelButtonText}>
+                예약 취소
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
-      <LiveCoHostSelector
-        candidates={
-          coHostCandidates
+      <ConfirmModal
+        open={isCancelConfirmOpen}
+        tone="orange"
+        title="예약을 취소할까요?"
+        description={"취소된 라이브 예약은\n복구할 수 없어요"}
+        onCancel={() =>
+          setIsCancelConfirmOpen(
+            false,
+          )
         }
-        selectedIds={
-          selectedCoHostIds
+        onConfirm={() =>
+          void cancelReservation()
         }
-        isLoading={
-          !isEdit &&
-          (activeBandQuery.isLoading ||
-            bandMembersQuery.isLoading)
-        }
-        errorMessage={
-          coHostErrorMessage
-        }
-        onToggle={toggleCoHost}
       />
-
-      <View style={styles.footer}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={!canSubmit}
-          style={({ pressed }) => [
-            styles.submitButton,
-            !canSubmit
-              ? styles.submitButtonDisabled
-              : null,
-            pressed && canSubmit
-              ? styles.submitButtonPressed
-              : null,
-          ]}
-          onPress={() =>
-            void submit()
-          }
-        >
-          <Text style={styles.submitButtonText}>
-            {isPending
-              ? "저장 중..."
-              : isEdit
-                ? "예약 수정"
-                : mode === "reserve"
-                  ? "라이브 예약"
-                  : "라이브 시작"}
-          </Text>
-        </Pressable>
-
-        {isEdit ? (
-          <Pressable
-            accessibilityRole="button"
-            disabled={isPending}
-            style={({ pressed }) => [
-              styles.cancelButton,
-              pressed && !isPending
-                ? styles.submitButtonPressed
-                : null,
-            ]}
-            onPress={
-              cancelReservation
-            }
-          >
-            <Text style={styles.cancelButtonText}>
-              예약 취소
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
     </Screen>
   );
 }
@@ -1024,16 +1041,13 @@ function ScheduleChoice({
             ? styles.radioSelected
             : null,
         ]}
-      />
+      >
+        {selected ? (
+          <View style={styles.radioDot} />
+        ) : null}
+      </View>
       <View style={styles.choiceTextWrap}>
-        <Text
-          style={[
-            styles.choiceTitle,
-            selected
-              ? styles.choiceTitleSelected
-              : null,
-          ]}
-        >
+        <Text style={styles.choiceTitle}>
           {title}
         </Text>
         <Text style={styles.choiceDescription}>
@@ -1048,74 +1062,52 @@ const styles =
   StyleSheet.create({
     container: {
       flexGrow: 1,
-      gap: spacing.lg,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
       backgroundColor:
-        colors.neutral100,
+        colors.secondary0,
     },
 
-    hero: {
-      gap: spacing.sm,
-      paddingTop:
-        spacing.sm,
-      paddingBottom:
-        spacing.sm,
+    header: {
+      paddingHorizontal: 20,
     },
 
-    heroTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 28,
-      lineHeight: 38,
-      fontWeight: "800",
-      letterSpacing: 0,
-    },
-
-    heroDescription: {
-      color:
-        colors.neutral600,
-      fontSize: 15,
-      lineHeight: 20,
-      fontWeight: "500",
-      letterSpacing: 0,
+    content: {
+      flexGrow: 1,
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 24,
     },
 
     formCard: {
-      gap: spacing.lg,
+      gap: 16,
       borderRadius: 14,
       backgroundColor:
         colors.white,
       paddingHorizontal: 18,
-      paddingVertical:
-        spacing.md,
-      shadowColor:
-        colors.neutral900,
-      shadowOpacity: 0.08,
-      shadowRadius: 15,
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      elevation: 3,
+      paddingVertical: 12,
+      boxShadow:
+        "0px 4px 15px 0px rgba(20, 20, 20, 0.08)",
     },
 
     cardTitle: {
+      ...textStyles.body1,
       color:
         colors.neutral900,
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: "700",
-      letterSpacing: 0,
     },
 
     choiceList: {
-      gap: spacing.sm,
+      flexDirection: "row",
+      gap: 20,
     },
 
     choiceCard: {
-      minHeight: 66,
+      flex: 1,
+      height: 66,
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: spacing.md,
+      gap: 12,
       borderWidth: 1,
       borderColor:
         colors.neutral300,
@@ -1123,10 +1115,12 @@ const styles =
         radius.sm,
       backgroundColor:
         colors.white,
-      paddingHorizontal:
-        spacing.md,
-      paddingVertical:
-        spacing.md,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+
+    submitButtonPressed: {
+      opacity: 0.84,
     },
 
     choiceCardSelected: {
@@ -1139,10 +1133,12 @@ const styles =
     radio: {
       width: 12,
       height: 12,
+      alignItems: "center",
+      justifyContent: "center",
       marginTop: 2,
       borderWidth: 1,
       borderColor:
-        colors.neutral400,
+        colors.neutral300,
       borderRadius:
         radius.pill,
       backgroundColor:
@@ -1153,6 +1149,14 @@ const styles =
       borderColor:
         colors.secondary500,
       backgroundColor:
+        colors.secondary0,
+    },
+
+    radioDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor:
         colors.secondary500,
     },
 
@@ -1162,105 +1166,80 @@ const styles =
     },
 
     choiceTitle: {
-      color:
-        colors.neutral700,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "700",
-      letterSpacing: 0,
-    },
-
-    choiceTitleSelected: {
+      ...textStyles.caption3,
       color:
         colors.neutral900,
     },
 
     choiceDescription: {
-      marginTop: 2,
+      ...textStyles.caption4,
       color:
         colors.neutral500,
-      fontSize: 12,
-      lineHeight: 16,
-      fontWeight: "500",
-      letterSpacing: 0,
+      lineHeight: 12,
+      marginTop: 2,
     },
 
-    scheduleFields: {
-      gap: spacing.sm,
-    },
-
-    scheduleInputGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.md,
-    },
-
-    smallLabel: {
-      width: 44,
-      color:
-        colors.neutral900,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "700",
-      letterSpacing: 0,
-    },
-
-    scheduleInput: {
-      height: 38,
-      flex: 1,
+    scheduleBox: {
       borderWidth: 1,
       borderColor:
         colors.neutral300,
-      borderRadius: 6,
-      backgroundColor:
-        colors.white,
-      paddingHorizontal:
-        spacing.md,
-      color:
-        colors.neutral900,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "500",
-      letterSpacing: 0,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
     },
 
-    helperText: {
+    scheduleRow: {
+      height: 36,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+    },
+
+    scheduleLabel: {
+      ...textStyles.caption2,
       color:
         colors.neutral500,
-      fontSize: 12,
-      lineHeight: 18,
-      fontWeight: "500",
-      letterSpacing: 0,
+    },
+
+    scheduleInput: {
+      ...textStyles.body2,
+      flex: 1,
+      minWidth: 0,
+      color:
+        colors.neutral900,
+      paddingVertical: 0,
+      textAlign: "right",
+    },
+
+    scheduleDivider: {
+      height: 1,
+      backgroundColor:
+        colors.neutral300,
+      marginVertical: 8,
     },
 
     errorText: {
+      ...textStyles.caption2,
       color:
         colors.error,
-      fontSize: 12,
-      lineHeight: 18,
-      fontWeight: "600",
-      letterSpacing: 0,
+      textAlign: "center",
     },
 
     fields: {
-      gap: spacing.lg,
+      gap: 16,
     },
 
     fieldRow: {
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: spacing.sm,
     },
 
     fieldLabel: {
+      ...textStyles.caption3,
       width: 76,
-      paddingTop: 5,
+      paddingTop: 4,
       color:
         colors.neutral900,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "700",
-      letterSpacing: 0,
     },
 
     required: {
@@ -1269,7 +1248,8 @@ const styles =
     },
 
     input: {
-      height: 32,
+      ...textStyles.caption2,
+      height: 28,
       flex: 1,
       minWidth: 0,
       borderWidth: 1,
@@ -1278,18 +1258,15 @@ const styles =
       borderRadius: 4,
       backgroundColor:
         colors.white,
-      paddingHorizontal:
-        spacing.lg,
       color:
         colors.neutral900,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "500",
-      letterSpacing: 0,
+      paddingHorizontal: 16,
+      paddingVertical: 0,
     },
 
     textArea: {
-      minHeight: 64,
+      ...textStyles.caption2,
+      height: 56,
       flex: 1,
       minWidth: 0,
       borderWidth: 1,
@@ -1298,72 +1275,67 @@ const styles =
       borderRadius: 4,
       backgroundColor:
         colors.white,
-      paddingHorizontal:
-        spacing.lg,
-      paddingVertical:
-        spacing.sm,
       color:
         colors.neutral900,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "500",
-      letterSpacing: 0,
+      paddingHorizontal: 16,
+      paddingVertical: 4,
     },
 
     footer: {
-      marginTop: "auto",
-      gap: spacing.sm,
-      paddingTop:
-        spacing.md,
+      marginTop: 16,
+    },
+
+    footerRow: {
+      flexDirection: "row",
+      gap: 20,
+    },
+
+    footerRowButton: {
+      flex: 1,
+      height: 48,
     },
 
     submitButton: {
       height: 52,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius:
-        radius.md,
+      borderRadius: 10,
       backgroundColor:
         colors.secondary500,
     },
 
-    submitButtonDisabled: {
-      backgroundColor:
-        colors.neutral400,
-    },
-
-    submitButtonPressed: {
-      opacity: 0.84,
+    buttonDisabled: {
+      opacity: 0.6,
     },
 
     submitButtonText: {
+      ...textStyles.label1,
       color:
         colors.white,
-      fontSize: 16,
-      lineHeight: 22,
-      fontWeight: "800",
-      letterSpacing: 0,
+    },
+
+    submitReserveText: {
+      ...textStyles.label2,
+      color:
+        colors.white,
     },
 
     cancelButton: {
+      flex: 1,
       height: 48,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius:
-        radius.md,
+      borderRadius: 10,
       borderWidth: 1,
       borderColor:
-        colors.error,
+        colors.secondary500,
       backgroundColor:
         colors.white,
     },
 
     cancelButtonText: {
+      ...textStyles.label2,
       color:
-        colors.error,
-      fontSize: 15,
-      lineHeight: 20,
-      fontWeight: "800",
-      letterSpacing: 0,
+        colors.secondary500,
     },
   });

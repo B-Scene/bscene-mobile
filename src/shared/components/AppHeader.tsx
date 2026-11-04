@@ -1,5 +1,4 @@
 import { router } from "expo-router";
-import { ChevronLeft } from "lucide-react-native";
 import {
   Pressable,
   StyleSheet,
@@ -8,7 +7,8 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { colors } from "@/shared/constants/theme";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { colors, textStyles } from "@/shared/constants/theme";
 
 type AppHeaderProps = {
   title: string;
@@ -43,7 +43,7 @@ export function AppHeader({
             }}
             style={styles.iconButton}
           >
-            <ChevronLeft size={24} color={colors.neutral900} />
+            <AppIcon name="arrowLeft" size={24} />
           </Pressable>
         ) : null}
       </View>
@@ -59,7 +59,7 @@ export function AppHeader({
 
 const styles = StyleSheet.create({
   container: {
-    minHeight: 48,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -74,16 +74,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
     flex: 1,
+    ...textStyles.label2,
     color: colors.neutral900,
-    fontSize: 16,
-    fontWeight: "800",
     textAlign: "center",
   },
 });

@@ -237,6 +237,59 @@ export const inviteBandMember =
     );
   };
 
+export const acceptBandInvite =
+  async (
+    bandId: number,
+    body: {
+      nickname: string;
+      part: BandMemberPart;
+    },
+  ) => {
+    const response =
+      await axiosInstance.patch<
+        BandManagementApiResponse<unknown>
+      >(
+        `/bands/${bandId}/members/accept`,
+        body,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
+export const rejectBandInvite =
+  async (
+    bandId: number,
+  ) => {
+    const response =
+      await axiosInstance.delete<
+        BandManagementApiResponse<null>
+      >(
+        `/bands/${bandId}/members/reject`,
+      );
+
+    return assertNullableSuccess(
+      response,
+    );
+  };
+
+export const activateBandMemberProfile =
+  async (
+    profileId: number,
+  ) => {
+    const response =
+      await axiosInstance.patch<
+        BandManagementApiResponse<BandMemberProfile>
+      >(
+        `/band-member-profiles/${profileId}/activate`,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
 export const removeBandMember =
   async (
     bandId: number,

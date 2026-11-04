@@ -13,7 +13,25 @@ export type ConcertListItem = {
   status: string;
   isInterested: boolean;
   interestCount: number;
+  month: string;
+  day: string;
+  thumbnailUrl?: string;
 };
+
+const MONTH_LABELS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
 
 export const firstString = (
   ...values: (string | string[] | null | undefined)[]
@@ -132,6 +150,17 @@ export const mapPerformanceToConcert = (
     status: concert.status ?? formatDday(concert, date),
     isInterested: concert.isInterested ?? concert.interested ?? false,
     interestCount: concert.interestCount ?? 0,
+    month: date ? MONTH_LABELS[date.getMonth()] : "TBD",
+    day: date ? String(date.getDate()).padStart(2, "0") : "--",
+    thumbnailUrl: firstString(
+      concert.posterImageUrl,
+      concert.posterUrl,
+      concert.performanceImageUrl,
+      concert.imageUrl,
+      concert.mainImageUrl,
+      concert.thumbnailUrl,
+      concert.imageUrls,
+    ),
   };
 };
 

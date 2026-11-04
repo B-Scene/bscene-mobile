@@ -69,6 +69,8 @@ export interface LiveReplayItem {
   viewCount: number;
 
   durationSeconds?: number;
+
+  durationSec?: number;
 }
 
 export interface LiveHomeResponse {
@@ -385,6 +387,19 @@ export interface LiveChatTicketResponse {
   subprotocol: string;
 
   expiresInSeconds: number;
+}
+
+export interface LiveMemberItem {
+  bandProfileImageUrl: string | null;
+  nickname: string;
+  bandName: string;
+  part: string[];
+  isLeader: boolean;
+  profileImageUrl?: string | null;
+}
+
+export interface LiveMembersResponse {
+  members: LiveMemberItem[];
 }
 
 export interface LiveChatMessage {

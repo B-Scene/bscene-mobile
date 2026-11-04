@@ -1,48 +1,34 @@
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, type Href } from "expo-router";
+import { Fragment, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { BandBanner } from "@/features/my/BandBanner";
+import { MyHeader } from "@/features/my/MyHeader";
+import { EmptyState } from "@/features/my/MyProfileParts";
+import { useBandMyPageQuery } from "@/hooks/api/user/useBandMyPage";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
-import { AppHeader } from "@/shared/components/AppHeader";
+import { AppIcon } from "@/shared/components/AppIcon";
 import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
-import { colors } from "@/shared/constants/theme";
+import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { formatDDayLabel, getDDay } from "@/shared/utils/dDay";
 import type {
-  ApplicantStatus,
   ReceivedApplicant,
   ReceivedRecruitmentPost,
   RecruitmentStatusFilter,
 } from "@/types/user/receivedApplications";
 
 const TABS: { code: RecruitmentStatusFilter; label: string }[] = [
-  { code: "OPEN", label: "진행중" },
-  { code: "CLOSE", label: "마감" },
+  { code: "OPEN", label: "진행중인 공고" },
+  { code: "CLOSE", label: "마감된 공고" },
 ];
-
-const STATUS_LABEL: Record<ApplicantStatus, string> = {
-  PENDING: "검토 대기",
-  BAND_ACCEPTED: "확정 대기",
-  ACCEPTED: "참여 확정",
-  REJECTED: "거절",
-};
-
-const formatDate = (value: string) => {
-  const dateValue = value.split(" ")[0] ?? value;
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${month}.${day} 마감`;
-};
 
 export function BandApplicationsScreen() {
   const [status, setStatus] = useState<RecruitmentStatusFilter>("OPEN");
+  const { data: bandMyPage } = useBandMyPageQuery();
+  const { activeBand } = useActiveBandId();
   const query = useReceivedApplicationsQuery(status);
   const posts = useMemo(
     () => query.data?.pages.flatMap((page) => page.items) ?? [],
@@ -55,141 +41,140 @@ export function BandApplicationsScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>
-      <AppHeader title="받은 지원 관리" />
+      <MyHeader title="받은 지원 관리" />
 
-      <View style={styles.tabs}>
-        {TABS.map((tab) => {
-          const selected = status === tab.code;
-
-          return (
-            <Pressable
-              key={tab.code}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              style={[
-                styles.tab,
-                selected ? styles.tabSelected : styles.tabIdle,
-              ]}
-              onPress={() => setStatus(tab.code)}
-            >
-              <Text
-                style={[
-                  styles.tabText,
-                  selected ? styles.tabTextSelected : styles.tabTextIdle,
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>지원 현황 요약</Text>
-        <Text style={styles.summaryValue}>
-          공고 {posts.length.toLocaleString()} · 지원자{" "}
-          {applicantCount.toLocaleString()}
-        </Text>
-      </View>
-
-      {query.isLoading ? (
-        <AppState loading title="받은 지원을 불러오는 중이에요" />
-      ) : query.isError ? (
-        <AppState
-          title="받은 지원을 불러오지 못했어요"
-          description="잠시 후 다시 시도해 주세요."
-          actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
-        />
-      ) : posts.length === 0 ? (
-        <AppState
-          title={
-            status === "OPEN"
-              ? "진행중인 공고가 없어요"
-              : "마감된 공고가 없어요"
-          }
-          description={
-            status === "OPEN"
-              ? "진행중인 모집 공고 지원자가 여기에 표시돼요."
-              : "마감된 모집 공고 지원자가 여기에 표시돼요."
-          }
-        />
-      ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => String(item.recruitmentPostId)}
-          contentContainerStyle={styles.listContent}
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
-              void query.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.4}
-          renderItem={({ item }) => (
-            <RecruitmentApplicationCard
-              post={item}
-              isOpen={status === "OPEN"}
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => String(item.recruitmentPostId)}
+        contentContainerStyle={styles.content}
+        ListHeaderComponentStyle={styles.listHeader}
+        ListHeaderComponent={
+          <>
+            <BandBanner
+              bandName={bandMyPage?.bandName ?? ""}
+              description="현재 선택된 밴드의 모집 공고 지원자"
+              profileImageUrl={activeBand?.profileImageUrl}
             />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListFooterComponent={
-            query.isFetchingNextPage ? (
-              <Text style={styles.footerText}>
-                다음 지원자를 불러오는 중이에요
+
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryLeft}>
+                <View style={styles.summaryIcon}>
+                  <AppIcon name="applyMember" width={19} height={12} />
+                </View>
+                <Text style={styles.summaryLabel}>지원 현황 요약</Text>
+              </View>
+
+              <Text style={styles.summaryValue}>
+                공고 <Text style={styles.summaryCount}>{posts.length}</Text> ·
+                지원자 <Text style={styles.summaryCount}>{applicantCount}</Text>
               </Text>
-            ) : undefined
+            </View>
+
+            <View style={styles.tabs}>
+              {TABS.map((tab) => {
+                const selected = status === tab.code;
+
+                return (
+                  <Pressable
+                    key={tab.code}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected }}
+                    style={[styles.tab, selected && styles.tabSelected]}
+                    onPress={() => setStatus(tab.code)}
+                  >
+                    <Text
+                      style={selected ? styles.tabTextOn : styles.tabTextOff}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        }
+        ItemSeparatorComponent={Separator}
+        renderItem={({ item }) => <RecruitmentCard post={item} />}
+        onEndReached={() => {
+          if (query.hasNextPage && !query.isFetchingNextPage) {
+            void query.fetchNextPage();
           }
-        />
-      )}
+        }}
+        onEndReachedThreshold={0.4}
+        ListEmptyComponent={
+          query.isLoading ? (
+            <AppState loading title="받은 지원을 불러오는 중이에요" />
+          ) : query.isError ? (
+            <AppState
+              title="받은 지원을 불러오지 못했어요"
+              description="잠시 후 다시 시도해 주세요."
+              actionLabel="다시 시도"
+              onAction={() => void query.refetch()}
+            />
+          ) : (
+            <View style={styles.empty}>
+              <EmptyState
+                title={
+                  status === "CLOSE"
+                    ? "마감된 공고가 없어요"
+                    : "진행중인 공고가 없어요"
+                }
+                description={
+                  status === "CLOSE"
+                    ? "마감된 모집 공고가 여기에 표시돼요"
+                    : "진행중인 모집 공고가 여기에 표시돼요"
+                }
+              />
+            </View>
+          )
+        }
+      />
     </Screen>
   );
 }
 
-function RecruitmentApplicationCard({
-  post,
-  isOpen,
-}: {
-  post: ReceivedRecruitmentPost;
-  isOpen: boolean;
-}) {
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
+function RecruitmentCard({ post }: { post: ReceivedRecruitmentPost }) {
+  const dDayLabel = formatDDayLabel(
+    getDDay(post.dueDate.split(" ")[0] ?? post.dueDate, new Date()),
+  );
+
   return (
-    <View style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <Text
-          style={[
-            styles.deadlineBadge,
-            isOpen ? styles.deadlineOpen : styles.deadlineClosed,
-          ]}
-        >
-          {formatDate(post.dueDate)}
-        </Text>
-        <Text style={styles.countBadge}>지원자 {post.totalApplicants}명</Text>
-      </View>
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        style={styles.cardHeader}
+        onPress={() =>
+          router.push(
+            `/band/session/recruitments/${post.recruitmentPostId}` as Href,
+          )
+        }
+      >
+        <View style={styles.dDayChip}>
+          <Text style={styles.dDayText}>{dDayLabel}</Text>
+        </View>
 
-      <Text numberOfLines={1} style={styles.postTitle}>
-        {post.title}
-      </Text>
-
-      <Text numberOfLines={1} style={styles.postMeta}>
-        {[post.part, post.genre, post.region].filter(Boolean).join(" · ")}
-      </Text>
+        <View style={styles.cardTitleBlock}>
+          <Text style={styles.cardTitle}>{post.title}</Text>
+          <Text style={styles.cardMeta}>
+            {`${post.part} · ${post.genre} · ${post.region}`}
+            <Text style={styles.metaDivider}>{"  |  "}</Text>
+            <Text style={styles.metaAccent}>
+              지원자 {post.totalApplicants}명
+            </Text>
+          </Text>
+        </View>
+      </Pressable>
 
       <View style={styles.applicants}>
-        {post.recruiters.map((applicant) => (
-          <Pressable
-            key={applicant.applySubmissionId}
-            accessibilityRole="button"
-            onPress={() =>
-              router.push(
-                `/band/my/applications/${applicant.applySubmissionId}?status=${applicant.status}` as Parameters<
-                  typeof router.push
-                >[0],
-              )
-            }
-          >
+        {post.recruiters.map((applicant, index) => (
+          <Fragment key={applicant.applySubmissionId}>
+            {index > 0 ? <View style={styles.applicantDivider} /> : null}
             <ApplicantRow applicant={applicant} />
-          </Pressable>
+          </Fragment>
         ))}
       </View>
     </View>
@@ -198,169 +183,195 @@ function RecruitmentApplicationCard({
 
 function ApplicantRow({ applicant }: { applicant: ReceivedApplicant }) {
   return (
-    <View style={styles.applicantRow}>
-      <Avatar
-        imageUrl={applicant.profileImageUrl}
-        label={applicant.name}
-        size={44}
-      />
-      <View style={styles.applicantText}>
-        <Text numberOfLines={1} style={styles.applicantName}>
-          {applicant.name}
-        </Text>
-        <Text numberOfLines={1} style={styles.applicantMeta}>
-          {[applicant.part, applicant.level, applicant.region]
-            .filter(Boolean)
-            .join(" · ")}
-        </Text>
+    <Pressable
+      accessibilityRole="button"
+      style={styles.applicantRow}
+      onPress={() =>
+        router.push(
+          `/band/my/applications/${applicant.applySubmissionId}?status=${applicant.status}` as Href,
+        )
+      }
+    >
+      <View style={styles.applicantMain}>
+        <ProfileImage imageUrl={applicant.profileImageUrl} size={40} />
+
+        <View style={styles.applicantText}>
+          <Text numberOfLines={1} style={styles.applicantName}>
+            {applicant.name}
+          </Text>
+          <Text numberOfLines={1} style={styles.applicantMeta}>
+            {`${applicant.part} · ${applicant.level} · ${applicant.region}`}
+            <Text style={styles.metaDivider}>{"  |  "}</Text>
+            <Text style={styles.applicantLink}>지원서 확인</Text>
+          </Text>
+        </View>
       </View>
-      <Text
-        style={[
-          styles.statusBadge,
-          applicant.status === "PENDING" && styles.statusPending,
-          applicant.status === "BAND_ACCEPTED" && styles.statusAcceptedWait,
-          applicant.status === "ACCEPTED" && styles.statusAccepted,
-          applicant.status === "REJECTED" && styles.statusRejected,
-        ]}
-      >
-        {STATUS_LABEL[applicant.status]}
-      </Text>
-    </View>
+
+      {applicant.status === "PENDING" ? (
+        <AppIcon name="arrowRight" />
+      ) : applicant.status === "REJECTED" ? (
+        <View style={[styles.statusChip, styles.statusRejected]}>
+          <Text style={styles.statusRejectedText}>거절</Text>
+        </View>
+      ) : applicant.status === "BAND_ACCEPTED" ? (
+        <View style={[styles.statusChip, styles.statusWaiting]}>
+          <Text style={styles.statusWaitingText}>확정 대기</Text>
+        </View>
+      ) : (
+        <View style={[styles.statusChip, styles.statusAccepted]}>
+          <Text style={styles.statusAcceptedText}>참여 확정</Text>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    gap: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     backgroundColor: colors.white,
   },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  listHeader: {
+    gap: 24,
+    marginBottom: 24,
+  },
+  summaryCard: {
+    ...shadows.card,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    padding: 12,
+  },
+  summaryLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  summaryIcon: {
+    width: 35,
+    height: 35,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: colors.secondary400,
+  },
+  summaryLabel: {
+    ...textStyles.caption3,
+    color: colors.neutral600,
+  },
+  summaryValue: {
+    ...textStyles.body1,
+    color: colors.neutral800,
+  },
+  summaryCount: {
+    ...textStyles.h3,
+    color: colors.secondary500,
+    letterSpacing: 0.72,
+  },
   tabs: {
-    height: 48,
     flexDirection: "row",
     borderBottomWidth: 2,
-    borderBottomColor: colors.neutral300,
+    borderBottomColor: colors.neutral400,
     marginHorizontal: -24,
+    paddingHorizontal: 24,
   },
   tab: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
+    marginBottom: -2,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+    paddingBottom: 10,
   },
   tabSelected: {
-    borderBottomWidth: 2,
     borderBottomColor: colors.secondary500,
-    marginBottom: -2,
   },
-  tabIdle: {},
-  tabText: {
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  tabTextSelected: {
+  tabTextOn: {
+    ...textStyles.body6,
     color: colors.secondary500,
-    fontWeight: "700",
   },
-  tabTextIdle: {
+  tabTextOff: {
+    ...textStyles.body1,
     color: colors.neutral400,
   },
-  summaryCard: {
-    gap: 4,
-    borderRadius: 12,
-    backgroundColor: colors.white,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
-  },
-  summaryLabel: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-  },
-  summaryValue: {
-    color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 22,
-  },
-  listContent: {
-    paddingBottom: 32,
-  },
   separator: {
-    height: 14,
+    height: 16,
   },
-  postCard: {
-    gap: 10,
-    borderRadius: 12,
+  empty: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  card: {
+    ...shadows.card,
+    gap: 28,
+    borderRadius: 8,
     backgroundColor: colors.white,
-    paddingHorizontal: 24,
-    paddingVertical: 18,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
   },
-  postHeader: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+  cardHeader: {
+    gap: 12,
   },
-  deadlineBadge: {
-    minHeight: 22,
+  dDayChip: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: colors.secondary500,
     borderRadius: 999,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 22,
     paddingHorizontal: 12,
+    paddingVertical: 2,
   },
-  deadlineOpen: {
-    backgroundColor: colors.secondary500,
-    color: colors.white,
+  dDayText: {
+    ...textStyles.caption3,
+    color: colors.secondary400,
+    textAlign: "center",
   },
-  deadlineClosed: {
-    backgroundColor: colors.neutral300,
-    color: colors.neutral600,
+  cardTitleBlock: {
+    gap: 4,
   },
-  countBadge: {
-    minHeight: 22,
-    borderRadius: 999,
-    backgroundColor: colors.secondary100,
-    color: colors.secondary600,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 22,
-    paddingHorizontal: 12,
-  },
-  postTitle: {
+  cardTitle: {
+    ...textStyles.label1,
     color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 22,
   },
-  postMeta: {
+  cardMeta: {
+    ...textStyles.caption3,
     color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
+  },
+  metaDivider: {
+    color: colors.neutral300,
+  },
+  metaAccent: {
+    color: colors.secondary500,
   },
   applicants: {
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral300,
-    gap: 14,
-    paddingTop: 14,
+    gap: 16,
+  },
+  applicantDivider: {
+    height: 1,
+    backgroundColor: colors.neutral400,
   },
   applicantRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 12,
+  },
+  applicantMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   applicantText: {
     flex: 1,
@@ -368,47 +379,45 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   applicantName: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
+    ...textStyles.label1,
+    color: "#000000",
   },
   applicantMeta: {
+    ...textStyles.caption2,
     color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
   },
-  statusBadge: {
-    minHeight: 22,
+  applicantLink: {
+    ...textStyles.caption3,
+    color: colors.secondary500,
+  },
+  statusChip: {
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 999,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 22,
-    paddingHorizontal: 12,
-  },
-  statusPending: {
-    backgroundColor: colors.secondary100,
-    color: colors.secondary600,
-  },
-  statusAcceptedWait: {
-    backgroundColor: colors.neutral300,
-    color: colors.neutral600,
-  },
-  statusAccepted: {
-    backgroundColor: colors.secondary500,
-    color: colors.white,
+    paddingHorizontal: 15,
+    paddingVertical: 2,
   },
   statusRejected: {
     backgroundColor: colors.neutral300,
+  },
+  statusRejectedText: {
+    ...textStyles.caption3,
     color: colors.neutral600,
   },
-  footerText: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    paddingVertical: 16,
-    textAlign: "center",
+  statusWaiting: {
+    borderWidth: 1,
+    borderColor: colors.secondary500,
+  },
+  statusWaitingText: {
+    ...textStyles.caption3,
+    color: colors.secondary500,
+  },
+  statusAccepted: {
+    backgroundColor: colors.secondary400,
+  },
+  statusAcceptedText: {
+    ...textStyles.caption3,
+    color: colors.white,
   },
 });

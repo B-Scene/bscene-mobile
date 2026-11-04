@@ -144,10 +144,14 @@ type AuthState = {
   clearSession: () => Promise<void>;
 
   restoreSession: () => Promise<void>;
+
+  setCurrentMode: (
+    currentMode: UserMode,
+  ) => Promise<void>;
 };
 
 export const useAuthStore =
-  create<AuthState>((set) => {
+  create<AuthState>((set, get) => {
     const clearSession =
       async () => {
         await secureTokenStorage.clearTokens();
@@ -203,6 +207,30 @@ export const useAuthStore =
       },
 
       clearSession,
+
+      async setCurrentMode(
+        currentMode,
+      ) {
+        const user =
+          get().user;
+
+        if (!user) {
+          return;
+        }
+
+        const nextUser = {
+          ...user,
+          currentMode,
+        };
+
+        await secureTokenStorage.setUser(
+          nextUser,
+        );
+
+        set({
+          user: nextUser,
+        });
+      },
 
       async restoreSession() {
         set({

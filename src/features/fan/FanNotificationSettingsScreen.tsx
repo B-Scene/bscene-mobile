@@ -1,187 +1,160 @@
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
+import { MyHeader } from "@/features/my/MyHeader";
 import {
-  useNotificationSettingsQuery,
-  useUpdateNotificationSetting,
-} from "@/hooks/api/notification/useNotification";
-import { AppCard } from "@/shared/components/AppCard";
-import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
+  NotificationToggleList,
+  type NotificationToggleItem,
+} from "@/features/my/NotificationToggleList";
+import { useNotificationSettingToggle } from "@/features/my/useNotificationSettingToggle";
 import { Screen } from "@/shared/components/Screen";
-import { colors, radius, spacing } from "@/shared/constants/theme";
+import { colors, textStyles } from "@/shared/constants/theme";
 import type { NotificationSettingType } from "@/types/notification";
 
-type SettingItem = {
-  label: string;
-  description: string;
-  settingType: NotificationSettingType;
-  keyName: string;
+type VariantConfig = {
+  title: string;
+  notice: string;
+  items: NotificationToggleItem[];
+  defaultValues: Record<string, boolean>;
+  settingTypeById: Record<string, NotificationSettingType>;
 };
 
-const CONCERT_SETTINGS: SettingItem[] = [
-  {
-    label: "팔로우 밴드 공연",
-    description: "팔로우한 밴드가 새 공연을 등록하면 알려드려요.",
-    settingType: "FAN_FOLLOWED_BAND_PERFORMANCE",
-    keyName: "new-concert",
+const VARIANTS: Record<"concert" | "live", VariantConfig> = {
+  concert: {
+    title: "공연 알림 설정",
+    notice: "별도의 알림 상세 모달 없이 목록 우측 토글로 켜고 끕니다",
+    items: [
+      {
+        id: "new-concert",
+        title: "팔로우 밴드 새 공연 알림",
+        description: "팔로우한 밴드가 공연을 등록하면 알려드려요",
+      },
+      {
+        id: "concert-reminder",
+        title: "참여 예정 공연 리마인드",
+        description: "공연 시작 1시간 전에 알려드려요",
+      },
+      {
+        id: "concert-info-change",
+        title: "공연 정보 변경 알림",
+        description: "일시 · 장소 · 티켓 정보가 바뀌면 알려드려요",
+      },
+    ],
+    defaultValues: {
+      "new-concert": true,
+      "concert-reminder": true,
+      "concert-info-change": true,
+    },
+    settingTypeById: {
+      "new-concert": "FAN_FOLLOWED_BAND_PERFORMANCE",
+      "concert-reminder": "FAN_PERFORMANCE_REMINDER",
+      "concert-info-change": "FAN_PERFORMANCE_UPDATE",
+    },
   },
-  {
-    label: "공연 리마인더",
-    description: "관심 공연 시작 전 리마인더를 받을 수 있어요.",
-    settingType: "FAN_PERFORMANCE_REMINDER",
-    keyName: "concert-reminder",
+  live: {
+    title: "라이브 알림 설정",
+    notice:
+      "팔로우한 밴드와 직접 알림을 신청한 예정 라이브를 기준으로\n알림을 받습니다",
+    items: [
+      {
+        id: "followed-band-live-start",
+        title: "팔로우 밴드 라이브 시작 알림",
+        description: "팔로우한 밴드가 라이브를 시작하면 알려드려요",
+      },
+      {
+        id: "upcoming-live-reminder",
+        title: "예정 라이브 리마인드",
+        description: "알림 신청한 라이브 시작 30분 전에 알려드려요",
+      },
+      {
+        id: "live-replay",
+        title: "라이브 다시보기 등록 알림",
+        description: "종료된 라이브의 다시보기가 등록되면 알려드려요",
+      },
+    ],
+    defaultValues: {
+      "followed-band-live-start": true,
+      "upcoming-live-reminder": true,
+      "live-replay": false,
+    },
+    settingTypeById: {
+      "followed-band-live-start": "FAN_FOLLOWED_BAND_LIVE_START",
+      "upcoming-live-reminder": "FAN_SCHEDULED_LIVE_REMINDER",
+      "live-replay": "FAN_LIVE_REPLAY_READY",
+    },
   },
-  {
-    label: "공연 정보 변경",
-    description: "관심 공연의 일정이나 정보가 바뀌면 알려드려요.",
-    settingType: "FAN_PERFORMANCE_UPDATE",
-    keyName: "concert-info-change",
-  },
-];
-
-const LIVE_SETTINGS: SettingItem[] = [
-  {
-    label: "팔로우 밴드 라이브 시작",
-    description: "팔로우한 밴드가 라이브를 시작하면 알려드려요.",
-    settingType: "FAN_FOLLOWED_BAND_LIVE_START",
-    keyName: "followed-band-live-start",
-  },
-  {
-    label: "예정된 라이브 리마인더",
-    description: "예약한 라이브가 곧 시작되면 알려드려요.",
-    settingType: "FAN_SCHEDULED_LIVE_REMINDER",
-    keyName: "upcoming-live-reminder",
-  },
-  {
-    label: "라이브 다시보기",
-    description: "다시보기가 준비되면 알려드려요.",
-    settingType: "FAN_LIVE_REPLAY_READY",
-    keyName: "live-replay",
-  },
-];
+};
 
 export function FanNotificationSettingsScreen({
   variant,
 }: {
   variant: "concert" | "live";
 }) {
-  const query = useNotificationSettingsQuery({ mode: "FAN" });
-  const mutation = useUpdateNotificationSetting();
-  const settings = variant === "concert" ? CONCERT_SETTINGS : LIVE_SETTINGS;
-  const title = variant === "concert" ? "공연 알림 설정" : "라이브 알림 설정";
-
-  const toggleSetting = async (item: SettingItem, enabled: boolean) => {
-    try {
-      await mutation.mutateAsync({
-        mode: "FAN",
-        settingType: item.settingType,
-        enabled,
-      });
-    } catch {
-      Alert.alert("알림 설정", "알림 설정을 변경하지 못했어요.");
-    }
-  };
+  const config = VARIANTS[variant];
+  const { values, isDisabled, statusMessage, toggle } =
+    useNotificationSettingToggle({
+      mode: "FAN",
+      defaultValues: config.defaultValues,
+      settingTypeById: config.settingTypeById,
+    });
 
   return (
-    <Screen contentStyle={styles.container}>
-      <AppHeader title={title} />
+    <Screen edges={["top"]} contentStyle={styles.container}>
+      <MyHeader title={config.title} />
 
-      {query.isLoading ? (
-        <AppState loading title="알림 설정을 불러오는 중이에요" />
-      ) : query.isError ? (
-        <AppState
-          title="알림 설정을 불러오지 못했어요"
-          description="잠시 후 다시 시도해 주세요."
-          actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
-        />
-      ) : (
-        <View style={styles.list}>
-          {settings.map((item) => {
-            const enabled = query.data?.values[item.keyName] ?? false;
-
-            return (
-              <AppCard key={item.settingType} style={styles.settingCard}>
-                <View style={styles.settingText}>
-                  <Text style={styles.settingLabel}>{item.label}</Text>
-                  <Text style={styles.settingDescription}>
-                    {item.description}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: enabled }}
-                  disabled={mutation.isPending}
-                  style={[
-                    styles.switchTrack,
-                    enabled && styles.switchTrackOn,
-                    mutation.isPending && styles.disabled,
-                  ]}
-                  onPress={() => void toggleSetting(item, !enabled)}
-                >
-                  <View
-                    style={[
-                      styles.switchThumb,
-                      enabled && styles.switchThumbOn,
-                    ]}
-                  />
-                </Pressable>
-              </AppCard>
-            );
-          })}
+      <View style={styles.content}>
+        <View style={styles.notice}>
+          <Text style={styles.noticeText}>{config.notice}</Text>
         </View>
-      )}
+
+        {statusMessage ? (
+          <Text style={styles.status}>{statusMessage}</Text>
+        ) : null}
+
+        <View style={styles.list}>
+          <NotificationToggleList
+            items={config.items}
+            values={values}
+            tone="primary"
+            disabled={isDisabled}
+            onToggle={(id, checked) => void toggle(id, checked)}
+          />
+        </View>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
-  },
-  list: {
-    gap: spacing.md,
-  },
-  settingCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  settingText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  settingLabel: {
-    color: colors.neutral900,
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  settingDescription: {
-    color: colors.neutral600,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  switchTrack: {
-    width: 48,
-    height: 28,
-    borderRadius: radius.pill,
-    backgroundColor: colors.neutral400,
-    padding: 3,
-    justifyContent: "center",
-  },
-  switchTrackOn: {
-    backgroundColor: colors.primary500,
-  },
-  switchThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    paddingBottom: 24,
     backgroundColor: colors.white,
   },
-  switchThumbOn: {
-    alignSelf: "flex-end",
+  content: {
+    paddingHorizontal: 20,
   },
-  disabled: {
-    opacity: 0.5,
+  notice: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: colors.primary300,
+    borderRadius: 12,
+    backgroundColor: colors.primary0,
+    padding: 12,
+  },
+  noticeText: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  status: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
+    marginTop: 12,
+    textAlign: "center",
+  },
+  list: {
+    marginTop: 24,
   },
 });

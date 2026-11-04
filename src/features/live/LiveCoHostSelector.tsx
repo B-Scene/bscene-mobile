@@ -1,7 +1,3 @@
-import {
-  ChevronRight,
-  Users,
-} from "lucide-react-native";
 import { useState } from "react";
 import {
   Modal,
@@ -13,12 +9,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppButton } from "@/shared/components/AppButton";
 import { AppHeader } from "@/shared/components/AppHeader";
-import { Avatar } from "@/shared/components/Avatar";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import {
   colors,
-  spacing,
+  textStyles,
 } from "@/shared/constants/theme";
 import type {
   LiveReservationCoHostCandidate,
@@ -86,33 +82,29 @@ export function LiveCoHostSelector({
           setIsOpen(true)
         }
       >
-        <View style={styles.cardIcon}>
-          <Users
-            size={20}
-            color={
-              colors.secondary600
-            }
-          />
-        </View>
+        <AppIcon name="coHostIcon" size={36} />
 
         <View style={styles.cardText}>
           <Text style={styles.cardTitle}>
             공동 진행 (선택)
           </Text>
           <Text style={styles.cardDescription}>
-            {selectedIds.length > 0
-              ? `공동 진행자 ${selectedIds.length}명 선택됨`
-              : "멤버와 함께 라이브를 진행할 수 있어요."}
+            멤버와 함께 라이브를 진행할 수 있어요.
           </Text>
         </View>
 
-        <ChevronRight
-          size={22}
-          color={
-            colors.neutral400
-          }
-        />
+        <Text style={styles.chevron}>›</Text>
       </Pressable>
+
+      {isLoading ? (
+        <Text style={styles.countLoading}>
+          공동 진행 후보 불러오는 중
+        </Text>
+      ) : selectedIds.length > 0 ? (
+        <Text style={styles.countSelected}>
+          공동 진행자 {selectedIds.length}명 선택됨
+        </Text>
+      ) : null}
 
       <Modal
         visible={isOpen}
@@ -122,7 +114,21 @@ export function LiveCoHostSelector({
         <SafeAreaView style={styles.modal}>
           <AppHeader
             title="공동 진행"
+            rightContent={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="닫기"
+                hitSlop={12}
+                onPress={close}
+              >
+                <AppIcon
+                  name="closeHeader"
+                  size={28}
+                />
+              </Pressable>
+            }
             onBack={close}
+            style={styles.modalHeader}
           />
 
           <ScrollView
@@ -165,10 +171,15 @@ export function LiveCoHostSelector({
           </ScrollView>
 
           <View style={styles.footer}>
-            <AppButton
-              label="확인"
+            <Pressable
+              accessibilityRole="button"
+              style={styles.confirmButton}
               onPress={close}
-            />
+            >
+              <Text style={styles.confirmText}>
+                확인
+              </Text>
+            </Pressable>
           </View>
         </SafeAreaView>
       </Modal>
@@ -188,14 +199,12 @@ function CandidateRow({
 }) {
   return (
     <View style={styles.row}>
-      <Avatar
+      <ProfileImage
         imageUrl={
           candidate.bandMemberProfileImageUrl
         }
-        label={
-          candidate.nickname
-        }
         size={36}
+        variant="band"
       />
 
       <View style={styles.rowText}>
@@ -253,36 +262,18 @@ const styles =
       minHeight: 64,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.sm,
+      gap: 12,
       borderRadius: 14,
       backgroundColor:
         colors.white,
       paddingHorizontal: 18,
-      paddingVertical:
-        spacing.sm,
-      shadowColor:
-        colors.neutral900,
-      shadowOpacity: 0.08,
-      shadowRadius: 15,
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      elevation: 3,
+      paddingVertical: 8,
+      boxShadow:
+        "0px 4px 15px 0px rgba(20, 20, 20, 0.08)",
     },
 
     pressed: {
       opacity: 0.85,
-    },
-
-    cardIcon: {
-      width: 36,
-      height: 36,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 18,
-      backgroundColor:
-        colors.secondary100,
     },
 
     cardText: {
@@ -291,21 +282,38 @@ const styles =
     },
 
     cardTitle: {
+      ...textStyles.caption3,
       color:
         colors.neutral900,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: "700",
-      letterSpacing: 0,
     },
 
     cardDescription: {
+      ...textStyles.caption2,
       color:
         colors.neutral600,
-      fontSize: 12,
-      lineHeight: 18,
-      fontWeight: "500",
-      letterSpacing: 0,
+    },
+
+    chevron: {
+      color:
+        colors.neutral300,
+      fontSize: 32,
+      lineHeight: 32,
+    },
+
+    countLoading: {
+      ...textStyles.caption2,
+      color:
+        colors.neutral500,
+      marginTop: -4,
+      textAlign: "right",
+    },
+
+    countSelected: {
+      ...textStyles.caption2,
+      color:
+        colors.secondary500,
+      marginTop: -4,
+      textAlign: "right",
     },
 
     modal: {
@@ -314,87 +322,73 @@ const styles =
         colors.white,
     },
 
+    modalHeader: {
+      height: 52,
+      paddingHorizontal: 20,
+    },
+
     list: {
-      gap: spacing.md,
-      padding: spacing.lg,
+      gap: 16,
+      paddingHorizontal: 28,
+      paddingTop: 36,
     },
 
     message: {
+      ...textStyles.caption2,
       color:
         colors.neutral500,
-      fontSize: 12,
-      lineHeight: 18,
+      paddingVertical: 40,
       textAlign: "center",
-      paddingVertical:
-        spacing.xl,
     },
 
     errorMessage: {
+      ...textStyles.caption2,
       color:
         colors.error,
-      fontSize: 12,
-      lineHeight: 18,
+      paddingVertical: 40,
       textAlign: "center",
-      paddingVertical:
-        spacing.xl,
     },
 
     row: {
       minHeight: 60,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing.sm,
       borderRadius: 8,
       backgroundColor:
         colors.white,
-      paddingHorizontal:
-        spacing.sm,
-      shadowColor:
-        colors.neutral900,
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      elevation: 2,
+      paddingHorizontal: 12,
+      boxShadow:
+        "0px 0px 8px 0px rgba(20, 20, 20, 0.08)",
     },
 
     rowText: {
       flex: 1,
       gap: 2,
+      marginLeft: 12,
     },
 
     nickname: {
+      ...textStyles.caption3,
       color:
         colors.neutral900,
-      fontSize: 14,
-      fontWeight: "600",
-      letterSpacing: 0,
     },
 
     part: {
+      ...textStyles.caption2,
       color:
         colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      letterSpacing: 0,
     },
 
     ownerLabel: {
+      ...textStyles.caption3,
       color:
         colors.neutral900,
-      fontSize: 14,
-      fontWeight: "600",
-      letterSpacing: 0,
     },
 
     inviteLabel: {
+      ...textStyles.caption3,
       color:
         colors.secondary500,
-      fontSize: 14,
-      fontWeight: "600",
-      letterSpacing: 0,
     },
 
     inviteLabelSelected: {
@@ -403,9 +397,25 @@ const styles =
     },
 
     footer: {
-      paddingHorizontal:
-        spacing.lg,
-      paddingVertical:
-        spacing.sm,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 20,
+    },
+
+    confirmButton: {
+      height: 52,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 10,
+      backgroundColor:
+        colors.secondary500,
+      boxShadow:
+        "0px 4px 12px 0px rgba(251, 177, 14, 0.24)",
+    },
+
+    confirmText: {
+      ...textStyles.label2,
+      color:
+        colors.white,
     },
   });

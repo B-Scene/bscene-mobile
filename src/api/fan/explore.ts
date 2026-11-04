@@ -15,7 +15,9 @@ import type {
   FanExplorePostDetail,
   FanExplorePostLikeResponse,
   FanExploreRecommendationParams,
+  FanExploreRecentSearch,
   FanExploreSearchParams,
+  NormalizedFanExploreRecentSearch,
   NormalizedFanExploreBandsResponse,
   NormalizedFanExplorePostComment,
   NormalizedFanExploreContentsResponse,
@@ -515,6 +517,70 @@ export const followExploreBand = async (bandId: number) => {
 export const unfollowExploreBand = async (bandId: number) => {
   const response = await axiosInstance.delete<FanExploreApiResponse<null>>(
     `/bands/${bandId}/follow`,
+  );
+
+  return assertMutationSuccess(response);
+};
+
+const normalizeRecentSearches = (
+  result: unknown,
+): NormalizedFanExploreRecentSearch[] => {
+  const items = Array.isArray(result)
+    ? result
+    : (Object.values((result ?? {}) as Record<string, unknown>).find(
+        Array.isArray,
+      ) ?? []);
+
+  return (items as (string | FanExploreRecentSearch)[])
+    .map((item) => {
+      if (typeof item === "string") {
+        return { recentSearchId: null, keyword: item.trim() };
+      }
+
+      const recentSearchId = Number(
+        item.recentSearchId ?? item.keywordId ?? item.id ?? Number.NaN,
+      );
+
+      return {
+        recentSearchId: Number.isFinite(recentSearchId) ? recentSearchId : null,
+        keyword: (
+          item.keyword ??
+          item.searchKeyword ??
+          item.searchTerm ??
+          item.searchWord ??
+          item.query ??
+          item.value ??
+          ""
+        ).trim(),
+      };
+    })
+    .filter(
+      (item, index, list) =>
+        item.keyword.length > 0 &&
+        list.findIndex(({ keyword }) => keyword === item.keyword) === index,
+    )
+    .slice(0, 10);
+};
+
+export const getFanExploreRecentSearches = async () => {
+  const response = await axiosInstance.get<FanExploreApiResponse<unknown>>(
+    "/explore/search/recent",
+  );
+
+  return normalizeRecentSearches(assertSuccess(response));
+};
+
+export const deleteFanExploreRecentSearch = async (recentSearchId: number) => {
+  const response = await axiosInstance.delete<FanExploreApiResponse<null>>(
+    `/explore/search/recent/${recentSearchId}`,
+  );
+
+  return assertMutationSuccess(response);
+};
+
+export const deleteAllFanExploreRecentSearches = async () => {
+  const response = await axiosInstance.delete<FanExploreApiResponse<null>>(
+    "/explore/search/recent",
   );
 
   return assertMutationSuccess(response);

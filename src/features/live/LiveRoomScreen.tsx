@@ -12,12 +12,6 @@ import {
 } from "expo-audio";
 
 import {
-    Radio,
-    Wifi,
-    WifiOff
-} from "lucide-react-native";
-
-import {
     useEffect,
     useMemo,
     useRef,
@@ -28,6 +22,7 @@ import {
 import {
     Alert,
     BackHandler,
+    Pressable,
     StyleSheet,
     Text,
     View,
@@ -69,18 +64,27 @@ import {
     secureTokenStorage,
 } from "@/shared/utils/secureTokenStorage";
 
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
+import {
+    LiveRoomActionBar,
+    LiveRoomBanner,
+    LiveRoomChatList,
+    LiveRoomComposer,
+    LiveRoomHeader,
+    LiveRoomMemberSheet,
+    LiveRoomMicButton,
+    LiveRoomPill,
+    LiveRoomSoundIndicator,
+    LiveRoomStage,
+} from "@/features/live/LiveRoomParts";
+
 import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
-import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
 
 import {
     colors,
-    spacing,
+    shadows,
+    textStyles,
 } from "@/shared/constants/theme";
 
 import {
@@ -130,6 +134,12 @@ const parseId = (
     ? parsed
     : 0;
 };
+
+const isCoHostInviteParam = (
+  value?: string,
+) =>
+  value === "1" ||
+  value === "accept";
 
 export function LiveRoomScreen({
   mode,
@@ -223,9 +233,17 @@ export function LiveRoomScreen({
     isInvitePending,
     setIsInvitePending,
   ] = useState(
-    params.coHostInvite ===
-      "1",
+    isCoHostInviteParam(
+      params.coHostInvite,
+    ),
   );
+
+  const shouldAutoAcceptInvite =
+    params.coHostInvite ===
+    "accept";
+
+  const autoAcceptStartedRef =
+    useRef(false);
 
   const isEnteringAsCoHostRef =
     useRef(false);
@@ -960,6 +978,26 @@ export function LiveRoomScreen({
       mode,
     ]);
 
+  const [
+    isExitConfirmOpen,
+    setIsExitConfirmOpen,
+  ] = useState(false);
+
+  const [
+    isCoHostModalOpen,
+    setIsCoHostModalOpen,
+  ] = useState(false);
+
+  const [
+    isComposerOpen,
+    setIsComposerOpen,
+  ] = useState(false);
+
+  const [
+    isMemberSheetOpen,
+    setIsMemberSheetOpen,
+  ] = useState(false);
+
   const confirmExitLive =
     useCallback(() => {
       if (
@@ -969,39 +1007,11 @@ export function LiveRoomScreen({
         return;
       }
 
-      Alert.alert(
-        isOwner
-          ? "라이브 종료"
-          : "라이브 나가기",
-
-        isOwner
-          ? "라이브를 종료할까요?"
-          : "라이브에서 나갈까요?",
-
-        [
-          {
-            text: "취소",
-            style: "cancel",
-          },
-
-          {
-            text:
-              isOwner
-                ? "종료"
-                : "나가기",
-
-            style:
-              "destructive",
-
-            onPress: () =>
-              void exitLive(),
-          },
-        ],
+      setIsExitConfirmOpen(
+        true,
       );
     }, [
       closeMutation.isPending,
-      exitLive,
-      isOwner,
       leaveMutation.isPending,
     ]);
 
@@ -1121,6 +1131,16 @@ export function LiveRoomScreen({
           Alert.alert(
             "공동 진행 초대",
             "초대를 처리하지 못했어요.",
+            shouldAutoAcceptInvite
+              ? [
+                  {
+                    text: "확인",
+
+                    onPress: () =>
+                      router.back(),
+                  },
+                ]
+              : undefined,
           );
 
           return;
@@ -1163,6 +1183,22 @@ export function LiveRoomScreen({
       }
     };
 
+  useEffect(() => {
+    if (
+      !shouldAutoAcceptInvite ||
+      autoAcceptStartedRef.current
+    ) {
+      return;
+    }
+
+    autoAcceptStartedRef.current =
+      true;
+
+    void respondInvite(
+      true,
+    );
+  });
+
   const sortedMessages =
     useMemo(
       () =>
@@ -1178,72 +1214,86 @@ export function LiveRoomScreen({
       [messages],
     );
 
+  if (
+    isInvitePending &&
+    shouldAutoAcceptInvite
+  ) {
+    return (
+      <Screen
+        contentStyle={
+          styles.stateContainer
+        }
+      >
+        <AppHeader
+          title="라이브"
+          style={styles.stateHeader}
+        />
+      </Screen>
+    );
+  }
+
   if (isInvitePending) {
     return (
       <Screen
         contentStyle={
-          styles.container
+          styles.stateContainer
         }
       >
-        <AppHeader title="라이브" />
+        <AppHeader
+          title="라이브"
+          style={styles.stateHeader}
+        />
 
-        <AppCard
-          style={
-            styles.section
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
+        <View style={styles.inviteCard}>
+          <Text style={styles.inviteTitle}>
             공동 진행 초대
           </Text>
 
-          <Text
-            style={
-              styles.description
-            }
-          >
+          <Text style={styles.inviteDescription}>
             이 라이브의 공동 진행자로
             초대받았어요.
           </Text>
 
-          <View
-            style={
-              styles.row
-            }
-          >
-            <AppButton
-              label="거절"
-              variant="secondary"
-              style={
-                styles.rowButton
-              }
+          <View style={styles.inviteActions}>
+            <Pressable
+              accessibilityRole="button"
+              style={[
+                styles.inviteButton,
+                styles.inviteReject,
+              ]}
               onPress={() =>
                 void respondInvite(
                   false,
                 )
               }
-            />
+            >
+              <Text style={styles.inviteRejectText}>
+                거절
+              </Text>
+            </Pressable>
 
-            <AppButton
-              label="수락"
-              style={
-                styles.rowButton
-              }
-              loading={
+            <Pressable
+              accessibilityRole="button"
+              disabled={
                 respondInviteMutation.isPending ||
                 enterMutation.isPending
               }
+              style={[
+                styles.inviteButton,
+                styles.inviteAccept,
+              ]}
               onPress={() =>
                 void respondInvite(
                   true,
                 )
               }
-            />
+            >
+              <Text style={styles.inviteAcceptText}>
+                수락
+              </Text>
+            </Pressable>
           </View>
-        </AppCard>
+        </View>
       </Screen>
     );
   }
@@ -1253,271 +1303,132 @@ export function LiveRoomScreen({
     !live
   ) {
     return (
-      <Screen>
-        <AppHeader title="라이브" />
-
-        <AppState
-          loading
-          title="라이브에 입장하는 중이에요"
+      <Screen
+        contentStyle={
+          styles.stateContainer
+        }
+      >
+        <AppHeader
+          title="라이브"
+          style={styles.stateHeader}
         />
+
+        <Text style={styles.stateText}>
+          라이브 방에 입장하는 중이에요.
+        </Text>
       </Screen>
     );
   }
 
   if (!live) {
     return (
-      <Screen>
-        <AppHeader title="라이브" />
-
-        <AppState
-          title="라이브 정보를 불러오지 못했어요"
+      <Screen
+        contentStyle={
+          styles.stateContainer
+        }
+      >
+        <AppHeader
+          title="라이브"
+          style={styles.stateHeader}
         />
+
+        <Text style={styles.stateText}>
+          라이브 정보를 불러오지 못했어요.
+        </Text>
       </Screen>
     );
   }
 
+  const tone =
+    mode;
+
+  const isExitPending =
+    leaveMutation.isPending ||
+    closeMutation.isPending;
+
+  const isAudioActive =
+    isBroadcastProtocol
+      ? mediaConnected &&
+        !isMicMuted
+      : mediaConnected;
+
+  const coHostNickname =
+    currentCoHostRequest?.nickname ??
+    null;
+
   return (
     <Screen
+      scroll={false}
       contentStyle={
         styles.container
       }
     >
-      <AppHeader
-        title="라이브"
+      <LiveRoomHeader
+        tone={tone}
+        startedAt={live.startedAt}
+        viewerCount={
+          viewerCount ??
+          live.viewerCount ??
+          live.viewCount ??
+          0
+        }
+        exitLabel={
+          isOwner
+            ? "라이브 종료"
+            : "나가기"
+        }
+        exitDisabled={isExitPending}
+        onExit={confirmExitLive}
       />
 
-      <AppCard
-        style={
-          styles.hero
-        }
-      >
-        <View
-          style={
-            styles.liveHeader
+      {mediaError ? (
+        <LiveRoomBanner
+          message={mediaError}
+          backgroundColor={
+            tone === "band"
+              ? colors.error
+              : colors.primary400
           }
-        >
-          <Badge
-            label="LIVE"
-            tone="pink"
-          />
-
-          <View
-            style={
-              styles.connection
-            }
-          >
-            {mediaConnected ? (
-              <Wifi
-                size={16}
-                color={
-                  colors.primary600
-                }
-              />
-            ) : (
-              <WifiOff
-                size={16}
-                color={
-                  colors.error
-                }
-              />
-            )}
-
-            <Text
-              style={styles.meta}
-            >
-              {mediaConnected
-                ? "오디오 연결됨"
-                : "오디오 연결 중"}
-            </Text>
-          </View>
-        </View>
-
-        <Avatar
-          imageUrl={
-            live.bandProfileImageUrl
-          }
-          label={
-            live.bandName
-          }
-          size={72}
         />
+      ) : null}
 
-        <Text
-          style={styles.title}
-        >
-          {live.title}
-        </Text>
-
-        <Text
-          style={styles.bandName}
-        >
-          {live.bandName}
-        </Text>
-
-        {live.description ? (
-          <Text
-            style={
-              styles.description
-            }
-          >
-            {
-              live.description
-            }
-          </Text>
-        ) : null}
-
-        <Text
-          style={styles.meta}
-        >
-          {viewerCount ??
-            live.viewerCount ??
-            live.viewCount ??
-            0}
-          명 시청 중 ·{" "}
-          {live.playback.role} ·{" "}
-          {
-            live.playback
-              .protocol
+      {isBroadcastProtocol &&
+      mediaConnected &&
+      isMicMuted ? (
+        <LiveRoomBanner
+          message="마이크가 음소거됐어요. 다시 누르면 송출돼요."
+          backgroundColor={
+            colors.secondary500
           }
-        </Text>
-
-        {otherCoPublishers.length >
-        0 ? (
-          <Text
-            style={styles.meta}
-          >
-            공동 진행{" "}
-            {
-              otherCoPublishers.length
-            }
-            명 참여 중
-          </Text>
-        ) : null}
-
-        {mediaError ? (
-          <Text
-            style={
-              styles.error
-            }
-          >
-            {mediaError}
-          </Text>
-        ) : null}
-
-        {isBroadcastProtocol ? (
-          <View
-            style={
-              styles.micControl
-            }
-          >
-            <AppButton
-              label={
-                mediaConnected
-                  ? isMicMuted
-                    ? "마이크 켜기"
-                    : "마이크 끄기"
-                  : "마이크 연결 중"
-              }
-              variant={
-                isMicMuted
-                  ? "primary"
-                  : "secondary"
-              }
-              disabled={
-                !mediaConnected
-              }
-              onPress={
-                toggleMic
-              }
-            />
-
-            {mediaConnected &&
-            isMicMuted ? (
-              <Text
-                style={
-                  styles.micHint
-                }
-              >
-                마이크가 음소거됐어요.
-                다시 누르면 송출돼요.
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-      </AppCard>
+        />
+      ) : null}
 
       {currentCoHostRequest ? (
-        <AppCard
-          style={
-            styles.section
+        <LiveRoomPill
+          label={
+            coHostRequests.length > 1
+              ? `공동 진행 요청 ${coHostRequests.length}건 확인`
+              : coHostNickname
+                ? `${coHostNickname}님의 요청 확인`
+                : "공동 진행 요청 확인"
           }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            공동 진행 요청
-          </Text>
-
-          <Text
-            style={
-              styles.description
-            }
-          >
-            {currentCoHostRequest.nickname
-              ? `${currentCoHostRequest.nickname}님의 `
-              : ""}
-            공동 진행 요청이
-            도착했어요.
-          </Text>
-
-          <View
-            style={
-              styles.row
-            }
-          >
-            <AppButton
-              label="닫기"
-              variant="secondary"
-              style={
-                styles.rowButton
-              }
-              onPress={() =>
-                dismissCoHostRequest(
-                  currentCoHostRequest.userId,
-                )
-              }
-            />
-
-            <AppButton
-              label="공동 진행 수락"
-              style={
-                styles.rowButton
-              }
-              loading={
-                acceptCoHostMutation.isPending
-              }
-              onPress={() =>
-                void acceptRequester()
-              }
-            />
-          </View>
-        </AppCard>
+          onPress={() =>
+            setIsCoHostModalOpen(
+              true,
+            )
+          }
+        />
       ) : null}
 
       {canRequestCoHost ? (
-        <AppButton
+        <LiveRoomPill
           label={
             isAwaitingCoHostApproval
               ? "공동 진행 승인 대기 중"
               : "공동 진행 요청"
           }
-          variant="secondary"
           disabled={
-            isAwaitingCoHostApproval
-          }
-          loading={
+            isAwaitingCoHostApproval ||
             requestCoHostMutation.isPending
           }
           onPress={() =>
@@ -1526,152 +1437,194 @@ export function LiveRoomScreen({
         />
       ) : null}
 
-      <AppCard
-        style={
-          styles.section
+      <LiveRoomStage
+        tone={tone}
+        isAudioActive={
+          isAudioActive
         }
-      >
-        <View
-          style={
-            styles.chatHeader
+        imageUrl={
+          live.bandProfileImageUrl
+        }
+        bandName={live.bandName}
+        title={live.title}
+        description={
+          live.description
+        }
+      />
+
+      <LiveRoomChatList
+        tone={tone}
+        messages={
+          sortedMessages
+        }
+        composerOpen={
+          isComposerOpen
+        }
+        isHighlighted={(message) =>
+          message.senderName ===
+            live.bandName ||
+          (Boolean(
+            live.bandProfileImageUrl,
+          ) &&
+            message.senderProfileImageUrl ===
+              live.bandProfileImageUrl)
+        }
+      />
+
+      {isComposerOpen ? (
+        <LiveRoomComposer
+          tone={tone}
+          value={messageText}
+          errorMessage={
+            chat.lastError
           }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            실시간 채팅
-          </Text>
-
-          <View
-            style={
-              styles.connection
-            }
-          >
-            {chat.isConnected ? (
-              <Radio
-                size={15}
-                color={
-                  colors.primary600
-                }
-              />
-            ) : null}
-
-            <Text
-              style={styles.meta}
-            >
-              {chat.isConnected
-                ? "연결됨"
-                : "연결 중"}
-            </Text>
-          </View>
-        </View>
-
-        <View
-          style={
-            styles.messages
-          }
-        >
-          {sortedMessages.length ===
-          0 ? (
-            <Text
-              style={styles.meta}
-            >
-              아직 채팅이 없어요.
-            </Text>
-          ) : (
-            sortedMessages.map(
-              (message) => {
-                const isMine =
-                  currentUserId !=
-                    null &&
-                  message.senderId ===
-                    currentUserId;
-
-                return (
-                  <View
-                    key={
-                      message.messageId
-                    }
-                    style={[
-                      styles.message,
-
-                      isMine &&
-                        styles.myMessage,
-                    ]}
-                  >
-                    <Text
-                      style={
-                        styles.messageName
-                      }
-                    >
-                      {
-                        message.senderName
-                      }
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.messageBody
-                      }
-                    >
-                      {
-                        message.content
-                      }
-                    </Text>
-                  </View>
-                );
-              },
-            )
-          )}
-        </View>
-
-        <AppTextInput
-          label="채팅"
-          value={
-            messageText
-          }
-          maxLength={500}
-          placeholder="메시지를 입력하세요"
           onChangeText={
             setMessageText
           }
-          onSubmitEditing={
-            sendMessage
-          }
+          onSend={sendMessage}
         />
+      ) : null}
 
-        <AppButton
-          label="전송"
-          onPress={
-            sendMessage
-          }
-        />
+      <LiveRoomActionBar
+        tone={tone}
+        center={
+          isBroadcastProtocol ? (
+            <LiveRoomMicButton
+              label={
+                mediaConnected
+                  ? isMicMuted
+                    ? "마이크 켜기"
+                    : "마이크 끄기"
+                  : "마이크 연결 중"
+              }
+              isLive={
+                mediaConnected &&
+                !isMicMuted
+              }
+              isMuted={isMicMuted}
+              disabled={
+                !mediaConnected
+              }
+              onPress={toggleMic}
+            />
+          ) : (
+            <LiveRoomSoundIndicator
+              tone={tone}
+            />
+          )
+        }
+        onOpenMembers={() =>
+          setIsMemberSheetOpen(
+            true,
+          )
+        }
+        onToggleChat={() =>
+          setIsComposerOpen(
+            (current) =>
+              !current,
+          )
+        }
+      />
 
-        {chat.lastError ? (
-          <Text
-            style={
-              styles.error
-            }
-          >
-            {chat.lastError}
-          </Text>
-        ) : null}
-      </AppCard>
+      <LiveRoomMemberSheet
+        tone={tone}
+        liveId={live.liveId}
+        open={isMemberSheetOpen}
+        onClose={() =>
+          setIsMemberSheetOpen(
+            false,
+          )
+        }
+      />
 
-      <AppButton
-        label={
+      <ConfirmModal
+        open={isExitConfirmOpen}
+        tone={
+          tone === "band"
+            ? "orange"
+            : "pink"
+        }
+        title={
           isOwner
-            ? "라이브 종료"
+            ? "라이브를 종료할까요?"
+            : "라이브를 나갈까요?"
+        }
+        description={
+          isOwner
+            ? "라이브를 종료하면 청취자들도\n자동으로 나가게 돼요."
+            : "진행 중인 라이브에서 나가게 돼요.\n언제든 다시 입장할 수 있어요."
+        }
+        confirmLabel={
+          isOwner
+            ? "종료"
             : "나가기"
         }
-        variant="secondary"
-        loading={
-          leaveMutation.isPending ||
-          closeMutation.isPending
+        onCancel={() =>
+          setIsExitConfirmOpen(
+            false,
+          )
         }
-        onPress={confirmExitLive}
+        onConfirm={() => {
+          setIsExitConfirmOpen(
+            false,
+          );
+
+          void exitLive();
+        }}
+      />
+
+      <ConfirmModal
+        open={
+          isCoHostModalOpen &&
+          Boolean(
+            currentCoHostRequest,
+          )
+        }
+        tone="orange"
+        title={
+          coHostNickname
+            ? `${coHostNickname}님의 공동 송출 요청을 승인할까요?`
+            : "공동 송출 요청을 승인할까요?"
+        }
+        description={
+          coHostNickname
+            ? `승인하면 ${coHostNickname}님이\n공동 진행자로 라이브에 참여해요.`
+            : "승인하면 공동 진행자로\n라이브에 참여해요."
+        }
+        cancelLabel="닫기"
+        confirmLabel={
+          acceptCoHostMutation.isPending
+            ? "승인 중"
+            : "승인하기"
+        }
+        confirmDisabled={
+          acceptCoHostMutation.isPending
+        }
+        onBackdropPress={() =>
+          setIsCoHostModalOpen(
+            false,
+          )
+        }
+        onCancel={() => {
+          setIsCoHostModalOpen(
+            false,
+          );
+
+          if (
+            currentCoHostRequest
+          ) {
+            dismissCoHostRequest(
+              currentCoHostRequest.userId,
+            );
+          }
+        }}
+        onConfirm={() => {
+          setIsCoHostModalOpen(
+            false,
+          );
+
+          void acceptRequester();
+        }}
       />
     </Screen>
   );
@@ -1680,140 +1633,91 @@ export function LiveRoomScreen({
 const styles =
   StyleSheet.create({
     container: {
-      gap: spacing.lg,
-      paddingBottom:
-        spacing.xxl,
-    },
-
-    hero: {
-      alignItems: "center",
-      gap: spacing.md,
-    },
-
-    liveHeader: {
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent:
-        "space-between",
-    },
-
-    connection: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-    },
-
-    title: {
-      color:
-        colors.neutral900,
-      fontSize: 24,
-      fontWeight: "900",
-      textAlign: "center",
-    },
-
-    bandName: {
-      color:
-        colors.neutral800,
-      fontSize: 15,
-      fontWeight: "800",
-    },
-
-    description: {
-      color:
-        colors.neutral700,
-      fontSize: 13,
-      lineHeight: 20,
-      textAlign: "center",
-    },
-
-    meta: {
-      color:
-        colors.neutral500,
-      fontSize: 11,
-    },
-
-    error: {
-      color:
-        colors.error,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-
-    section: {
-      gap: spacing.md,
-    },
-
-    micControl: {
-      width: "100%",
-      gap: spacing.xs,
-    },
-
-    micHint: {
-      color:
-        colors.neutral500,
-      fontSize: 11,
-      textAlign: "center",
-    },
-
-    sectionTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 17,
-      fontWeight: "900",
-    },
-
-    row: {
-      flexDirection: "row",
-      gap: spacing.sm,
-    },
-
-    rowButton: {
       flex: 1,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      backgroundColor:
+        colors.white,
     },
 
-    chatHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent:
-        "space-between",
-      gap: spacing.md,
+    stateContainer: {
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      backgroundColor:
+        colors.white,
     },
 
-    messages: {
-      gap: spacing.sm,
+    stateHeader: {
+      paddingHorizontal: 15,
     },
 
-    message: {
-      alignSelf:
-        "flex-start",
-      maxWidth: "85%",
-      gap: spacing.xs,
-      padding:
-        spacing.md,
+    stateText: {
+      ...textStyles.caption2,
+      color:
+        colors.neutral500,
+      paddingVertical: 40,
+      textAlign: "center",
+    },
+
+    inviteCard: {
+      ...shadows.card,
+      gap: 12,
       borderRadius: 12,
       backgroundColor:
-        colors.neutral200,
+        colors.white,
+      marginHorizontal: 20,
+      marginTop: 16,
+      padding: 20,
     },
 
-    myMessage: {
-      alignSelf:
-        "flex-end",
-      backgroundColor:
-        colors.primary100,
-    },
-
-    messageName: {
-      color:
-        colors.neutral600,
-      fontSize: 11,
-      fontWeight: "800",
-    },
-
-    messageBody: {
+    inviteTitle: {
+      ...textStyles.label1,
       color:
         colors.neutral900,
-      fontSize: 13,
-      lineHeight: 19,
+    },
+
+    inviteDescription: {
+      ...textStyles.caption1,
+      color:
+        colors.neutral600,
+    },
+
+    inviteActions: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 8,
+    },
+
+    inviteButton: {
+      flex: 1,
+      height: 42,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor:
+        colors.secondary500,
+    },
+
+    inviteReject: {
+      backgroundColor:
+        colors.white,
+    },
+
+    inviteAccept: {
+      backgroundColor:
+        colors.secondary500,
+    },
+
+    inviteRejectText: {
+      ...textStyles.label2,
+      color:
+        colors.secondary500,
+    },
+
+    inviteAcceptText: {
+      ...textStyles.label2,
+      color:
+        colors.white,
     },
   });

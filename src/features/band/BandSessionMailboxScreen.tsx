@@ -7,10 +7,9 @@ import {
   useSessionChatRoomListSocket,
 } from "@/hooks/api/session/useSessionChat";
 import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
-import { colors } from "@/shared/constants/theme";
+import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import type {
   ChatRoomListFilter,
   ChatRoomListItem,
@@ -78,8 +77,12 @@ export function BandSessionMailboxScreen() {
   };
 
   return (
-    <Screen scroll={false} contentStyle={styles.container}>
-      <AppHeader title="쪽지함" />
+    <Screen
+      edges={["top", "left", "right"]}
+      scroll={false}
+      contentStyle={styles.container}
+    >
+      <AppHeader title="쪽지함" style={styles.header} />
 
       <View style={styles.tabs}>
         <MailboxTab
@@ -110,14 +113,13 @@ export function BandSessionMailboxScreen() {
           </Pressable>
         </View>
       ) : rooms.length === 0 ? (
-        <AppState
-          title={
-            filter === "UNREAD"
-              ? "읽지 않은 쪽지가 없어요"
-              : "주고받은 쪽지가 없어요"
-          }
-          description="세션 모집 또는 지원 과정에서 대화를 시작하면 여기에 표시돼요."
-        />
+        <View style={styles.stateWrap}>
+          <Text style={styles.stateText}>
+            {filter === "UNREAD"
+              ? "읽지 않은 쪽지가 없어요."
+              : "받은 쪽지가 없어요."}
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={rooms}
@@ -132,10 +134,6 @@ export function BandSessionMailboxScreen() {
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footer}>이전 쪽지를 불러오고 있어요</Text>
-            ) : query.hasNextPage ? (
-              <Text style={styles.footer}>
-                아래로 스크롤하면 이전 쪽지를 더 불러와요
-              </Text>
             ) : undefined
           }
         />
@@ -157,7 +155,7 @@ function MailboxTab({
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected }}
-      style={[styles.tab, selected && styles.tabSelected]}
+      style={styles.tab}
       onPress={onPress}
     >
       <Text
@@ -168,6 +166,7 @@ function MailboxTab({
       >
         {label}
       </Text>
+      {selected ? <View style={styles.tabIndicator} /> : null}
     </Pressable>
   );
 }
@@ -189,11 +188,7 @@ function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
         )
       }
     >
-      <Avatar
-        imageUrl={room.counterpartProfileImageUrl}
-        label={room.counterpartName}
-        size={35}
-      />
+      <ProfileImage imageUrl={room.counterpartProfileImageUrl} size={35} />
 
       <View style={styles.content}>
         <View style={styles.headerRow}>
@@ -230,12 +225,6 @@ function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
         >
           {room.lastMessage || "아직 주고받은 쪽지가 없어요."}
         </Text>
-
-        {!room.canSend ? (
-          <Text style={styles.disabledText}>
-            현재 메시지를 보낼 수 없는 대화입니다.
-          </Text>
-        ) : null}
       </View>
     </Pressable>
   );
@@ -245,14 +234,21 @@ function MessageStatusBadge({ status }: { status: "accepted" | "declined" }) {
   const isAccepted = status === "accepted";
 
   return (
-    <Text
+    <View
       style={[
         styles.statusBadge,
         isAccepted ? styles.acceptedBadge : styles.declinedBadge,
       ]}
     >
-      {isAccepted ? "수락" : "거절"}
-    </Text>
+      <Text
+        style={[
+          styles.statusText,
+          isAccepted ? styles.acceptedText : styles.declinedBadgeText,
+        ]}
+      >
+        {isAccepted ? "수락" : "거절"}
+      </Text>
+    </View>
   );
 }
 
@@ -260,7 +256,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 0,
+    paddingVertical: 0,
     backgroundColor: colors.white,
+  },
+  header: {
+    paddingHorizontal: 15,
   },
   tabs: {
     height: 40,
@@ -273,9 +273,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabSelected: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.secondary500,
+  tabIndicator: {
+    position: "absolute",
+    right: 0,
+    bottom: -1,
+    left: 0,
+    height: 2,
+    backgroundColor: colors.secondary500,
   },
   tabText: {
     fontSize: 14,
@@ -292,27 +296,24 @@ const styles = StyleSheet.create({
     minHeight: 320,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
+    marginTop: 24,
+    paddingHorizontal: 15,
   },
   stateText: {
+    ...textStyles.caption1,
     color: colors.neutral500,
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
     textAlign: "center",
   },
   retryButton: {
+    marginTop: 12,
     borderRadius: 8,
     backgroundColor: colors.secondary500,
-    marginTop: 12,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   retryButtonText: {
+    ...textStyles.caption2,
     color: colors.white,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
   },
   list: {
     paddingHorizontal: 15,
@@ -323,19 +324,15 @@ const styles = StyleSheet.create({
     height: 12,
   },
   card: {
+    ...shadows.card,
     minHeight: 84,
-    borderRadius: 12,
-    backgroundColor: colors.white,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
+    borderRadius: 12,
+    backgroundColor: colors.white,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
   },
   content: {
     flex: 1,
@@ -356,6 +353,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   name: {
+    flexShrink: 1,
     color: colors.neutral900,
     fontSize: 18,
     fontWeight: "700",
@@ -364,9 +362,9 @@ const styles = StyleSheet.create({
   unreadBadge: {
     minWidth: 18,
     height: 18,
-    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 9,
     backgroundColor: colors.secondary500,
     paddingHorizontal: 5,
   },
@@ -374,22 +372,30 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 10,
     fontWeight: "500",
-    lineHeight: 10,
+    lineHeight: 12,
   },
   statusBadge: {
     height: 22,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 999,
+    paddingHorizontal: 12,
+  },
+  statusText: {
     fontSize: 12,
     fontWeight: "500",
-    lineHeight: 22,
-    paddingHorizontal: 12,
+    lineHeight: 18,
   },
   acceptedBadge: {
     backgroundColor: colors.secondary100,
-    color: colors.secondary500,
   },
   declinedBadge: {
     backgroundColor: colors.neutral300,
+  },
+  acceptedText: {
+    color: colors.secondary500,
+  },
+  declinedBadgeText: {
     color: colors.neutral600,
   },
   timeWrap: {
@@ -410,27 +416,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary500,
   },
   preview: {
+    marginTop: 8,
     color: colors.neutral800,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
-    marginTop: 8,
   },
   declinedText: {
     color: colors.neutral400,
   },
-  disabledText: {
-    color: colors.neutral500,
-    fontSize: 11,
-    fontWeight: "500",
-    lineHeight: 16,
-    marginTop: 6,
-  },
   footer: {
+    ...textStyles.caption2,
     color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
     paddingVertical: 16,
     textAlign: "center",
   },

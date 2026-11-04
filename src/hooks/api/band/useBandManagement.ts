@@ -5,9 +5,11 @@ import {
 } from "@tanstack/react-query";
 
 import {
+    acceptBandInvite,
     getBandMemberProfile,
     getBandMembers,
     inviteBandMember,
+    rejectBandInvite,
     removeBandMember,
     searchBandMemberCandidates,
     updateBandMemberProfile,
@@ -262,6 +264,47 @@ export const useInviteBandMember =
       },
     });
   };
+
+export const useAcceptBandInviteMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      bandId,
+      body,
+    }: {
+      bandId: number;
+      body: {
+        nickname: string;
+        part: BandMemberPart;
+      };
+    }) => acceptBandInvite(bandId, body),
+    onSuccess: (_result, { bandId }) => {
+      queryClient.invalidateQueries({
+        queryKey: bandManagementKeys.members(bandId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: bandManagementKeys.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: myProfilesKeys.all,
+      });
+    },
+  });
+};
+
+export const useRejectBandInviteMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ bandId }: { bandId: number }) => rejectBandInvite(bandId),
+    onSuccess: (_result, { bandId }) => {
+      queryClient.invalidateQueries({
+        queryKey: bandManagementKeys.members(bandId),
+      });
+    },
+  });
+};
 
 export const useRemoveBandMember =
   (

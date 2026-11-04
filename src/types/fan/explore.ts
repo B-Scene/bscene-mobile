@@ -13,7 +13,7 @@ export interface FanExploreRecommendationParams {
   withDummy?: boolean;
 }
 
-export type FanExploreSearchSort = "POPULAR" | "LATEST";
+export type FanExploreSearchSort = "ACCURACY" | "POPULAR" | "LATEST";
 
 export interface FanExploreSearchParams {
   keyword: string;
@@ -225,6 +225,9 @@ export interface FanExploreBandDetail extends FanExploreBand {
 }
 
 export interface FanExplorePageResponse<T> {
+  totalCount?: number;
+  totalElements?: number;
+  total?: number;
   items?: T[];
   content?: T[];
   data?: T[];
@@ -266,4 +269,21 @@ export interface NormalizedFanExploreContentsResponse
   hasNext: boolean;
   page: number;
   nextCursor: number | null;
+}
+
+export interface FanExploreRecentSearch {
+  recentSearchId?: number | string;
+  keywordId?: number | string;
+  id?: number | string;
+  keyword?: string;
+  searchKeyword?: string;
+  searchTerm?: string;
+  searchWord?: string;
+  query?: string;
+  value?: string;
+}
+
+export interface NormalizedFanExploreRecentSearch {
+  recentSearchId: number | null;
+  keyword: string;
 }

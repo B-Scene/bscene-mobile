@@ -7,23 +7,44 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import Svg, { Circle, Path } from "react-native-svg";
 
 import { uploadMediaAsset } from "@/api/media/media";
+import {
+  DatePickerSheet,
+  TimePickerSheet,
+} from "@/features/band/BandDateTimeSheets";
+import {
+  DescriptionInput,
+  FormField,
+  MAX_TAGS,
+  MediaSourceSheet,
+  RegisterComplete,
+  TagInput,
+} from "@/features/band/BandFormParts";
+import {
+  FormInput,
+  SelectField,
+  SubmitButton,
+} from "@/features/my/MyFormParts";
 import {
   useBandPerformanceQuery,
   useCreateBandPerformance,
   useUpdateBandPerformance,
 } from "@/hooks/api/band/useBand";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import { AppButton } from "@/shared/components/AppButton";
 import { AppHeader } from "@/shared/components/AppHeader";
+import { AppIcon } from "@/shared/components/AppIcon";
 import { AppState } from "@/shared/components/AppState";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
-import { colors } from "@/shared/constants/theme";
+import {
+  BAND_GENRE_LABELS,
+  BAND_REGION_LABELS,
+} from "@/shared/constants/bandLabels";
+import { colors, textStyles } from "@/shared/constants/theme";
+import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
 import type {
   CreatePerformanceRequest,
   PerformanceAgeRating,
@@ -33,14 +54,28 @@ import type {
 
 type Step = 1 | 2;
 
-const DESCRIPTION_MAX_LENGTH = 500;
-
 const AGE_RATINGS: { label: string; value: PerformanceAgeRating }[] = [
-  { label: "전체", value: "ALL" },
-  { label: "12세", value: "AGE_12" },
-  { label: "15세", value: "AGE_15" },
-  { label: "19세", value: "AGE_19" },
+  { label: "전체 관람가", value: "ALL" },
+  { label: "12세 이상", value: "AGE_12" },
+  { label: "15세 이상", value: "AGE_15" },
+  { label: "19세 이상", value: "AGE_19" },
 ];
+
+const toOptions = (labels: Record<string, string>) =>
+  Object.entries(labels).map(([value, label]) => ({ value, label }));
+
+const GENRE_OPTIONS = toOptions(BAND_GENRE_LABELS);
+const REGION_OPTIONS = toOptions(BAND_REGION_LABELS);
+
+const formatDateRange = (start: string, end: string) => {
+  if (!start) return "";
+
+  const startLabel = start.replaceAll("-", ".");
+
+  if (!end || end === start) return startLabel;
+
+  return `${startLabel} - ${end.replaceAll("-", ".")}`;
+};
 
 const parseRouteId = (value?: string | string[]) => {
   const rawValue = Array.isArray(value) ? value[0] : value;
@@ -48,12 +83,6 @@ const parseRouteId = (value?: string | string[]) => {
 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
-
-const splitTags = (value: string) =>
-  value
-    .split(",")
-    .map((item) => item.trim().replace(/^#/, ""))
-    .filter(Boolean);
 
 type SelectedPosterAsset = {
   uri: string;
@@ -72,7 +101,7 @@ export function BandPerformanceFormScreen() {
   if (activeBandQuery.isLoading || (isEditMode && performanceQuery.isLoading)) {
     return (
       <Screen contentStyle={styles.container}>
-        <AppHeader title={isEditMode ? "공연 수정" : "공연 등록"} />
+        <AppHeader title={isEditMode ? "공연 수정" : "공연 등록"} style={styles.stateHeader} />
         <AppState loading title="공연 정보를 준비하는 중이에요" />
       </Screen>
     );
@@ -81,7 +110,7 @@ export function BandPerformanceFormScreen() {
   if (!bandId) {
     return (
       <Screen contentStyle={styles.container}>
-        <AppHeader title={isEditMode ? "공연 수정" : "공연 등록"} />
+        <AppHeader title={isEditMode ? "공연 수정" : "공연 등록"} style={styles.stateHeader} />
         <AppState
           title="등록된 밴드를 찾지 못했어요"
           description="밴드 프로필을 먼저 확인해 주세요."
@@ -93,7 +122,7 @@ export function BandPerformanceFormScreen() {
   if (isEditMode && (performanceQuery.isError || !performanceQuery.data)) {
     return (
       <Screen contentStyle={styles.container}>
-        <AppHeader title="공연 수정" />
+        <AppHeader title="공연 수정" style={styles.stateHeader} />
         <AppState
           title="공연 정보를 불러오지 못했어요"
           description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
@@ -132,7 +161,12 @@ function PerformanceForm({
   const [performanceDate, setPerformanceDate] = useState(
     initialPerformance?.performanceDate ?? "",
   );
-  const [startTime, setStartTime] = useState(initialPerformance?.startTime ?? "");
+  const [endDate, setEndDate] = useState(
+    initialPerformance?.performanceDate ?? "",
+  );
+  const [startTime, setStartTime] = useState(
+    initialPerformance?.startTime.slice(0, 5) ?? "",
+  );
   const [region, setRegion] = useState(initialPerformance?.region ?? "");
   const [venue, setVenue] = useState(initialPerformance?.venue ?? "");
   const [description, setDescription] = useState(
@@ -144,25 +178,41 @@ function PerformanceForm({
   const [ticketLink, setTicketLink] = useState(
     initialPerformance?.ticketLink ?? "",
   );
-  const [posterImageUrl, setPosterImageUrl] = useState(
-    initialPerformance?.posterImageUrl ?? "",
-  );
+  const posterImageUrl = initialPerformance?.posterImageUrl ?? "";
   const [selectedPoster, setSelectedPoster] =
     useState<SelectedPosterAsset | null>(null);
-  const [ageRating, setAgeRating] = useState<PerformanceAgeRating>(
-    initialPerformance?.ageRating ?? "ALL",
+  const [ageRating, setAgeRating] = useState<PerformanceAgeRating | "">(
+    initialPerformance?.ageRating ?? "",
   );
-  const [tags, setTags] = useState(initialPerformance?.tags?.join(", ") ?? "");
+  const [tags, setTags] = useState(initialPerformance?.tags ?? []);
+  const [isSourceSheetOpen, setIsSourceSheetOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [completedPerformanceId, setCompletedPerformanceId] = useState<
+    number | null
+  >(null);
   const isSubmitting =
     createPerformance.isPending || updatePerformance.isPending || uploading;
-  const hasStep1Error = [title, genre, region, description].some(
+  const hasStep1Error = [title, genre, region, ageRating, description].some(
     (value) => !value.trim(),
   );
   const hasStep2Error = [performanceDate, startTime, venue, ticketPrice].some(
     (value) => !value.trim(),
   );
+  const posterPreviewUrl = selectedPoster?.uri ?? posterImageUrl.trim();
+  const titleError = showErrors && !title.trim();
+  const genreError = showErrors && !genre.trim();
+  const regionError = showErrors && !region.trim();
+  const ageRatingError = showErrors && !ageRating;
+  const descriptionError = showErrors && !description.trim();
+  const dateError = showErrors && !performanceDate.trim();
+  const timeError = showErrors && !startTime.trim();
+  const venueError = showErrors && !venue.trim();
+  const priceError = showErrors && !ticketPrice.trim();
 
   const requestPosterPermission = async (camera: boolean) => {
     const permission = camera
@@ -214,20 +264,17 @@ function PerformanceForm({
   };
 
   const submit = async () => {
-    if (hasStep1Error || hasStep2Error) {
+    if (hasStep1Error || hasStep2Error || !ageRating) {
       setShowErrors(true);
       return;
     }
 
     const onSuccess = (nextPerformanceId: number) => {
-      router.replace(
-        `/band/home/concerts/${nextPerformanceId}` as Parameters<
-          typeof router.replace
-        >[0],
-      );
+      setCompletedPerformanceId(nextPerformanceId);
     };
 
     try {
+      setSubmitError(null);
       setUploading(true);
 
       const uploadedPosterUrl = selectedPoster
@@ -239,7 +286,6 @@ function PerformanceForm({
           })
         : "";
 
-      const nextTags = splitTags(tags);
       const commonPayload = {
         title: title.trim(),
         genre: genre.trim(),
@@ -253,7 +299,7 @@ function PerformanceForm({
         posterImageUrl:
           uploadedPosterUrl || posterImageUrl.trim() || undefined,
         ageRating,
-        tags: nextTags.length > 0 ? nextTags : undefined,
+        tags: tags.length > 0 ? tags : undefined,
       };
 
       if (isEditMode && performanceId) {
@@ -268,10 +314,9 @@ function PerformanceForm({
         commonPayload satisfies CreatePerformanceRequest,
       );
       onSuccess(result.performanceId);
-    } catch {
-      Alert.alert(
-        isEditMode ? "공연 수정" : "공연 등록",
-        "공연 정보를 저장하지 못했어요.",
+    } catch (error) {
+      setSubmitError(
+        getApiErrorMessage(error, "저장에 실패했어요. 다시 시도해주세요"),
       );
     } finally {
       setUploading(false);
@@ -288,43 +333,108 @@ function PerformanceForm({
     setStep(2);
   };
 
+  if (completedPerformanceId !== null) {
+    return (
+      <Screen contentStyle={styles.completeContainer}>
+        <RegisterComplete
+          title={isEditMode ? "공연이 수정됐어요" : "공연이 등록됐어요"}
+          description={
+            isEditMode
+              ? "변경사항이 저장됐어요"
+              : "팔로워들에게 공연 소식이\n전달됐어요"
+          }
+          rows={[
+            { label: "공연명", value: title },
+            { label: "날짜", value: formatDateRange(performanceDate, endDate) },
+            { label: "장소", value: venue },
+          ]}
+          primaryLabel="공연 상세 보기"
+          onHome={() => router.replace("/band/home")}
+          onPrimary={() =>
+            router.replace(
+              `/band/home/concerts/${completedPerformanceId}` as Parameters<
+                typeof router.replace
+              >[0],
+            )
+          }
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen contentStyle={styles.container}>
-      <AppHeader title={isEditMode ? "공연 수정" : "공연 등록"} />
+      <View style={styles.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="뒤로가기"
+          hitSlop={12}
+          onPress={() => setIsLeaveConfirmOpen(true)}
+        >
+          <AppIcon name="arrowLeft" size={24} />
+        </Pressable>
+        <Text numberOfLines={1} style={styles.headerTitle}>
+          {isEditMode ? "공연 수정" : "공연 등록"}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="닫기"
+          hitSlop={12}
+          onPress={() => setIsLeaveConfirmOpen(true)}
+        >
+          <AppIcon name="close" size={24} />
+        </Pressable>
+      </View>
+
       <StepIndicator step={step} />
 
       <View style={styles.body}>
         <View style={styles.formCard}>
           {step === 1 ? (
             <>
-              <Field label="공연명" required error={showErrors && !title.trim()}>
-                <NativeInput
+              <FormField label="공연명" required error={titleError}>
+                <FormInput
+                  tone="secondary"
                   value={title}
                   placeholder="공연 제목을 입력해주세요"
-                  error={showErrors && !title.trim()}
+                  style={titleError ? styles.inputError : undefined}
                   onChangeText={setTitle}
                 />
-              </Field>
+              </FormField>
 
-              <Field label="장르" required error={showErrors && !genre.trim()}>
-                <NativeInput
+              <FormField
+                label="장르"
+                required
+                error={genreError}
+                style={styles.genreField}
+              >
+                <SelectField
+                  overlay
                   value={genre}
+                  options={GENRE_OPTIONS}
                   placeholder="장르 선택"
-                  error={showErrors && !genre.trim()}
-                  onChangeText={setGenre}
+                  error={genreError}
+                  onChange={setGenre}
                 />
-              </Field>
+              </FormField>
 
-              <Field label="지역" required error={showErrors && !region.trim()}>
-                <NativeInput
+              <FormField
+                label="지역"
+                required
+                error={regionError}
+                style={styles.regionField}
+              >
+                <SelectField
+                  overlay
                   value={region}
+                  options={REGION_OPTIONS}
                   placeholder="지역 선택"
-                  error={showErrors && !region.trim()}
-                  onChangeText={setRegion}
+                  error={regionError}
+                  onChange={setRegion}
                 />
-              </Field>
+              </FormField>
 
-              <Field label="관람 연령" required>
+              <FormField label="관람 연령" required error={ageRatingError}>
                 <View style={styles.ageRow}>
                   {AGE_RATINGS.map((item) => (
                     <Pressable
@@ -334,16 +444,21 @@ function PerformanceForm({
                         styles.ageButton,
                         ageRating === item.value
                           ? styles.ageButtonSelected
-                          : styles.ageButtonIdle,
+                          : ageRatingError
+                            ? styles.ageButtonError
+                            : styles.ageButtonIdle,
                       ]}
                       onPress={() => setAgeRating(item.value)}
                     >
                       <Text
+                        numberOfLines={1}
                         style={[
                           styles.ageButtonText,
-                          ageRating === item.value
-                            ? styles.ageButtonTextSelected
-                            : styles.ageButtonTextIdle,
+                          ageRating === item.value &&
+                            styles.ageButtonTextSelected,
+                          ageRating !== item.value &&
+                            ageRatingError &&
+                            styles.ageButtonTextError,
                         ]}
                       >
                         {item.label}
@@ -351,213 +466,209 @@ function PerformanceForm({
                     </Pressable>
                   ))}
                 </View>
-              </Field>
+              </FormField>
 
-              <Field label="공연 포스터">
-                <View style={styles.posterBox}>
-                  {selectedPoster ? (
+              <FormField label="공연 포스터">
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.posterBox}
+                  onPress={() => setIsSourceSheetOpen(true)}
+                >
+                  {posterPreviewUrl ? (
                     <Image
-                      source={{ uri: selectedPoster.uri }}
-                      style={styles.posterPreview}
-                    />
-                  ) : posterImageUrl.trim() ? (
-                    <Image
-                      source={{ uri: posterImageUrl.trim() }}
+                      accessibilityLabel="공연 포스터"
+                      source={{ uri: posterPreviewUrl }}
                       style={styles.posterPreview}
                     />
                   ) : (
                     <View style={styles.posterPlaceholder}>
-                      <PosterIcon />
+                      <AppIcon name="formAddImage" size={24} />
                       <Text style={styles.posterPlaceholderText}>
-                        공연 포스터 URL을 입력해주세요
+                        공연 포스터를 업로드해주세요
                       </Text>
                     </View>
                   )}
-                </View>
+                </Pressable>
+              </FormField>
 
-                <View style={styles.posterActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.posterActionButton}
-                    onPress={() => void pickPoster(false)}
-                  >
-                    <Text style={styles.posterActionText}>갤러리</Text>
-                  </Pressable>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.posterActionButton}
-                    onPress={() => void pickPoster(true)}
-                  >
-                    <Text style={styles.posterActionText}>카메라</Text>
-                  </Pressable>
-
-                  {selectedPoster ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.posterClearButton}
-                      onPress={() => setSelectedPoster(null)}
-                    >
-                      <Text style={styles.posterClearText}>선택 취소</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-
-                <NativeInput
-                  value={posterImageUrl}
-                  placeholder="포스터 이미지 URL 직접 입력"
-                  autoCapitalize="none"
-                  onChangeText={setPosterImageUrl}
-                />
-              </Field>
-
-              <Field
-                label="공연 소개"
-                required
-                error={showErrors && !description.trim()}
-              >
-                <NativeInput
+              <FormField label="공연 소개" required error={descriptionError}>
+                <DescriptionInput
                   value={description}
                   placeholder="공연에 대해 소개해주세요"
-                  multiline
-                  maxLength={DESCRIPTION_MAX_LENGTH}
-                  error={showErrors && !description.trim()}
+                  error={descriptionError}
                   onChangeText={setDescription}
                 />
-                <Text style={styles.countText}>
-                  {description.length}/{DESCRIPTION_MAX_LENGTH}
-                </Text>
-              </Field>
+              </FormField>
 
-              <Field label="태그">
-                <NativeInput
-                  value={tags}
-                  placeholder="쉼표로 구분해서 입력"
-                  onChangeText={setTags}
-                />
-                {splitTags(tags).length > 0 ? (
-                  <View style={styles.tagPreview}>
-                    {splitTags(tags).slice(0, 8).map((tag) => (
-                      <View key={tag} style={styles.tagChip}>
-                        <Text style={styles.tagChipText}>{tag}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </Field>
+              <FormField label={`태그 (최대 ${MAX_TAGS}개)`}>
+                <TagInput tags={tags} onChange={setTags} />
+              </FormField>
             </>
           ) : (
             <>
-              <Field
-                label="공연 날짜"
-                required
-                error={showErrors && !performanceDate.trim()}
-              >
-                <NativeInput
-                  value={performanceDate}
-                  placeholder="YYYY-MM-DD"
-                  error={showErrors && !performanceDate.trim()}
-                  onChangeText={setPerformanceDate}
+              <FormField label="공연 날짜" required error={dateError}>
+                <PickerButton
+                  value={formatDateRange(performanceDate, endDate)}
+                  placeholder="날짜 선택"
+                  icon="formCalendar"
+                  error={dateError}
+                  onPress={() => setIsDatePickerOpen(true)}
                 />
-              </Field>
+              </FormField>
 
-              <Field
-                label="공연 시작 시간"
-                required
-                error={showErrors && !startTime.trim()}
-              >
-                <NativeInput
+              <FormField label="공연 시작 시간" required error={timeError}>
+                <PickerButton
                   value={startTime}
-                  placeholder="HH:mm"
-                  error={showErrors && !startTime.trim()}
-                  onChangeText={setStartTime}
+                  placeholder="시간 선택"
+                  icon="formClock"
+                  error={timeError}
+                  onPress={() => setIsTimePickerOpen(true)}
                 />
-              </Field>
+              </FormField>
 
-              <Field label="공연 장소" required error={showErrors && !venue.trim()}>
-                <NativeInput
+              <FormField label="공연 장소" required error={venueError}>
+                <FormInput
+                  tone="secondary"
                   value={venue}
                   placeholder="공연 장소를 작성해주세요"
-                  error={showErrors && !venue.trim()}
+                  style={venueError ? styles.inputError : undefined}
                   onChangeText={setVenue}
                 />
-              </Field>
+              </FormField>
 
-              <Field
-                label="티켓 가격"
-                required
-                error={showErrors && !ticketPrice.trim()}
-              >
-                <NativeInput
+              <FormField label="티켓 가격" required error={priceError}>
+                <FormInput
+                  tone="secondary"
                   value={ticketPrice}
                   placeholder="티켓 가격을 작성해주세요"
-                  error={showErrors && !ticketPrice.trim()}
+                  style={priceError ? styles.inputError : undefined}
                   onChangeText={setTicketPrice}
                 />
-              </Field>
+              </FormField>
 
-              <Field label="티켓 예매 링크 (선택)">
-                <NativeInput
+              <FormField label="티켓 예매 링크 (선택)">
+                <FormInput
+                  tone="secondary"
                   value={ticketLink}
                   placeholder="예매 링크 또는 관련 게시글 링크를 첨부해주세요"
                   autoCapitalize="none"
                   onChangeText={setTicketLink}
                 />
-              </Field>
+              </FormField>
             </>
           )}
         </View>
-
-        <View style={styles.submitArea}>
-          {step === 1 ? (
-            <AppButton
-              label="다음"
-              style={[
-                styles.submitButton,
-                hasStep1Error ? styles.submitButtonDisabled : styles.submitButtonActive,
-              ]}
-              onPress={goNext}
-            />
-          ) : (
-            <AppButton
-              label={isSubmitting ? "저장 중..." : isEditMode ? "수정 완료" : "공연 등록"}
-              loading={isSubmitting}
-              disabled={isSubmitting}
-              style={[
-                styles.submitButton,
-                hasStep2Error ? styles.submitButtonDisabled : styles.submitButtonActive,
-              ]}
-              onPress={() => void submit()}
-            />
-          )}
-        </View>
       </View>
+
+      <View style={styles.submitArea}>
+        {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
+
+        {step === 1 ? (
+          <SubmitButton
+            tone="secondary"
+            label="다음"
+            active={!hasStep1Error}
+            disabled={false}
+            onPress={goNext}
+          />
+        ) : (
+          <SubmitButton
+            tone="secondary"
+            label={uploading ? "업로드 중..." : isEditMode ? "수정 완료" : "공연 등록"}
+            active={!hasStep2Error && !isSubmitting}
+            disabled={isSubmitting}
+            onPress={() => void submit()}
+          />
+        )}
+      </View>
+
+      <MediaSourceSheet
+        open={isSourceSheetOpen}
+        onClose={() => setIsSourceSheetOpen(false)}
+        onSelect={(camera) => void pickPoster(camera)}
+      />
+
+      <DatePickerSheet
+        open={isDatePickerOpen}
+        startDate={performanceDate}
+        endDate={endDate}
+        onClose={() => setIsDatePickerOpen(false)}
+        onSelect={(range) => {
+          setPerformanceDate(range.start);
+          setEndDate(range.end);
+          setIsDatePickerOpen(false);
+        }}
+      />
+
+      <TimePickerSheet
+        open={isTimePickerOpen}
+        value={startTime}
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(nextTime) => {
+          setStartTime(nextTime);
+          setIsTimePickerOpen(false);
+        }}
+      />
+
+      <ConfirmModal
+        open={isLeaveConfirmOpen}
+        tone="orange"
+        title={isEditMode ? "수정을 취소할까요?" : "공연 등록을 취소할까요?"}
+        description={
+          isEditMode
+            ? "수정한 내용은 저장되지 않고\n사라집니다."
+            : "입력한 내용은 저장되지 않고\n사라집니다."
+        }
+        onCancel={() => setIsLeaveConfirmOpen(false)}
+        onConfirm={() => router.replace("/band/home")}
+      />
     </Screen>
+  );
+}
+
+function PickerButton({
+  value,
+  placeholder,
+  icon,
+  error,
+  onPress,
+}: {
+  value: string;
+  placeholder: string;
+  icon: "formCalendar" | "formClock";
+  error: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      style={[styles.pickerButton, error && styles.inputError]}
+      onPress={onPress}
+    >
+      <Text style={[styles.pickerText, !value && styles.pickerPlaceholder]}>
+        {value || placeholder}
+      </Text>
+      <AppIcon name={icon} size={16} />
+    </Pressable>
   );
 }
 
 function StepIndicator({ step }: { step: Step }) {
   return (
     <View style={styles.stepWrap}>
-      <View style={styles.stepItem}>
-        {step > 1 ? <CheckStepIcon /> : <NumberStepIcon value="1" active />}
+      <View style={[styles.stepItem, styles.stepItemFirst]}>
+        <AppIcon name={step > 1 ? "formStepDone" : "formStep1"} size={24} />
         <Text
-          style={[
-            styles.stepLabel,
-            step === 1 ? styles.stepLabelActive : styles.stepLabelIdle,
-          ]}
+          style={[styles.stepLabel, step === 1 && styles.stepLabelActive]}
         >
           기본 정보
         </Text>
       </View>
       <View style={[styles.stepLine, step > 1 && styles.stepLineActive]} />
       <View style={styles.stepItem}>
-        <NumberStepIcon value="2" active={step === 2} />
+        <AppIcon name={step === 2 ? "formStep2Active" : "formStep2"} size={24} />
         <Text
-          style={[
-            styles.stepLabel,
-            step === 2 ? styles.stepLabelActive : styles.stepLabelIdle,
-          ]}
+          style={[styles.stepLabel, step === 2 && styles.stepLabelActive]}
         >
           일정 & 장소
         </Text>
@@ -566,224 +677,99 @@ function StepIndicator({ step }: { step: Step }) {
   );
 }
 
-function Field({
-  label,
-  required = false,
-  error = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  error?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>
-        {label} {required ? <Text style={styles.required}>*</Text> : null}
-      </Text>
-      {children}
-      {error ? <Text style={styles.errorText}>{label}은 필수 항목이에요</Text> : null}
-    </View>
-  );
-}
-
-function NativeInput({
-  error = false,
-  multiline = false,
-  style,
-  ...props
-}: React.ComponentProps<typeof TextInput> & {
-  error?: boolean;
-}) {
-  return (
-    <TextInput
-      placeholderTextColor={colors.neutral500}
-      textAlignVertical={multiline ? "top" : "center"}
-      style={[
-        styles.input,
-        multiline && styles.textArea,
-        error && styles.inputError,
-        style,
-      ]}
-      multiline={multiline}
-      {...props}
-    />
-  );
-}
-
-function NumberStepIcon({ value, active }: { value: string; active: boolean }) {
-  return (
-    <View>
-      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-        <Circle
-          cx={12}
-          cy={12}
-          r={11}
-          fill={active ? colors.secondary500 : colors.white}
-          stroke={active ? colors.secondary500 : colors.secondary300}
-          strokeWidth={2}
-        />
-      </Svg>
-      <Text style={[styles.stepNumber, active && styles.stepNumberActive]}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function CheckStepIcon() {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={12} fill={colors.secondary500} />
-      <Path
-        d="M7 12.2L10.2 15.4L17.2 8.6"
-        stroke={colors.white}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function PosterIcon() {
-  return (
-    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M4 5.5C4 4.672 4.672 4 5.5 4H18.5C19.328 4 20 4.672 20 5.5V18.5C20 19.328 19.328 20 18.5 20H5.5C4.672 20 4 19.328 4 18.5V5.5Z"
-        stroke={colors.secondary500}
-        strokeWidth={2}
-      />
-      <Path
-        d="M6.5 16L10 12.5L12.5 15L14.5 13L18 16.5"
-        stroke={colors.secondary500}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Circle cx={16} cy={8} r={1.5} fill={colors.secondary500} />
-    </Svg>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: 104,
+    paddingBottom: 24,
     backgroundColor: colors.secondary0,
   },
+  completeContainer: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  stateHeader: {
+    paddingHorizontal: 15,
+  },
+  header: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.white,
+    paddingHorizontal: 24,
+  },
+  headerTitle: {
+    flexShrink: 1,
+    color: colors.neutral900,
+    fontSize: 20,
+    fontWeight: "700",
+    lineHeight: 24,
+  },
   stepWrap: {
-    backgroundColor: colors.secondary0,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "center",
     gap: 12,
+    backgroundColor: colors.secondary0,
     paddingTop: 16,
-    paddingBottom: 18,
   },
   stepItem: {
     alignItems: "center",
-    gap: 7,
+    gap: 4,
+  },
+  stepItemFirst: {
+    gap: 9,
   },
   stepLine: {
     width: 128,
     height: 2,
-    backgroundColor: colors.secondary300,
     marginTop: 11,
+    backgroundColor: colors.secondary300,
   },
   stepLineActive: {
     backgroundColor: colors.secondary500,
   },
   stepLabel: {
-    fontSize: 10,
-    fontWeight: "500",
-    lineHeight: 12,
+    ...textStyles.body4,
+    color: colors.neutral400,
+    textAlign: "center",
   },
   stepLabelActive: {
     color: colors.secondary500,
   },
-  stepLabelIdle: {
-    color: colors.neutral400,
-  },
-  stepNumber: {
-    position: "absolute",
-    left: 0,
-    top: 5,
-    width: 24,
-    color: colors.secondary500,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-    textAlign: "center",
-  },
-  stepNumberActive: {
-    color: colors.white,
-  },
   body: {
+    marginTop: 24,
     paddingHorizontal: 20,
   },
   formCard: {
+    gap: 12,
     borderRadius: 16,
     backgroundColor: colors.white,
-    gap: 12,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
+    boxShadow: "0px 0px 8px 0px rgba(0, 0, 0, 0.08)",
   },
-  field: {
-    gap: 8,
+  genreField: {
+    zIndex: 3,
   },
-  label: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  required: {
-    color: colors.error,
-  },
-  input: {
-    minHeight: 38,
-    borderWidth: 1,
-    borderColor: colors.neutral400,
-    borderRadius: 5,
-    backgroundColor: colors.white,
-    color: colors.neutral900,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  textArea: {
-    minHeight: 60,
-    paddingTop: 8,
+  regionField: {
+    zIndex: 2,
   },
   inputError: {
     borderColor: colors.error,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 10,
-    fontWeight: "500",
-    lineHeight: 12,
   },
   ageRow: {
     flexDirection: "row",
     gap: 8,
   },
   ageButton: {
-    flex: 1,
     height: 26,
-    borderRadius: 8,
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 8,
   },
   ageButtonSelected: {
     backgroundColor: colors.secondary500,
@@ -791,19 +777,22 @@ const styles = StyleSheet.create({
   ageButtonIdle: {
     backgroundColor: colors.neutral300,
   },
+  ageButtonError: {
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
   ageButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
+    ...textStyles.caption3,
+    color: colors.neutral600,
+    textAlign: "center",
   },
   ageButtonTextSelected: {
     color: colors.white,
   },
-  ageButtonTextIdle: {
-    color: colors.neutral600,
+  ageButtonTextError: {
+    color: colors.error,
   },
   posterBox: {
-    minHeight: 128,
     borderWidth: 1,
     borderColor: colors.neutral400,
     borderRadius: 5,
@@ -815,91 +804,39 @@ const styles = StyleSheet.create({
     height: 128,
   },
   posterPlaceholder: {
-    flex: 1,
-    minHeight: 128,
     alignItems: "center",
-    justifyContent: "center",
     gap: 12,
     paddingVertical: 16,
   },
   posterPlaceholderText: {
+    ...textStyles.caption2,
     color: colors.neutral500,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
   },
-  posterActions: {
+  pickerButton: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  posterActionButton: {
-    minHeight: 34,
-    borderRadius: 8,
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.secondary500,
-    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.neutral400,
+    borderRadius: 5,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
   },
-  posterActionText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
+  pickerText: {
+    ...textStyles.caption2,
+    flex: 1,
+    color: colors.neutral900,
   },
-  posterClearButton: {
-    minHeight: 34,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.neutral300,
-    paddingHorizontal: 14,
-  },
-  posterClearText: {
-    color: colors.neutral700,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
-  },
-  countText: {
-    alignSelf: "flex-end",
-    color: colors.neutral400,
-    fontSize: 10,
-    fontWeight: "500",
-    lineHeight: 12,
-    marginTop: -22,
-    marginRight: 10,
-  },
-  tagPreview: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tagChip: {
-    minHeight: 26,
-    borderRadius: 999,
-    backgroundColor: colors.secondary100,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 15,
-  },
-  tagChipText: {
-    color: colors.secondary500,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
+  pickerPlaceholder: {
+    color: colors.neutral500,
   },
   submitArea: {
+    gap: 8,
     marginTop: 18,
+    paddingHorizontal: 20,
   },
-  submitButton: {
-    minHeight: 52,
-    borderRadius: 12,
-  },
-  submitButtonActive: {
-    backgroundColor: colors.secondary500,
-  },
-  submitButtonDisabled: {
-    backgroundColor: colors.neutral300,
+  submitError: {
+    ...textStyles.body5,
+    color: colors.error,
+    textAlign: "center",
   },
 });

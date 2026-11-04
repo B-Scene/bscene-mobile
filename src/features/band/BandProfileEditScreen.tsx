@@ -1,173 +1,70 @@
-import {
-    router,
-} from "expo-router";
+import { router } from "expo-router";
+import { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
-import * as ImagePicker from "expo-image-picker";
-
+import type { BandMemberPart } from "@/api/band/bandManagement";
+import { uploadMediaAsset } from "@/api/media/media";
+import { BandBanner } from "@/features/my/BandBanner";
 import {
-    Camera,
-    Image as ImageIcon,
-    Trash2,
-} from "lucide-react-native";
-
+  ChipGroup,
+  FieldLabel,
+  FormInput,
+  ProfileImagePicker,
+  SelectField,
+  SubmitButton,
+} from "@/features/my/MyFormParts";
+import { MyHeader } from "@/features/my/MyHeader";
+import { useProfileImageSelection } from "@/features/my/useProfileImageSelection";
+import { useBandQuery } from "@/hooks/api/band/useBand";
 import {
-    Alert,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-
-import {
-    useState,
-} from "react";
-
-import {
-    uploadMediaAsset,
-} from "@/api/media/media";
-
-import {
-    useBandQuery,
-} from "@/hooks/api/band/useBand";
-
-import {
-    useBandMemberProfileQuery,
-    useUpdateBandMemberProfile,
-    useUpdateBandProfile,
+  useBandMemberProfileQuery,
+  useUpdateBandMemberProfile,
+  useUpdateBandProfile,
 } from "@/hooks/api/band/useBandManagement";
-
-import {
-    useActiveBandId,
-} from "@/hooks/api/user/useMyProfiles";
-
-import { AppHeader } from "@/shared/components/AppHeader";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
 import { Screen } from "@/shared/components/Screen";
-
 import {
-    colors,
-} from "@/shared/constants/theme";
+  BAND_GENRE_LABELS,
+  BAND_PART_LABELS,
+  BAND_REGION_LABELS,
+} from "@/shared/constants/bandLabels";
+import { colors, textStyles } from "@/shared/constants/theme";
 
-import type {
-    BandMemberPart,
-} from "@/api/band/bandManagement";
+const toOptions = (labels: Record<string, string>) =>
+  Object.entries(labels).map(([value, label]) => ({ value, label }));
 
-const GENRES = [
-  ["INDIE", "인디"],
-  ["POP", "팝"],
-  ["POP_ROCK", "팝록"],
-  ["JAZZ", "재즈"],
-  ["BLUES", "블루스"],
-  [
-    "ALTERNATIVE_ROCK",
-    "얼터너티브록",
-  ],
-  [
-    "PSYCHEDELIC_ROCK",
-    "사이키델릭록",
-  ],
-  [
-    "ELECTRONIC_ROCK",
-    "일렉트로닉록",
-  ],
-  ["FOLK_ROCK", "포크록"],
-  ["PUNK_ROCK", "펑크록"],
-  ["HARD_ROCK", "하드록"],
-  ["METAL", "메탈"],
-  ["ETC", "기타"],
-] as const;
-
-const REGIONS = [
-  ["SEOUL", "서울"],
-  ["GYEONGGI", "경기"],
-  ["INCHEON", "인천"],
-  ["GANGWON", "강원"],
-  ["DAEJEON", "대전"],
-  ["SEJONG", "세종"],
-  ["CHUNGBUK", "충북"],
-  ["CHUNGNAM", "충남"],
-  ["DAEGU", "대구"],
-  ["GYEONGBUK", "경북"],
-  ["BUSAN", "부산"],
-  ["ULSAN", "울산"],
-  ["GYEONGNAM", "경남"],
-  ["GWANGJU", "광주"],
-  ["JEONBUK", "전북"],
-  ["JEONNAM", "전남"],
-  ["JEJU", "제주"],
-] as const;
-
-const PARTS: [
-  BandMemberPart,
-  string,
-][] = [
-  ["VOCAL", "보컬"],
-  ["GUITAR", "기타"],
-  ["BASS", "베이스"],
-  ["KEYBOARD", "키보드"],
-  ["DRUM", "드럼"],
-  ["ETC", "기타"],
+const GENRE_OPTIONS = toOptions(BAND_GENRE_LABELS);
+const REGION_OPTIONS = toOptions(BAND_REGION_LABELS);
+const PART_OPTIONS: { value: BandMemberPart; label: string }[] = [
+  { value: "VOCAL", label: "보컬" },
+  { value: "GUITAR", label: "기타" },
+  { value: "BASS", label: "베이스" },
+  { value: "DRUM", label: "드럼" },
+  { value: "KEYBOARD", label: "키보드" },
 ];
 
-type SelectedImage = {
-  uri: string;
-  fileName?: string | null;
-  mimeType?: string | null;
-};
-
 export function BandProfileEditScreen() {
-  const activeBand =
-    useActiveBandId();
+  const activeBand = useActiveBandId();
+  const bandId = activeBand.activeBandId;
+  const memberProfileId = activeBand.activeBand?.bandMemberProfileId ?? null;
+  const bandQuery = useBandQuery(bandId);
+  const memberQuery = useBandMemberProfileQuery(memberProfileId);
 
-  const bandId =
-    activeBand.activeBandId;
-
-  const memberProfileId =
-    activeBand.activeBand
-      ?.bandMemberProfileId ??
-    null;
-
-  const bandQuery =
-    useBandQuery(
-      bandId,
-    );
-
-  const memberQuery =
-    useBandMemberProfileQuery(
-      memberProfileId,
-    );
-
-  if (
-    activeBand.isLoading ||
-    bandQuery.isLoading ||
-    memberQuery.isLoading
-  ) {
+  if (activeBand.isLoading || bandQuery.isLoading || memberQuery.isLoading) {
     return (
-      <Screen>
-        <AppHeader title="밴드 프로필 관리" />
-
-        <AppState
-          loading
-          title="밴드 프로필을 불러오는 중이에요"
-        />
+      <Screen contentStyle={styles.container}>
+        <MyHeader title="밴드 프로필 관리" />
+        <AppState loading title="밴드 프로필을 불러오는 중이에요" />
       </Screen>
     );
   }
 
-  if (
-    !bandId ||
-    bandQuery.isError ||
-    !bandQuery.data
-  ) {
+  if (!bandId || bandQuery.isError || !bandQuery.data) {
     return (
-      <Screen>
-        <AppHeader title="밴드 프로필 관리" />
-
-        <AppState
-          title="밴드 프로필을 불러오지 못했어요"
-        />
+      <Screen contentStyle={styles.container}>
+        <MyHeader title="밴드 프로필 관리" />
+        <AppState title="프로필 정보를 불러오지 못했어요" />
       </Screen>
     );
   }
@@ -175,16 +72,9 @@ export function BandProfileEditScreen() {
   return (
     <BandProfileEditForm
       bandId={bandId}
-      memberProfileId={
-        memberProfileId
-      }
-      band={
-        bandQuery.data
-      }
-      member={
-        memberQuery.data ??
-        null
-      }
+      memberProfileId={memberProfileId}
+      band={bandQuery.data}
+      member={memberQuery.data ?? null}
     />
   );
 }
@@ -196,808 +86,267 @@ function BandProfileEditForm({
   member,
 }: {
   bandId: number;
-
-  memberProfileId:
-    | number
-    | null;
-
+  memberProfileId: number | null;
   band: {
     name: string;
     genre: string;
     region: string;
-    profileImageUrl:
-      | string
-      | null;
-    description:
-      | string
-      | null;
+    profileImageUrl: string | null;
+    description: string | null;
   };
-
   member: {
     nickname: string;
     part: string;
   } | null;
 }) {
-  const updateBand =
-    useUpdateBandProfile(
-      bandId,
-    );
-
-  const updateMember =
-    useUpdateBandMemberProfile(
-      memberProfileId,
-    );
-
-  const [name, setName] =
-    useState(band.name);
-
-  const [genre, setGenre] =
-    useState(band.genre);
-
-  const [region, setRegion] =
-    useState(band.region);
-
-  const [
-    description,
-    setDescription,
-  ] = useState(
-    band.description ?? "",
+  const updateBand = useUpdateBandProfile(bandId);
+  const updateMember = useUpdateBandMemberProfile(memberProfileId);
+  const image = useProfileImageSelection();
+  const [name, setName] = useState(band.name);
+  const [genre, setGenre] = useState(band.genre);
+  const [region, setRegion] = useState(band.region);
+  const [description, setDescription] = useState(band.description ?? "");
+  const [activityName, setActivityName] = useState(member?.nickname ?? "");
+  const [part, setPart] = useState<BandMemberPart | "">(
+    (member?.part as BandMemberPart | undefined) ?? "",
   );
+  const [isUploading, setIsUploading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [
-    activityName,
-    setActivityName,
-  ] = useState(
-    member?.nickname ?? "",
-  );
+  const isValid = Boolean(name.trim() && genre && region);
+  const isSubmitting =
+    isUploading || updateBand.isPending || updateMember.isPending;
+  const displayedImage =
+    image.selectedImage?.uri ??
+    (image.isDeleted ? null : band.profileImageUrl);
+  const partOptions =
+    part === "ETC"
+      ? [...PART_OPTIONS, { value: part, label: BAND_PART_LABELS.ETC }]
+      : PART_OPTIONS;
 
-  const [part, setPart] =
-    useState<BandMemberPart>(
-      (
-        member?.part as BandMemberPart
-      ) ?? "VOCAL",
-    );
+  const save = async () => {
+    if (!isValid) return;
 
-  const [
-    selectedImage,
-    setSelectedImage,
-  ] =
-    useState<SelectedImage | null>(
-      null,
-    );
+    setErrorMessage("");
 
-  const [
-    deleteImage,
-    setDeleteImage,
-  ] = useState(false);
+    let uploadedUrl: string | undefined;
 
-  const [
-    uploading,
-    setUploading,
-  ] = useState(false);
-
-
-  const imageUrl =
-    selectedImage?.uri ??
-    (
-      deleteImage
-        ? null
-        : band.profileImageUrl
-    );
-
-  const pickImage =
-    async (
-      camera:
-        | boolean,
-    ) => {
-      const permission =
-        camera
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (
-        !permission.granted
-      ) {
-        Alert.alert(
-          "권한 필요",
-          camera
-            ? "카메라 권한이 필요해요."
-            : "사진 접근 권한이 필요해요.",
-        );
-
+    if (image.selectedImage) {
+      try {
+        setIsUploading(true);
+        uploadedUrl = await uploadMediaAsset({
+          category: "BAND_PROFILE",
+          uri: image.selectedImage.uri,
+          fileName: image.selectedImage.fileName,
+          mimeType: image.selectedImage.mimeType,
+        });
+      } catch {
+        setErrorMessage("이미지 업로드에 실패했어요. 다시 시도해주세요");
         return;
+      } finally {
+        setIsUploading(false);
       }
+    }
 
-      const result =
-        camera
-          ? await ImagePicker.launchCameraAsync(
-              {
-                mediaTypes: [
-                  "images",
-                ],
-                allowsEditing:
-                  true,
-                aspect: [
-                  1,
-                  1,
-                ],
-                quality:
-                  0.85,
-              },
-            )
-          : await ImagePicker.launchImageLibraryAsync(
-              {
-                mediaTypes: [
-                  "images",
-                ],
-                allowsEditing:
-                  true,
-                aspect: [
-                  1,
-                  1,
-                ],
-                quality:
-                  0.85,
-              },
-            );
-
-      if (
-        result.canceled ||
-        !result.assets[0]
-      ) {
-        return;
-      }
-
-      const asset =
-        result.assets[0];
-
-      setSelectedImage({
-        uri: asset.uri,
-        fileName:
-          asset.fileName,
-        mimeType:
-          asset.mimeType,
+    try {
+      await updateBand.mutateAsync({
+        name: name.trim(),
+        genre,
+        region,
+        description: description.trim() || undefined,
+        ...(image.isDeleted
+          ? { deleteProfileImage: true }
+          : uploadedUrl
+            ? { profileImageUrl: uploadedUrl }
+            : {}),
       });
 
-      setDeleteImage(
-        false,
-      );
-    };
-
-  const save =
-    async () => {
-      if (
-        !name.trim()
-      ) {
-        Alert.alert(
-          "밴드 프로필",
-          "밴드명을 입력해 주세요.",
-        );
-
-        return;
+      if (memberProfileId && activityName.trim() && part) {
+        await updateMember.mutateAsync({
+          nickname: activityName.trim(),
+          part,
+        });
       }
 
-      try {
-        let uploadedUrl:
-          | string
-          | undefined;
-
-        if (selectedImage) {
-          setUploading(true);
-
-          uploadedUrl =
-            await uploadMediaAsset(
-              {
-                category:
-                  "BAND_PROFILE",
-
-                uri:
-                  selectedImage.uri,
-
-                fileName:
-                  selectedImage.fileName,
-
-                mimeType:
-                  selectedImage.mimeType,
-              },
-            );
-        }
-
-        await updateBand.mutateAsync(
-          {
-            name:
-              name.trim(),
-
-            genre,
-
-            region,
-
-            description:
-              description.trim() ||
-              undefined,
-
-            ...(deleteImage
-              ? {
-                  deleteProfileImage:
-                    true,
-                }
-              : uploadedUrl
-                ? {
-                    profileImageUrl:
-                      uploadedUrl,
-                  }
-                : {}),
-          },
-        );
-
-        if (
-          memberProfileId &&
-          activityName.trim()
-        ) {
-          await updateMember.mutateAsync(
-            {
-              nickname:
-                activityName.trim(),
-              part,
-            },
-          );
-        }
-
-        router.back();
-      } catch {
-        Alert.alert(
-          "밴드 프로필",
-          "밴드 프로필을 저장하지 못했어요.",
-        );
-      } finally {
-        setUploading(false);
-      }
-    };
+      router.back();
+    } catch {
+      setErrorMessage("저장에 실패했어요. 다시 시도해주세요");
+    }
+  };
 
   return (
-    <Screen
-      contentStyle={
-        styles.container
-      }
-    >
-      <AppHeader title="밴드 프로필 관리" />
+    <Screen contentStyle={styles.container}>
+      <MyHeader title="밴드 프로필 관리" />
 
-      <View
-        style={styles.imageCard}
-      >
-        <Avatar
-          imageUrl={
-            imageUrl
-          }
-          label={name}
-          size={92}
+      <View style={styles.banner}>
+        <BandBanner
+          bandName={`현재 선택된 밴드 · ${name || "밴드"}`}
+          description="현재 선택된 밴드의 공개 프로필을 수정합니다"
+          profileImageUrl={displayedImage}
         />
-
-        <View
-          style={
-            styles.imageActions
-          }
-        >
-          <IconButton
-            label="앨범"
-            icon={
-              <ImageIcon
-                size={18}
-                color={
-                  colors.secondary600
-                }
-              />
-            }
-            onPress={() =>
-              void pickImage(
-                false,
-              )
-            }
-          />
-
-          <IconButton
-            label="카메라"
-            icon={
-              <Camera
-                size={18}
-                color={
-                  colors.secondary600
-                }
-              />
-            }
-            onPress={() =>
-              void pickImage(
-                true,
-              )
-            }
-          />
-
-          <IconButton
-            label="삭제"
-            icon={
-              <Trash2
-                size={18}
-                color={
-                  colors.error
-                }
-              />
-            }
-            onPress={() => {
-              setSelectedImage(
-                null,
-              );
-
-              setDeleteImage(
-                true,
-              );
-            }}
-          />
-        </View>
       </View>
 
-      <FormField
-        label="밴드명"
-        required
-        value={name}
-        placeholder="밴드 이름을 입력해주세요"
-        onChangeText={
-          setName
-        }
-      />
-
-      <Selection
-        title="장르"
-        options={GENRES}
-        value={genre}
-        onChange={
-          setGenre
-        }
-      />
-
-      <Selection
-        title="활동 지역"
-        options={REGIONS}
-        value={region}
-        onChange={
-          setRegion
-        }
-      />
-
-      <View style={styles.field}>
-        <FieldLabel label="밴드 소개" />
-
-        <TextInput
-          value={
-            description
-          }
-          multiline
-          maxLength={1000}
-          textAlignVertical="top"
-          placeholder="밴드 소개를 입력해 주세요"
-          placeholderTextColor={
-            colors.neutral500
-          }
-          style={
-            styles.textArea
-          }
-          onChangeText={
-            setDescription
-          }
+      <View style={styles.form}>
+        <ProfileImagePicker
+          imageUrl={displayedImage}
+          variant="band"
+          tone="secondary"
+          label="프로필 이미지 변경"
+          onSelectGallery={() => void image.pickFromGallery()}
+          onSelectCamera={() => void image.takePhoto()}
+          onDelete={image.removeImage}
         />
+
+        <View style={styles.field}>
+          <FieldLabel label="밴드명" required />
+          <FormInput
+            tone="secondary"
+            value={name}
+            placeholder="밴드 이름을 입력해주세요"
+            onChangeText={setName}
+          />
+        </View>
+
+        <View style={styles.chipField}>
+          <FieldLabel label="관심 장르" />
+          <ChipGroup
+            options={GENRE_OPTIONS}
+            tone="secondary"
+            isSelected={(value) => value === genre}
+            onPress={setGenre}
+          />
+        </View>
+
+        <View style={styles.chipField}>
+          <FieldLabel label="활동 지역" />
+          <ChipGroup
+            options={REGION_OPTIONS}
+            tone="secondary"
+            isSelected={(value) => value === region}
+            onPress={setRegion}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <FieldLabel label="밴드 소개" />
+          <FormInput
+            multiline
+            tone="secondary"
+            value={description}
+            maxLength={1000}
+            textAlignVertical="top"
+            placeholder="밴드 소개글을 입력해주세요"
+            style={styles.textArea}
+            onChangeText={setDescription}
+          />
+        </View>
       </View>
 
       {memberProfileId ? (
-        <View
-          style={
-            styles.section
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            내 프로필 수정
-          </Text>
+        <>
+          <View style={styles.sectionBand} />
 
-          <Text style={styles.sectionDescription}>
-            이 밴드에서 표시되는 내 활동명과 파트를 수정합니다
-          </Text>
+          <View style={styles.memberSection}>
+            <View style={styles.memberHeading}>
+              <Text style={styles.memberTitle}>내 프로필 수정</Text>
+              <Text style={styles.memberDescription}>
+                이 밴드에서 표시되는 내 활동명과 파트를 수정합니다
+              </Text>
+            </View>
 
-          <FormField
-            label="활동명"
-            required
-            value={
-              activityName
-            }
-            placeholder="활동명을 입력해주세요"
-            onChangeText={
-              setActivityName
-            }
-          />
+            <View style={styles.field}>
+              <FieldLabel label="활동명" required />
+              <FormInput
+                tone="secondary"
+                value={activityName}
+                placeholder="활동명을 입력해주세요"
+                onChangeText={setActivityName}
+              />
+            </View>
 
-          <FieldLabel label="파트" required />
-
-          <View
-            style={styles.chips}
-          >
-            {PARTS.map(
-              ([
-                value,
-                label,
-              ]) => (
-                <Pill
-                  key={value}
-                  label={label}
-                  selected={
-                    part ===
-                    value
-                  }
-                  onPress={() =>
-                    setPart(
-                      value,
-                    )
-                  }
-                />
-              ),
-            )}
+            <View style={styles.field}>
+              <FieldLabel label="파트" required />
+              <SelectField
+                value={part}
+                options={partOptions}
+                placeholder="파트를 선택해주세요"
+                onChange={setPart}
+              />
+            </View>
           </View>
-        </View>
+        </>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={
-          uploading ||
-          updateBand.isPending ||
-          updateMember.isPending
-        }
-        style={[
-          styles.submitButton,
-          (
-            uploading ||
-            updateBand.isPending ||
-            updateMember.isPending
-          ) && styles.submitButtonDisabled,
-        ]}
-        onPress={() =>
-          void save()
-        }
-      >
-        <Text style={styles.submitButtonText}>
-          {uploading ? "업로드 중..." : "밴드 프로필 저장"}
-        </Text>
-      </Pressable>
+      <View style={styles.footer}>
+        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+
+        <SubmitButton
+          tone="secondary"
+          label={isUploading ? "업로드 중..." : "밴드 프로필 저장"}
+          active={isValid && !isSubmitting}
+          disabled={isSubmitting}
+          onPress={() => void save()}
+        />
+      </View>
     </Screen>
   );
 }
 
-function FormField({
-  label,
-  required = false,
-  value,
-  placeholder,
-  onChangeText,
-}: {
-  label: string;
-  required?: boolean;
-  value: string;
-  placeholder: string;
-  onChangeText: (value: string) => void;
-}) {
-  return (
-    <View style={styles.field}>
-      <FieldLabel label={label} required={required} />
-      <TextInput
-        value={value}
-        placeholder={placeholder}
-        placeholderTextColor={colors.neutral500}
-        style={styles.input}
-        onChangeText={onChangeText}
-      />
-    </View>
-  );
-}
-
-function FieldLabel({
-  label,
-  required = false,
-}: {
-  label: string;
-  required?: boolean;
-}) {
-  return (
-    <View style={styles.labelRow}>
-      <Text style={styles.label}>{label}</Text>
-      {required ? (
-        <Text style={styles.requiredMark}>*</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function IconButton({
-  label,
-  icon,
-  onPress,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={
-        styles.iconButton
-      }
-      onPress={onPress}
-    >
-      {icon}
-
-      <Text
-        style={
-          styles.iconButtonText
-        }
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function Selection({
-  title,
-  options,
-  value,
-  onChange,
-}: {
-  title: string;
-
-  options: readonly (
-    readonly [
-      string,
-      string,
-    ]
-  )[];
-
-  value: string;
-
-  onChange: (
-    value: string,
-  ) => void;
-}) {
-  return (
-    <View
-      style={styles.section}
-    >
-      <FieldLabel label={title} />
-
-      <View
-        style={styles.chips}
-      >
-        {options.map(
-          ([
-            optionValue,
-            label,
-          ]) => (
-            <Pill
-              key={
-                optionValue
-              }
-              label={label}
-              selected={
-                value ===
-                optionValue
-              }
-              onPress={() =>
-                onChange(
-                  optionValue,
-                )
-              }
-            />
-          ),
-        )}
-      </View>
-    </View>
-  );
-}
-
-function Pill({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      style={[
-        styles.pill,
-        selected ? styles.pillSelected : styles.pillIdle,
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.pillText,
-          selected ? styles.pillTextSelected : styles.pillTextIdle,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-const styles =
-  StyleSheet.create({
-    container: {
-      gap: 24,
-      paddingHorizontal: 20,
-      paddingBottom: 32,
-      backgroundColor: colors.white,
-    },
-
-    imageCard: {
-      alignItems: "center",
-      gap: 12,
-      paddingTop: 8,
-    },
-
-    imageActions: {
-      flexDirection: "row",
-      gap: 8,
-    },
-
-    iconButton: {
-      minHeight: 40,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      paddingHorizontal: 12,
-    },
-
-    iconButtonText: {
-      color:
-        colors.neutral700,
-      fontSize: 13,
-      fontWeight: "800",
-    },
-
-    section: {
-      gap: 12,
-    },
-
-    sectionTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 15,
-      fontWeight: "700",
-      lineHeight: 20,
-    },
-
-    sectionDescription: {
-      color: colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-      marginTop: -8,
-    },
-
-    chips: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-
-    field: {
-      gap: 8,
-    },
-
-    labelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-
-    label: {
-      color:
-        colors.neutral900,
-      fontSize: 15,
-      fontWeight: "500",
-      lineHeight: 20,
-    },
-
-    requiredMark: {
-      color: colors.error,
-      fontSize: 15,
-      fontWeight: "500",
-      lineHeight: 20,
-      marginLeft: 4,
-    },
-
-    input: {
-      height: 52,
-      borderWidth: 1,
-      borderColor: colors.neutral400,
-      borderRadius: 5,
-      backgroundColor: colors.white,
-      color: colors.neutral900,
-      fontSize: 13,
-      fontWeight: "500",
-      lineHeight: 18,
-      paddingHorizontal: 16,
-    },
-
-    textArea: {
-      height: 96,
-      borderWidth: 1,
-      borderColor:
-        colors.neutral400,
-      borderRadius: 5,
-      backgroundColor:
-        colors.white,
-      paddingHorizontal: 16,
-      paddingTop: 9,
-      paddingBottom: 20,
-      color:
-        colors.neutral900,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-
-    pill: {
-      minHeight: 26,
-      borderRadius: 999,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 15,
-      paddingVertical: 4,
-    },
-
-    pillSelected: {
-      backgroundColor: colors.secondary500,
-    },
-
-    pillIdle: {
-      backgroundColor: colors.neutral300,
-    },
-
-    pillText: {
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-
-    pillTextSelected: {
-      color: colors.white,
-    },
-
-    pillTextIdle: {
-      color: colors.neutral600,
-    },
-
-    submitButton: {
-      height: 52,
-      borderRadius: 12,
-      backgroundColor: colors.secondary500,
-      alignItems: "center",
-      justifyContent: "center",
-      marginTop: 8,
-    },
-
-    submitButtonDisabled: {
-      backgroundColor: colors.neutral300,
-    },
-
-    submitButtonText: {
-      color: colors.white,
-      fontSize: 18,
-      fontWeight: "700",
-      lineHeight: 20,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: colors.white,
+  },
+  banner: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  form: {
+    gap: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  field: {
+    gap: 8,
+  },
+  chipField: {
+    gap: 12,
+  },
+  textArea: {
+    height: 60,
+    paddingTop: 9,
+    paddingBottom: 9,
+    paddingRight: 26,
+  },
+  sectionBand: {
+    height: 16,
+    marginVertical: 16,
+    backgroundColor: colors.secondary0,
+  },
+  memberSection: {
+    gap: 16,
+    paddingHorizontal: 32,
+  },
+  memberHeading: {
+    gap: 4,
+  },
+  memberTitle: {
+    ...textStyles.body6,
+    color: colors.neutral900,
+  },
+  memberDescription: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
+  },
+  footer: {
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 32,
+  },
+  error: {
+    ...textStyles.body5,
+    color: colors.error,
+    textAlign: "center",
+  },
+});

@@ -5,25 +5,34 @@ import {
   Alert,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import Svg, { Path } from "react-native-svg";
 
 import { uploadMediaAsset } from "@/api/media/media";
+import {
+  DescriptionInput,
+  FormField,
+  MAX_TAGS,
+  MediaSourceSheet,
+  RegisterComplete,
+  TagInput,
+} from "@/features/band/BandFormParts";
+import { FormInput, SubmitButton } from "@/features/my/MyFormParts";
 import {
   useBandPostQuery,
   useCreateBandPost,
   useUpdateBandPost,
 } from "@/hooks/api/band/useBand";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import { AppButton } from "@/shared/components/AppButton";
 import { AppHeader } from "@/shared/components/AppHeader";
+import { AppIcon } from "@/shared/components/AppIcon";
 import { AppState } from "@/shared/components/AppState";
 import { Screen } from "@/shared/components/Screen";
-import { colors } from "@/shared/constants/theme";
+import { colors, textStyles } from "@/shared/constants/theme";
+import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
 import type {
   CreatePostRequest,
   PostDetailResponse,
@@ -58,15 +67,9 @@ const splitLines = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const splitTags = (value: string) =>
-  value
-    .split(",")
-    .map((item) => item.trim().replace(/^#/, ""))
-    .filter(Boolean);
-
 const joinLines = (items?: string[]) => items?.join("\n") ?? "";
 
-const DESCRIPTION_MAX_LENGTH = 500;
+const MAX_IMAGES = 10;
 
 type SelectedMediaAsset = {
   uri: string;
@@ -85,7 +88,7 @@ export function BandContentFormScreen() {
   if (activeBandQuery.isLoading || (isEditMode && postQuery.isLoading)) {
     return (
       <Screen contentStyle={styles.container}>
-        <AppHeader title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"} />
+        <AppHeader title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"} style={styles.header} />
         <AppState loading title="콘텐츠 정보를 준비하는 중이에요" />
       </Screen>
     );
@@ -94,7 +97,7 @@ export function BandContentFormScreen() {
   if (!bandId) {
     return (
       <Screen contentStyle={styles.container}>
-        <AppHeader title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"} />
+        <AppHeader title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"} style={styles.header} />
         <AppState
           title="등록된 밴드를 찾지 못했어요"
           description="밴드 프로필을 먼저 확인해 주세요."
@@ -106,7 +109,7 @@ export function BandContentFormScreen() {
   if (isEditMode && (postQuery.isError || !postQuery.data)) {
     return (
       <Screen contentStyle={styles.container}>
-        <AppHeader title="콘텐츠 수정" />
+        <AppHeader title="콘텐츠 수정" style={styles.header} />
         <AppState
           title="콘텐츠를 불러오지 못했어요"
           description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
@@ -139,21 +142,29 @@ function ContentForm({
   const isEditMode = Boolean(postId && initialPost);
   const createPost = useCreateBandPost(bandId);
   const updatePost = useUpdateBandPost(postId);
-  const [type, setType] = useState<PostType>(initialPost?.type ?? "PHOTO");
+  const [type, setType] = useState<PostType | null>(initialPost?.type ?? null);
   const [title, setTitle] = useState(initialPost?.title ?? "");
   const [description, setDescription] = useState(initialPost?.description ?? "");
   const [mediaUrls, setMediaUrls] = useState(joinLines(initialPost?.mediaUrls));
   const [thumbnailUrl, setThumbnailUrl] = useState(
     initialPost?.thumbnailUrl ?? "",
   );
+  const [hasExistingVideo, setHasExistingVideo] = useState(
+    initialPost?.type === "VIDEO" && Boolean(initialPost.mediaUrls?.length),
+  );
   const [selectedImages, setSelectedImages] = useState<SelectedMediaAsset[]>([]);
-  const [selectedThumbnail, setSelectedThumbnail] =
-    useState<SelectedMediaAsset | null>(null);
-  const [tags, setTags] = useState(initialPost?.tags?.join(", ") ?? "");
+  const [tags, setTags] = useState(initialPost?.tags ?? []);
+  const [isSourceSheetOpen, setIsSourceSheetOpen] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [completedPostId, setCompletedPostId] = useState<number | null>(null);
+  const existingImageUrls = type === "PHOTO" ? splitLines(mediaUrls) : [];
+  const typeError = showErrors && !type;
   const titleError = showErrors && !title.trim();
+  const isValid = Boolean(type && title.trim());
   const isSubmitting = createPost.isPending || updatePost.isPending || uploading;
+  const imageLimit = MAX_IMAGES - splitLines(mediaUrls).length;
 
   const requestImagePermission = async (camera: boolean) => {
     const permission = camera
@@ -173,7 +184,9 @@ function ContentForm({
   };
 
   const pickImages = async (camera: boolean) => {
-    if (!(await requestImagePermission(camera))) {
+    const remaining = imageLimit - selectedImages.length;
+
+    if (remaining <= 0 || !(await requestImagePermission(camera))) {
       return;
     }
 
@@ -187,7 +200,7 @@ function ContentForm({
       : await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
           allowsMultipleSelection: true,
-          selectionLimit: 6,
+          selectionLimit: remaining,
           quality: 0.85,
         });
 
@@ -201,32 +214,13 @@ function ContentForm({
       mimeType: asset.mimeType,
     }));
 
-    setSelectedImages((previous) => [...previous, ...assets].slice(0, 6));
-  };
+    setSelectedImages((previous) =>
+      [...previous, ...assets].slice(0, imageLimit),
+    );
 
-  const pickThumbnail = async () => {
-    if (!(await requestImagePermission(false))) {
-      return;
+    if (!isEditMode) {
+      setType((previous) => previous ?? "PHOTO");
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-    });
-
-    if (result.canceled || !result.assets[0]) {
-      return;
-    }
-
-    const asset = result.assets[0];
-
-    setSelectedThumbnail({
-      uri: asset.uri,
-      fileName: asset.fileName,
-      mimeType: asset.mimeType,
-    });
   };
 
   const removeSelectedImage = (uri: string) => {
@@ -235,21 +229,32 @@ function ContentForm({
     );
   };
 
+  const removeExistingImage = (url: string) => {
+    setMediaUrls(
+      splitLines(mediaUrls)
+        .filter((item) => item !== url)
+        .join("\n"),
+    );
+  };
+
+  const removeExistingVideo = () => {
+    setHasExistingVideo(false);
+    setMediaUrls("");
+    setThumbnailUrl("");
+  };
+
   const submit = async () => {
-    if (!title.trim()) {
+    if (!type || !title.trim()) {
       setShowErrors(true);
       return;
     }
 
     const onSuccess = (nextPostId: number) => {
-      router.replace(
-        `/band/home/contents/${nextPostId}` as Parameters<
-          typeof router.replace
-        >[0],
-      );
+      setCompletedPostId(nextPostId);
     };
 
     try {
+      setSubmitError(null);
       setUploading(true);
 
       const uploadedMediaUrls =
@@ -266,30 +271,16 @@ function ContentForm({
               ),
             );
 
-      const uploadedThumbnailUrl = selectedThumbnail
-        ? await uploadMediaAsset({
-            category: "POST_THUMBNAIL",
-            uri: selectedThumbnail.uri,
-            fileName: selectedThumbnail.fileName,
-            mimeType: selectedThumbnail.mimeType,
-          })
-        : "";
-
       const nextMediaUrls =
         type === "TEXT"
           ? []
           : [...splitLines(mediaUrls), ...uploadedMediaUrls];
-      const nextTags = splitTags(tags);
-      const nextThumbnailUrl =
-        uploadedThumbnailUrl ||
-        thumbnailUrl.trim() ||
-        uploadedMediaUrls[0] ||
-        "";
+      const nextThumbnailUrl = thumbnailUrl.trim() || uploadedMediaUrls[0] || "";
       const commonPayload = {
         title: title.trim(),
         description: description.trim() || undefined,
         mediaUrls: nextMediaUrls.length > 0 ? nextMediaUrls : undefined,
-        tags: nextTags.length > 0 ? nextTags : undefined,
+        tags: tags.length > 0 ? tags : undefined,
         thumbnailUrl: nextThumbnailUrl || undefined,
       };
 
@@ -306,77 +297,124 @@ function ContentForm({
         type,
       } satisfies CreatePostRequest);
       onSuccess(result.postId);
-    } catch {
-      Alert.alert(
-        isEditMode ? "콘텐츠 수정" : "콘텐츠 등록",
-        "콘텐츠를 저장하지 못했어요.",
+    } catch (error) {
+      setSubmitError(
+        getApiErrorMessage(error, "저장에 실패했어요. 다시 시도해주세요"),
       );
     } finally {
       setUploading(false);
     }
   };
 
+  if (completedPostId !== null) {
+    return (
+      <Screen contentStyle={styles.completeContainer}>
+        <RegisterComplete
+          title={isEditMode ? "콘텐츠가 수정됐어요" : "콘텐츠가 업로드됐어요"}
+          description={
+            isEditMode ? "변경사항이 저장됐어요" : "콘텐츠 탭에서 확인할 수 있어요"
+          }
+          rows={[
+            { label: "콘텐츠", value: type ? TYPE_TO_LABEL[type] : "" },
+            { label: "콘텐츠 제목", value: title },
+          ]}
+          primaryLabel="콘텐츠 보기"
+          onHome={() => router.replace("/band/home")}
+          onPrimary={() =>
+            router.replace(
+              `/band/home/contents/${completedPostId}` as Parameters<
+                typeof router.replace
+              >[0],
+            )
+          }
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen contentStyle={styles.container}>
-      <AppHeader title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"} />
+      <AppHeader
+        title={isEditMode ? "콘텐츠 수정" : "콘텐츠 등록"}
+        style={styles.header}
+      />
 
       <View style={styles.body}>
-        {type !== "TEXT" ? (
-          <View style={styles.uploadPanel}>
-            <UploadIcon />
-            <Text style={styles.uploadTitle}>
-              {type === "VIDEO" ? "영상 URL 입력" : "이미지 업로드"}
-            </Text>
-            <Text style={styles.uploadDescription}>
-              {type === "VIDEO"
-                ? "영상은 URL 입력 방식으로 저장해요"
-                : "갤러리 또는 카메라로 이미지를 추가해요"}
-            </Text>
-
-            {type === "PHOTO" ? (
-              <>
-                <View style={styles.uploadActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.uploadActionButton}
-                    onPress={() => void pickImages(false)}
-                  >
-                    <Text style={styles.uploadActionText}>갤러리</Text>
-                  </Pressable>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.uploadActionButton}
-                    onPress={() => void pickImages(true)}
-                  >
-                    <Text style={styles.uploadActionText}>카메라</Text>
-                  </Pressable>
+        {hasExistingVideo ? (
+          <View style={styles.videoCard}>
+            <View style={styles.videoThumbnail}>
+              {thumbnailUrl ? (
+                <Image
+                  source={{ uri: thumbnailUrl }}
+                  style={StyleSheet.absoluteFill}
+                />
+              ) : null}
+              <AppIcon name="playButton" size={24} />
+            </View>
+            <View style={styles.videoTexts}>
+              <Text numberOfLines={1} style={styles.videoName}>
+                기존 영상
+              </Text>
+              <Text style={styles.videoMeta}>선택 완료</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="파일 삭제"
+              style={styles.videoRemove}
+              onPress={removeExistingVideo}
+            >
+              <AppIcon name="close" size={14} />
+            </Pressable>
+          </View>
+        ) : type !== "VIDEO" ? (
+          <View style={styles.upload}>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.uploadPanel}
+              onPress={() => setIsSourceSheetOpen(true)}
+            >
+              <AppIcon name="formUpload" size={36} />
+              <View style={styles.uploadTexts}>
+                <Text style={styles.uploadTitle}>파일 선택</Text>
+                <View style={styles.uploadHints}>
+                  <Text style={styles.uploadHint}>JPG · PNG</Text>
+                  <Text style={styles.uploadHint}>최대 500MB</Text>
                 </View>
+              </View>
+            </Pressable>
 
-                {selectedImages.length > 0 ? (
-                  <View style={styles.previewGrid}>
-                    {selectedImages.map((asset) => (
-                      <View key={asset.uri} style={styles.previewItem}>
-                        <Image source={{ uri: asset.uri }} style={styles.previewImage} />
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel="선택 이미지 제거"
-                          style={styles.previewRemove}
-                          onPress={() => removeSelectedImage(asset.uri)}
-                        >
-                          <Text style={styles.previewRemoveText}>×</Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </>
+            {existingImageUrls.length > 0 || selectedImages.length > 0 ? (
+              <View style={styles.previews}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.previewList}
+                >
+                  {existingImageUrls.map((url) => (
+                    <ImagePreview
+                      key={url}
+                      uri={url}
+                      onRemove={() => removeExistingImage(url)}
+                    />
+                  ))}
+                  {selectedImages.map((asset) => (
+                    <ImagePreview
+                      key={asset.uri}
+                      uri={asset.uri}
+                      onRemove={() => removeSelectedImage(asset.uri)}
+                    />
+                  ))}
+                </ScrollView>
+                <Text style={styles.previewHint}>
+                  사진은 최대 {MAX_IMAGES}장까지 첨부할 수 있어요
+                </Text>
+              </View>
             ) : null}
           </View>
         ) : null}
 
         <View style={styles.formFields}>
-          <Field label="콘텐츠" required error={showErrors && !type}>
+          <FormField label="콘텐츠" required error={typeError}>
             <View style={styles.typeRow}>
               {CONTENT_TYPES.map((item) => (
                 <Pressable
@@ -387,19 +425,20 @@ function ContentForm({
                     styles.typeButton,
                     type === item.value
                       ? styles.typeButtonSelected
-                      : styles.typeButtonIdle,
+                      : typeError
+                        ? styles.typeButtonError
+                        : styles.typeButtonIdle,
                     isEditMode && styles.typeButtonDisabled,
                   ]}
-                  onPress={() => {
-                    if (!isEditMode) setType(item.value);
-                  }}
+                  onPress={() => setType(item.value)}
                 >
                   <Text
                     style={[
                       styles.typeButtonText,
-                      type === item.value
-                        ? styles.typeButtonTextSelected
-                        : styles.typeButtonTextIdle,
+                      type === item.value && styles.typeButtonTextSelected,
+                      type !== item.value &&
+                        typeError &&
+                        styles.typeButtonTextError,
                     ]}
                   >
                     {item.label}
@@ -408,193 +447,93 @@ function ContentForm({
               ))}
             </View>
             {isEditMode ? (
-              <Text style={styles.helpText}>
-                콘텐츠 타입은 수정할 수 없어요. 현재 유형: {TYPE_TO_LABEL[type]}
-              </Text>
+              <Text style={styles.helpText}>콘텐츠 타입은 수정할 수 없어요</Text>
             ) : null}
-          </Field>
+          </FormField>
 
-          <Field label="콘텐츠 제목" required error={titleError}>
-            <NativeInput
+          <FormField label="콘텐츠 제목" required error={titleError}>
+            <FormInput
+              tone="secondary"
               value={title}
               placeholder="콘텐츠 제목을 입력하세요"
-              error={titleError}
+              style={titleError ? styles.inputError : undefined}
               onChangeText={setTitle}
             />
-          </Field>
+          </FormField>
 
-          <Field label="설명">
-            <NativeInput
+          <FormField label="설명">
+            <DescriptionInput
               value={description}
               placeholder="콘텐츠에 대한 설명을 입력하세요"
-              multiline
-              maxLength={DESCRIPTION_MAX_LENGTH}
               onChangeText={setDescription}
             />
-            <Text style={styles.countText}>
-              {description.length}/{DESCRIPTION_MAX_LENGTH}
-            </Text>
-          </Field>
+          </FormField>
 
-          {type !== "TEXT" ? (
+          {type === "VIDEO" && !hasExistingVideo ? (
             <>
-              <Field label="미디어 URL">
-                <NativeInput
+              <FormField label="영상 URL">
+                <FormInput
+                  tone="secondary"
                   value={mediaUrls}
-                  placeholder={
-                    type === "PHOTO"
-                      ? "외부 이미지 URL이 있다면 한 줄에 하나씩 입력"
-                      : "한 줄에 하나씩 입력"
-                  }
-                  multiline
+                  placeholder="영상 URL을 입력해주세요"
                   autoCapitalize="none"
                   onChangeText={setMediaUrls}
                 />
-              </Field>
+              </FormField>
 
-              <Field label="썸네일">
-                {selectedThumbnail ? (
-                  <View style={styles.thumbnailPreviewRow}>
-                    <Image
-                      source={{ uri: selectedThumbnail.uri }}
-                      style={styles.thumbnailPreview}
-                    />
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.thumbnailRemoveButton}
-                      onPress={() => setSelectedThumbnail(null)}
-                    >
-                      <Text style={styles.thumbnailRemoveText}>선택 취소</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-
-                {type === "PHOTO" ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    style={styles.thumbnailPickerButton}
-                    onPress={() => void pickThumbnail()}
-                  >
-                    <Text style={styles.thumbnailPickerText}>
-                      대표 이미지 선택
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                <NativeInput
+              <FormField label="썸네일 URL">
+                <FormInput
+                  tone="secondary"
                   value={thumbnailUrl}
-                  placeholder="대표 이미지 URL 직접 입력"
+                  placeholder="대표 이미지 URL을 입력해주세요"
                   autoCapitalize="none"
                   onChangeText={setThumbnailUrl}
                 />
-              </Field>
+              </FormField>
             </>
           ) : null}
 
-          <Field label="태그">
-            <NativeInput
-              value={tags}
-              placeholder="쉼표로 구분해서 입력"
-              onChangeText={setTags}
-            />
-            {splitTags(tags).length > 0 ? (
-              <View style={styles.tagPreview}>
-                {splitTags(tags).slice(0, 8).map((tag) => (
-                  <View key={tag} style={styles.tagChip}>
-                    <Text style={styles.tagChipText}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </Field>
-        </View>
-
-        <View style={styles.submitArea}>
-          <AppButton
-            label={isSubmitting ? "저장 중..." : isEditMode ? "수정 완료" : "콘텐츠 등록"}
-            disabled={isSubmitting}
-            loading={isSubmitting}
-            style={[
-              styles.submitButton,
-              title.trim() ? styles.submitButtonActive : styles.submitButtonDisabled,
-            ]}
-            onPress={() => void submit()}
-          />
+          <FormField label={`태그 (최대 ${MAX_TAGS}개)`}>
+            <TagInput tags={tags} onChange={setTags} />
+          </FormField>
         </View>
       </View>
+
+      <View style={styles.submitArea}>
+        {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
+
+        <SubmitButton
+          tone="secondary"
+          label={uploading ? "업로드 중..." : isEditMode ? "수정 완료" : "콘텐츠 등록"}
+          active={isValid && !isSubmitting}
+          disabled={isSubmitting}
+          onPress={() => void submit()}
+        />
+      </View>
+
+      <MediaSourceSheet
+        open={isSourceSheetOpen}
+        onClose={() => setIsSourceSheetOpen(false)}
+        onSelect={(camera) => void pickImages(camera)}
+      />
     </Screen>
   );
 }
 
-function Field({
-  label,
-  required = false,
-  error = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  error?: boolean;
-  children: React.ReactNode;
-}) {
+function ImagePreview({ uri, onRemove }: { uri: string; onRemove: () => void }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.label}>
-        {label} {required ? <Text style={styles.required}>*</Text> : null}
-      </Text>
-      {children}
-      {error ? <Text style={styles.errorText}>{label}은 필수 항목이에요</Text> : null}
+    <View style={styles.preview}>
+      <Image source={{ uri }} style={styles.previewImage} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="사진 삭제"
+        hitSlop={6}
+        style={styles.previewRemove}
+        onPress={onRemove}
+      >
+        <AppIcon name="formCloseCircle" size={16} />
+      </Pressable>
     </View>
-  );
-}
-
-function NativeInput({
-  error = false,
-  multiline = false,
-  style,
-  ...props
-}: React.ComponentProps<typeof TextInput> & {
-  error?: boolean;
-}) {
-  return (
-    <TextInput
-      placeholderTextColor={colors.neutral500}
-      textAlignVertical={multiline ? "top" : "center"}
-      style={[
-        styles.input,
-        multiline && styles.textArea,
-        error && styles.inputError,
-        style,
-      ]}
-      multiline={multiline}
-      {...props}
-    />
-  );
-}
-
-function UploadIcon() {
-  return (
-    <Svg width={36} height={36} viewBox="0 0 36 36" fill="none">
-      <Path
-        d="M18 7V23"
-        stroke={colors.secondary500}
-        strokeWidth={2.6}
-        strokeLinecap="round"
-      />
-      <Path
-        d="M11.5 13.5L18 7L24.5 13.5"
-        stroke={colors.secondary500}
-        strokeWidth={2.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M8 25.5V27.5C8 29.157 9.343 30.5 11 30.5H25C26.657 30.5 28 29.157 28 27.5V25.5"
-        stroke={colors.secondary500}
-        strokeWidth={2.6}
-        strokeLinecap="round"
-      />
-    </Svg>
   );
 }
 
@@ -602,146 +541,120 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: 104,
+    paddingBottom: 24,
     backgroundColor: colors.white,
   },
+  completeContainer: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  header: {
+    paddingHorizontal: 15,
+  },
   body: {
+    gap: 24,
     paddingHorizontal: 32,
     paddingTop: 24,
   },
+  upload: {
+    gap: 12,
+  },
   uploadPanel: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: colors.secondary300,
     borderRadius: 8,
     backgroundColor: colors.secondary0,
+    paddingHorizontal: 20,
+    paddingVertical: 35,
+  },
+  uploadTexts: {
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 28,
-    paddingVertical: 34,
+    gap: 4,
   },
   uploadTitle: {
+    ...textStyles.body1,
     color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
   },
-  uploadDescription: {
+  uploadHints: {
+    alignItems: "center",
+  },
+  uploadHint: {
+    ...textStyles.caption2,
     color: colors.neutral500,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
     textAlign: "center",
   },
-  uploadActions: {
-    flexDirection: "row",
+  previews: {
     gap: 8,
-    marginTop: 8,
   },
-  uploadActionButton: {
-    minWidth: 78,
-    height: 32,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.secondary500,
-    paddingHorizontal: 14,
-  },
-  uploadActionText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
-  },
-  previewGrid: {
-    width: "100%",
-    flexDirection: "row",
-    flexWrap: "wrap",
+  previewList: {
     gap: 8,
-    marginTop: 8,
+    paddingTop: 4,
+    paddingRight: 4,
   },
-  previewItem: {
-    width: 72,
-    height: 72,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: colors.neutral300,
+  preview: {
+    width: 52,
+    height: 52,
   },
   previewImage: {
-    width: "100%",
-    height: "100%",
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: colors.neutral300,
   },
   previewRemove: {
     position: "absolute",
-    top: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.neutral900,
+    top: -4,
+    right: -4,
   },
-  previewRemoveText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 18,
+  previewHint: {
+    ...textStyles.caption4,
+    color: colors.neutral600,
   },
-  thumbnailPreviewRow: {
+  videoCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-  },
-  thumbnailPreview: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    backgroundColor: colors.neutral300,
-  },
-  thumbnailRemoveButton: {
-    minHeight: 32,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.neutral300,
-    paddingHorizontal: 12,
-  },
-  thumbnailRemoveText: {
-    color: colors.neutral700,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  thumbnailPickerButton: {
-    minHeight: 38,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 12,
     borderWidth: 1,
-    borderColor: colors.secondary400,
-    backgroundColor: colors.secondary0,
+    borderColor: colors.neutral400,
+    borderRadius: 12,
+    backgroundColor: colors.neutral200,
+    paddingHorizontal: 12,
+    paddingVertical: 13,
   },
-  thumbnailPickerText: {
-    color: colors.secondary600,
-    fontSize: 12,
-    fontWeight: "700",
+  videoThumbnail: {
+    width: 108,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderRadius: 8,
+    backgroundColor: colors.neutral300,
+  },
+  videoTexts: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  videoName: {
+    ...textStyles.caption3,
+    color: colors.neutral900,
+  },
+  videoMeta: {
+    ...textStyles.body5,
+    color: colors.neutral500,
+  },
+  videoRemove: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   formFields: {
     gap: 16,
-    marginTop: 24,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  required: {
-    color: colors.error,
   },
   typeRow: {
     flexDirection: "row",
@@ -750,9 +663,9 @@ const styles = StyleSheet.create({
   typeButton: {
     width: 56,
     height: 26,
-    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 8,
   },
   typeButtonSelected: {
     backgroundColor: colors.secondary500,
@@ -760,90 +673,38 @@ const styles = StyleSheet.create({
   typeButtonIdle: {
     backgroundColor: colors.neutral300,
   },
+  typeButtonError: {
+    borderWidth: 1,
+    borderColor: colors.error,
+  },
   typeButtonDisabled: {
-    opacity: 0.65,
+    opacity: 0.6,
   },
   typeButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
+    ...textStyles.caption3,
+    color: colors.neutral600,
   },
   typeButtonTextSelected: {
     color: colors.white,
   },
-  typeButtonTextIdle: {
-    color: colors.neutral600,
+  typeButtonTextError: {
+    color: colors.error,
   },
   helpText: {
-    color: colors.neutral600,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  input: {
-    minHeight: 38,
-    borderWidth: 1,
-    borderColor: colors.neutral400,
-    borderRadius: 5,
-    backgroundColor: colors.white,
-    color: colors.neutral900,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  textArea: {
-    minHeight: 60,
-    paddingTop: 8,
+    ...textStyles.body5,
+    color: colors.neutral500,
   },
   inputError: {
     borderColor: colors.error,
   },
-  errorText: {
-    color: colors.error,
-    fontSize: 10,
-    fontWeight: "500",
-    lineHeight: 12,
-  },
-  countText: {
-    alignSelf: "flex-end",
-    color: colors.neutral400,
-    fontSize: 10,
-    fontWeight: "500",
-    lineHeight: 12,
-    marginTop: -22,
-    marginRight: 10,
-  },
-  tagPreview: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tagChip: {
-    minHeight: 26,
-    borderRadius: 999,
-    backgroundColor: colors.secondary100,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 15,
-  },
-  tagChipText: {
-    color: colors.secondary500,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-  },
   submitArea: {
+    gap: 8,
     marginTop: 18,
+    paddingHorizontal: 20,
   },
-  submitButton: {
-    minHeight: 52,
-    borderRadius: 12,
-  },
-  submitButtonActive: {
-    backgroundColor: colors.secondary500,
-  },
-  submitButtonDisabled: {
-    backgroundColor: colors.neutral300,
+  submitError: {
+    ...textStyles.body5,
+    color: colors.error,
+    textAlign: "center",
   },
 });
