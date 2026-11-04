@@ -138,7 +138,7 @@ export function BandApplicationsScreen() {
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footerText}>다음 지원자를 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       )}

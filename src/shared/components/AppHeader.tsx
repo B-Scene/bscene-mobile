@@ -27,7 +27,7 @@ export function AppHeader({
             accessibilityRole="button"
             accessibilityLabel="뒤로가기"
             hitSlop={12}
-            onPress={onBack ?? router.back}
+            onPress={onBack ?? (() => router.back())}
             style={styles.iconButton}
           >
             <ChevronLeft size={24} color={colors.neutral900} />

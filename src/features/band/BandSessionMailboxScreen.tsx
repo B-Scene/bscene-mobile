@@ -146,7 +146,7 @@ export function BandSessionMailboxScreen() {
               <Text style={styles.footer}>
                 아래로 스크롤하면 이전 쪽지를 더 불러와요
               </Text>
-            ) : null
+            ) : undefined
           }
         />
       )}

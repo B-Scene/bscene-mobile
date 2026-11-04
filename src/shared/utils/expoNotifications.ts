@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import { AndroidImportance } from "expo-notifications";
 import { Platform } from "react-native";
 
 type PushRegistrationResult =
@@ -32,7 +33,7 @@ export const requestExpoPushToken = async (): Promise<PushRegistrationResult> =>
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
       name: "default",
-      importance: Notifications.AndroidImportance.MAX,
+      importance: AndroidImportance.MAX,
     });
   }
 

@@ -161,10 +161,21 @@ const normalizeNotificationItem = (
     actionable: toBoolean(value.actionable) ||
       (isRecord(value.bandInvite) && toBoolean(value.bandInvite.actionable)),
     bandInvite: isRecord(value.bandInvite) ? {
+      ...value.bandInvite,
+      bandInviteId: toNumberOrNull(value.bandInvite.bandInviteId),
+      bandMemberId: toNumberOrNull(value.bandInvite.bandMemberId),
       bandId: toNumberOrNull(value.bandInvite.bandId),
       bandName: toStringOrEmpty(value.bandInvite.bandName),
       bandProfileImageUrl: toStringOrNull(value.bandInvite.bandProfileImageUrl),
       actionable: toBoolean(value.bandInvite.actionable),
+      position: toStringOrNull(value.bandInvite.position),
+      part: toStringOrNull(value.bandInvite.part),
+      role: toStringOrNull(value.bandInvite.role),
+      genre: toStringOrNull(value.bandInvite.genre),
+      region: toStringOrNull(value.bandInvite.region),
+      memberCount: toNumberOrNull(value.bandInvite.memberCount),
+      acceptedMemberCount: toNumberOrNull(value.bandInvite.acceptedMemberCount),
+      profileImageUrl: toStringOrNull(value.bandInvite.profileImageUrl),
     } : null,
     createdAt:
       toStringOrEmpty(value.createdAt ?? value.createdDate ?? value.timeStamp) ||

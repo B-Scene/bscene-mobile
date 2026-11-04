@@ -247,13 +247,27 @@ test('notification normalization retains nested band invitation action data', as
   const api = loadTypeScript('src/api/notification.ts', {
     axios: { AxiosError: Error },
     '@/api/axiosInstance': { axiosInstance: { get: async () => ({ data: { isSuccess: true, result: {
-      items: [{ notificationId: 1, type: 'BAND_INVITE', bandInvite: { bandId: '7', bandName: 'B:Scene', actionable: true } }],
+      items: [{ notificationId: 1, type: 'BAND_INVITE', bandInvite: {
+        bandId: '7', bandName: 'B:Scene', actionable: true,
+        bandInviteId: '12', bandMemberId: '13', position: 'GUITAR',
+        genre: 'ROCK', region: 'SEOUL', memberCount: '4', acceptedMemberCount: '3',
+        profileImageUrl: 'https://example.com/band.png', extraLabel: '초대',
+      } }],
     } } }) } },
   });
   const result = await api.getNotifications();
   assert.equal(result.items[0].actionable, true);
   assert.equal(result.items[0].bandInvite.bandId, 7);
   assert.equal(result.items[0].bandInvite.bandName, 'B:Scene');
+  assert.equal(result.items[0].bandInvite.bandInviteId, 12);
+  assert.equal(result.items[0].bandInvite.bandMemberId, 13);
+  assert.equal(result.items[0].bandInvite.position, 'GUITAR');
+  assert.equal(result.items[0].bandInvite.genre, 'ROCK');
+  assert.equal(result.items[0].bandInvite.region, 'SEOUL');
+  assert.equal(result.items[0].bandInvite.memberCount, 4);
+  assert.equal(result.items[0].bandInvite.acceptedMemberCount, 3);
+  assert.equal(result.items[0].bandInvite.profileImageUrl, 'https://example.com/band.png');
+  assert.equal(result.items[0].bandInvite.extraLabel, '초대');
 });
 
 
@@ -386,4 +400,167 @@ test('notification cursor requests retain server cursor and failure state', asyn
   assert.equal(page.hasNext, true);
   isSuccess = false;
   await assert.rejects(api.getNotifications(), /list failed/);
+});
+
+function createBandNotificationScreen(item, responses = {}) {
+  const states = [];
+  const refs = [];
+  const calls = [];
+  const alerts = [];
+  const pushes = [];
+  let stateIndex = 0;
+  let refIndex = 0;
+  const mutation = (name) => ({
+    mutateAsync: async (body) => {
+      calls.push([name, JSON.parse(JSON.stringify(body))]);
+      return responses[name]?.(body);
+    },
+    mutate: (id) => calls.push([name, id]),
+  });
+  const jsx = (type, props) => ({ type, props });
+  const { BandNotificationListScreen } = loadTypeScript(
+    'src/features/band/BandNotificationListScreen.tsx', {
+      'react/jsx-runtime': { jsx, jsxs: jsx },
+      react: {
+        useState: (initial) => {
+          const index = stateIndex++;
+          if (!(index in states)) states[index] = initial;
+          return [states[index], (next) => {
+            states[index] = typeof next === 'function' ? next(states[index]) : next;
+          }];
+        },
+        useRef: (initial) => {
+          const index = refIndex++;
+          return refs[index] ??= { current: initial };
+        },
+      },
+      'react-native': { Alert: { alert: (...args) => alerts.push(args) } },
+      'expo-router': { router: {
+        push: (target) => pushes.push(target), canGoBack: () => false,
+        replace: (target) => pushes.push(target),
+      } },
+      '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: async () => {} }) },
+      '@/features/notification/BandNotificationCards': {
+        ActionNotificationCard: 'ActionNotificationCard', BandInviteCard: 'BandInviteCard',
+        RoleInputModal: 'RoleInputModal', RoleCompleteModal: 'RoleCompleteModal',
+        getBandInviteBandName: (value) => value.bandInvite?.bandName ?? '밴드',
+        isSelectablePart: () => false,
+      },
+      '@/features/notification/NotificationList': { NotificationList: 'NotificationList' },
+      '@/hooks/api/band/useBandManagement': { useBandMemberProfileQuery: () => ({}) },
+      '@/hooks/api/user/useMyProfiles': { useActiveBandId: () => ({}) },
+      '@/hooks/api/live/useLive': {
+        liveKeys: { all: ['live'] }, useRespondCoHostInvitationMutation: () => mutation('coHost'),
+      },
+      '@/hooks/api/session/useSessionApplication': {
+        useFinalizeApplicationSubmissionMutation: () => mutation('finalize'),
+      },
+      '@/hooks/api/notification/useNotification': {
+        notificationKeys: { all: ['notifications'] },
+        useNotificationsInfiniteQuery: () => ({ data: { pages: [{ items: [item] }] }, refetch() {} }),
+        useMarkNotificationAsRead: () => mutation('read'),
+        useRespondBandNotificationInvite: () => mutation('bandInvite'),
+      },
+      '@/shared/utils/notificationDeepLink': { getNotificationDeepLink },
+      './notificationActions': { getBandNotificationAction, isBandNotification },
+    },
+  );
+  return {
+    calls, alerts, pushes,
+    render() {
+      stateIndex = 0;
+      refIndex = 0;
+      const tree = BandNotificationListScreen();
+      return {
+        list: tree.props,
+        card: tree.props.renderCard(item)?.props,
+        input: tree.props.children.find((child) => child.type === 'RoleInputModal').props,
+        complete: tree.props.children.find((child) => child.type === 'RoleCompleteModal').props,
+      };
+    },
+  };
+}
+
+const flushNotificationScreen = () => new Promise((resolve) => setImmediate(resolve));
+const actionableBandInvite = () => notification({
+  type: 'BAND_INVITE', actionable: true, referenceId: 999,
+  bandInvite: { bandId: 7, bandName: 'B:Scene' },
+});
+
+test('band invite modal preserves the unread request until success and blocks duplicate submissions', async () => {
+  let finish;
+  const screen = createBandNotificationScreen(actionableBandInvite(), {
+    bandInvite: () => new Promise((resolve) => { finish = resolve; }),
+  });
+  screen.render().card.onAccept();
+  const input = screen.render().input;
+  assert.equal(input.open, true);
+  assert.deepEqual(screen.calls, []);
+  input.onConfirm('  테스트  ', 'GUITAR');
+  input.onConfirm('  테스트  ', 'GUITAR');
+  screen.render().input.onClose();
+  assert.equal(screen.render().input.open, true);
+  assert.deepEqual(screen.calls, [['bandInvite', { bandId: 7, profile: { nickname: '테스트', part: 'GUITAR' } }]]);
+  finish();
+  await flushNotificationScreen();
+  assert.deepEqual(screen.calls.map(([name]) => name), ['bandInvite', 'read']);
+  const result = screen.render();
+  assert.equal(result.input.open, false);
+  assert.equal(result.complete.open, true);
+  assert.equal(result.card.notification.actionable, false);
+});
+
+test('failed band invite stays unread and allows a retry from the same role modal', async () => {
+  let fail = true;
+  const screen = createBandNotificationScreen(actionableBandInvite(), {
+    bandInvite: async () => { if (fail) throw new Error('request failed'); },
+  });
+  screen.render().card.onAccept();
+  screen.render().input.onConfirm('테스트', 'BASS');
+  await flushNotificationScreen();
+  assert.equal(screen.render().input.open, true);
+  assert.equal(screen.render().card.notification.actionable, true);
+  assert.deepEqual(screen.calls.map(([name]) => name), ['bandInvite']);
+  fail = false;
+  screen.render().input.onConfirm('테스트', 'BASS');
+  await flushNotificationScreen();
+  assert.deepEqual(screen.calls.map(([name]) => name), ['bandInvite', 'bandInvite', 'read']);
+});
+
+test('co-host acceptance calls the response API before marking read and does not navigate', async () => {
+  const screen = createBandNotificationScreen(notification({ title: '공동 진행자로 초대됐어요' }));
+  screen.render().card.onAccept();
+  assert.deepEqual(screen.calls, []);
+  screen.alerts.at(-1)[2].find((button) => button.text === '수락').onPress();
+  await flushNotificationScreen();
+  assert.deepEqual(screen.calls, [['coHost', { liveId: 42, isAccepted: true }], ['read', 1]]);
+  assert.deepEqual(screen.pushes, []);
+  assert.equal(screen.render().card, undefined);
+});
+
+test('session role confirmation keeps the submission ID and finalization payload', async () => {
+  const screen = createBandNotificationScreen(notification({ type: 'SESSION', title: '세션 지원이 수락되었어요' }));
+  screen.render().card.onAccept();
+  screen.render().input.onConfirm('세션', 'DRUM');
+  await flushNotificationScreen();
+  assert.deepEqual(screen.calls, [
+    ['finalize', { applySubmissionId: 42, body: { isAccepted: true, nickname: '세션', part: 'DRUM' } }],
+    ['read', 1],
+  ]);
+  assert.equal(screen.render().complete.kind, 'sessionFinalize');
+});
+
+test('read failure after successful rejection does not allow the band request to be submitted twice', async () => {
+  const screen = createBandNotificationScreen(actionableBandInvite(), {
+    read: async () => { throw new Error('read failed'); },
+  });
+  const card = screen.render().card;
+  card.onReject();
+  screen.alerts.at(-1)[2].find((button) => button.text === '거절').onPress();
+  await flushNotificationScreen();
+  assert.deepEqual(screen.calls, [['bandInvite', { bandId: 7 }], ['read', 1]]);
+  assert.equal(screen.render().card.notification.actionable, false);
+  screen.render().card.onReject();
+  assert.deepEqual(screen.calls, [['bandInvite', { bandId: 7 }], ['read', 1]]);
+  assert.ok(screen.alerts.some(([title]) => title === '처리는 완료됐어요'));
 });

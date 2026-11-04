@@ -464,7 +464,7 @@ function LiveList({
           <Text style={styles.footerText}>
             더 불러오는 중이에요
           </Text>
-        ) : null
+        ) : undefined
       }
       onEndReached={onEndReached}
       onEndReachedThreshold={0.4}

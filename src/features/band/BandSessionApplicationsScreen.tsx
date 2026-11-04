@@ -101,7 +101,7 @@ export function BandSessionApplicationsScreen() {
               <Text style={styles.footerText}>
                 더 많은 지원 내역은 다음 페이지 연동에서 이어집니다
               </Text>
-            ) : null
+            ) : undefined
           }
         />
       )}

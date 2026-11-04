@@ -84,7 +84,7 @@ export function FollowedBandsScreen() {
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       </ListState>
@@ -228,7 +228,7 @@ function PerformanceList({
           ListFooterComponent={
             isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       </ListState>

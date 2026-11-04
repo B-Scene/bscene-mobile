@@ -201,7 +201,7 @@ export function BandSessionFindScreen() {
               <Text style={styles.loadingMore}>
                 세션 뮤지션을 더 불러오는 중이에요
               </Text>
-            ) : null
+            ) : undefined
           }
         />
       )}

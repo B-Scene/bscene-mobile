@@ -15,10 +15,21 @@ export interface RegisterPushTokenRequest {
 }
 
 export interface NotificationBandInvite {
+  bandInviteId?: number | null;
+  bandMemberId?: number | null;
   bandId: number | null;
   bandName: string;
   bandProfileImageUrl: string | null;
   actionable: boolean;
+  position?: string | null;
+  part?: string | null;
+  role?: string | null;
+  genre?: string | null;
+  region?: string | null;
+  memberCount?: number | null;
+  acceptedMemberCount?: number | null;
+  profileImageUrl?: string | null;
+  [key: string]: unknown;
 }
 
 export interface NotificationItem {
