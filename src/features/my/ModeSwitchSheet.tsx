@@ -1,7 +1,6 @@
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,7 @@ import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useModeStore } from "@/stores/useModeStore";
 import { useOnboardingDraftStore } from "@/stores/useOnboardingDraftStore";
+import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 
 const FAN_START_ID = "fan-start";
 
@@ -154,119 +154,101 @@ export function ModeSwitchSheet({
   };
 
   return (
-    <Modal
-      transparent
-      statusBarTranslucent
-      animationType="slide"
-      visible={open}
-      onRequestClose={close}
-    >
-      <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={close} />
+    <BottomSheetModal open={open} maxHeight="85%" onClose={close}>
+      <View
+        style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 32) }]}
+      >
+        <View style={styles.handle} />
+        <Text style={styles.title}>모드 전환</Text>
 
-        <View
-          style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 32) }]}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.sections}
         >
-          <View style={styles.handle} />
-          <Text style={styles.title}>모드 전환</Text>
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.fanTitle]}>팬 모드</Text>
+            <AccountRow
+              avatar={
+                fanProfile ? (
+                  <ProfileImage
+                    imageUrl={fanProfile.profileImageUrl}
+                    size={40}
+                  />
+                ) : (
+                  <View style={styles.plusAvatar}>
+                    <AppIcon name="plus" />
+                  </View>
+                )
+              }
+              name={fanProfile?.nickname || "팬 모드 시작하기"}
+              subtitle={fanProfile?.email}
+              selected={selectedId === fanAccountId}
+              selectedTone="fan"
+              onSelect={() => setPickedId(fanAccountId)}
+            />
+          </View>
 
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.sections}
-          >
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, styles.fanTitle]}>팬 모드</Text>
-              <AccountRow
-                avatar={
-                  fanProfile ? (
-                    <ProfileImage
-                      imageUrl={fanProfile.profileImageUrl}
-                      size={40}
-                    />
-                  ) : (
-                    <View style={styles.plusAvatar}>
-                      <AppIcon name="plus" />
-                    </View>
-                  )
-                }
-                name={fanProfile?.nickname || "팬 모드 시작하기"}
-                subtitle={fanProfile?.email}
-                selected={selectedId === fanAccountId}
-                selectedTone="fan"
-                onSelect={() => setPickedId(fanAccountId)}
-              />
-            </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, styles.bandTitle]}>
-                밴드 모드
-              </Text>
-              {bandAccounts.map((band) => (
-                <AccountRow
-                  key={band.id}
-                  avatar={
-                    <ProfileImage
-                      imageUrl={band.profileImageUrl}
-                      size={40}
-                      variant="band"
-                    />
-                  }
-                  name={band.bandName}
-                  subtitle={band.subtitle}
-                  selected={selectedId === band.id}
-                  selectedTone="band"
-                  onSelect={() => setPickedId(band.id)}
-                />
-              ))}
-            </View>
-          </ScrollView>
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={isDisabled}
-            style={[
-              styles.submit,
-              isDisabled
-                ? styles.submitDisabled
-                : isFanSelected
-                  ? styles.submitFan
-                  : styles.submitBand,
-            ]}
-            onPress={switchMode}
-          >
-            <Text
-              style={[
-                styles.submitText,
-                isDisabled && styles.submitTextDisabled,
-              ]}
-            >
-              모드 전환
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, styles.bandTitle]}>
+              밴드 모드
             </Text>
-          </Pressable>
-        </View>
+            {bandAccounts.map((band) => (
+              <AccountRow
+                key={band.id}
+                avatar={
+                  <ProfileImage
+                    imageUrl={band.profileImageUrl}
+                    size={40}
+                    variant="band"
+                  />
+                }
+                name={band.bandName}
+                subtitle={band.subtitle}
+                selected={selectedId === band.id}
+                selectedTone="band"
+                onSelect={() => setPickedId(band.id)}
+              />
+            ))}
+          </View>
+        </ScrollView>
 
-        <Toast
-          open={showError}
-          tone="error"
-          message="모드 전환에 실패했어요. 다시 시도해주세요"
-          onClose={() => setShowError(false)}
-        />
+        <Pressable
+          accessibilityRole="button"
+          disabled={isDisabled}
+          style={[
+            styles.submit,
+            isDisabled
+              ? styles.submitDisabled
+              : isFanSelected
+                ? styles.submitFan
+                : styles.submitBand,
+          ]}
+          onPress={switchMode}
+        >
+          <Text
+            style={[
+              styles.submitText,
+              isDisabled && styles.submitTextDisabled,
+            ]}
+          >
+            모드 전환
+          </Text>
+        </Pressable>
       </View>
-    </Modal>
+
+      <Toast
+        open={showError}
+        tone="error"
+        message="모드 전환에 실패했어요. 다시 시도해주세요"
+        onClose={() => setShowError(false)}
+      />
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(20, 20, 20, 0.5)",
-  },
   sheet: {
-    maxHeight: "85%",
+    flexShrink: 1,
     alignItems: "center",
     gap: 16,
     borderTopLeftRadius: 24,

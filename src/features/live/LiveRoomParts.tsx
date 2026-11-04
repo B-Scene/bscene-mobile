@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,7 @@ import { ProfileImage } from "@/shared/components/ProfileImage";
 import { getPartLabel } from "@/shared/constants/bandLabels";
 import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import type { LiveChatMessage } from "@/types/live/live";
+import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 
 export type LiveRoomTone = "band" | "fan";
 
@@ -507,73 +507,63 @@ export function LiveRoomMemberSheet({
   const members = query.data?.members ?? [];
 
   return (
-    <Modal
-      transparent
-      statusBarTranslucent
-      animationType="slide"
-      visible={open}
-      onRequestClose={onClose}
-    >
-      <View style={styles.sheetRoot}>
-        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+    <BottomSheetModal open={open} maxHeight="72%" onClose={onClose}>
+      <View style={styles.sheet}>
+        <View style={styles.sheetHandle} />
+        <Text style={styles.sheetTitle}>멤버</Text>
 
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>멤버</Text>
-
-          {query.isLoading ? (
-            <Text style={styles.sheetMessage}>멤버를 불러오는 중이에요.</Text>
-          ) : query.isError ? (
-            <Text style={styles.sheetMessage}>멤버를 불러오지 못했어요.</Text>
-          ) : members.length === 0 ? (
-            <Text style={styles.sheetMessage}>표시할 멤버가 없어요.</Text>
-          ) : (
-            <ScrollView contentContainerStyle={styles.sheetList}>
-              {members.map((member, index) => (
-                <View key={`${member.nickname}-${index}`} style={styles.member}>
-                  <ProfileImage
-                    imageUrl={
-                      member.profileImageUrl ?? member.bandProfileImageUrl
-                    }
-                    size={36}
-                    variant="band"
-                  />
-                  <View style={styles.memberText}>
-                    <View style={styles.memberNameRow}>
-                      <Text numberOfLines={1} style={styles.memberName}>
-                        {member.nickname}
-                      </Text>
-                      {member.isLeader ? (
-                        <View
+        {query.isLoading ? (
+          <Text style={styles.sheetMessage}>멤버를 불러오는 중이에요.</Text>
+        ) : query.isError ? (
+          <Text style={styles.sheetMessage}>멤버를 불러오지 못했어요.</Text>
+        ) : members.length === 0 ? (
+          <Text style={styles.sheetMessage}>표시할 멤버가 없어요.</Text>
+        ) : (
+          <ScrollView contentContainerStyle={styles.sheetList}>
+            {members.map((member, index) => (
+              <View key={`${member.nickname}-${index}`} style={styles.member}>
+                <ProfileImage
+                  imageUrl={
+                    member.profileImageUrl ?? member.bandProfileImageUrl
+                  }
+                  size={36}
+                  variant="band"
+                />
+                <View style={styles.memberText}>
+                  <View style={styles.memberNameRow}>
+                    <Text numberOfLines={1} style={styles.memberName}>
+                      {member.nickname}
+                    </Text>
+                    {member.isLeader ? (
+                      <View
+                        style={[
+                          styles.leaderBadge,
+                          tone === "fan" && styles.leaderBadgeFan,
+                        ]}
+                      >
+                        <Text
                           style={[
-                            styles.leaderBadge,
-                            tone === "fan" && styles.leaderBadgeFan,
+                            styles.leaderText,
+                            tone === "fan" && styles.leaderTextFan,
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.leaderText,
-                              tone === "fan" && styles.leaderTextFan,
-                            ]}
-                          >
-                            리더
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text numberOfLines={1} style={styles.memberPart}>
-                      {member.part.length > 0
-                        ? member.part.map(getPartLabel).join(" · ")
-                        : "포지션 미정"}
-                    </Text>
+                          리더
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
+                  <Text numberOfLines={1} style={styles.memberPart}>
+                    {member.part.length > 0
+                      ? member.part.map(getPartLabel).join(" · ")
+                      : "포지션 미정"}
+                  </Text>
                 </View>
-              ))}
-            </ScrollView>
-          )}
-        </View>
+              </View>
+            ))}
+          </ScrollView>
+        )}
       </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -945,17 +935,9 @@ const styles = StyleSheet.create({
   micIdle: {
     opacity: 0.45,
   },
-  sheetRoot: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(20, 20, 20, 0.5)",
-  },
   sheet: {
     minHeight: 236,
-    maxHeight: "72%",
+    flexShrink: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     backgroundColor: colors.white,

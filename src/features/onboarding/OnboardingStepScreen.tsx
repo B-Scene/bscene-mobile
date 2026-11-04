@@ -3,7 +3,6 @@ import { AlertCircle, ChevronLeft, Smartphone } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -36,6 +35,7 @@ import { requestExpoPushToken } from "@/shared/utils/expoNotifications";
 import { getHomePathForMode, useModeStore } from "@/stores/useModeStore";
 import { useOnboardingDraftStore } from "@/stores/useOnboardingDraftStore";
 import type { ModeCode } from "@/types/onboarding/onboarding";
+import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 
 type Step =
   | "agreement"
@@ -795,22 +795,32 @@ function TermModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const [shownTerm, setShownTerm] = useState({ title, content });
+
+  // 닫히는 동안 내용이 비지 않도록 마지막 약관을 유지한다.
+  if (visible && (title !== shownTerm.title || content !== shownTerm.content)) {
+    setShownTerm({ title, content });
+  }
+
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.termSheet}>
-          <View style={styles.termHeader}>
-            <Text style={styles.termTitle}>{title}</Text>
-            <Pressable onPress={onClose}>
-              <Text style={styles.termClose}>닫기</Text>
-            </Pressable>
-          </View>
-          <ScrollView style={styles.termScroll}>
-            <Text style={styles.termContent}>{content}</Text>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <BottomSheetModal
+      open={visible}
+      backdropColor="rgba(0, 0, 0, 0.4)"
+      maxHeight="70%"
+      onClose={onClose}
+    >
+      <View style={styles.termSheet}>
+        <View style={styles.termHeader}>
+          <Text style={styles.termTitle}>{shownTerm.title}</Text>
+          <Pressable onPress={onClose}>
+            <Text style={styles.termClose}>닫기</Text>
+          </Pressable>
+        </View>
+        <ScrollView style={styles.termScroll}>
+          <Text style={styles.termContent}>{shownTerm.content}</Text>
+        </ScrollView>
+      </View>
+    </BottomSheetModal>
   );
 }
 
@@ -1190,13 +1200,8 @@ const styles = StyleSheet.create({
   completeFooter: {
     width: "100%",
   },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-  },
   termSheet: {
-    maxHeight: "70%",
+    flexShrink: 1,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     backgroundColor: colors.white,

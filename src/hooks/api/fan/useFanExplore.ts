@@ -4,7 +4,10 @@ import {
   createFanExplorePostComment,
   deleteFanExplorePostComment,
   followExploreBand,
+  deleteAllFanExploreRecentSearches,
+  deleteFanExploreRecentSearch,
   getFanExploreBandDetail,
+  getFanExploreRecentSearches,
   getFanExplorePostComments,
   getFanExplorePostDetail,
   getRecommendedExploreBands,
@@ -32,6 +35,7 @@ export const fanExploreKeys = {
     [...fanExploreKeys.all, "searchPerformances", params] as const,
   searchContents: (params: Omit<FanExploreSearchParams, "cursor">) =>
     [...fanExploreKeys.all, "searchContents", params] as const,
+  recentSearches: () => [...fanExploreKeys.all, "recentSearches"] as const,
   bandDetail: (bandId: number) =>
     [...fanExploreKeys.all, "bandDetail", bandId] as const,
   postDetail: (postId: number) =>
@@ -230,5 +234,37 @@ export const useDeleteFanExplorePostComment = (postId: number) => {
         queryKey: fanExploreKeys.postDetail(postId),
       });
     },
+  });
+};
+
+export const useFanExploreRecentSearchesQuery = () => {
+  return useQuery({
+    queryKey: fanExploreKeys.recentSearches(),
+    queryFn: getFanExploreRecentSearches,
+    staleTime: 0,
+  });
+};
+
+export const useDeleteFanExploreRecentSearch = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteFanExploreRecentSearch,
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: fanExploreKeys.recentSearches(),
+      }),
+  });
+};
+
+export const useDeleteAllFanExploreRecentSearches = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: deleteAllFanExploreRecentSearches,
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: fanExploreKeys.recentSearches(),
+      }),
   });
 };

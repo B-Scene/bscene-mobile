@@ -25,6 +25,7 @@ import type {
   SessionRecruitmentListItem,
   SessionRecruitmentSort,
 } from "@/types/session/sessionRecruitment";
+import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 
 type SessionTabId = "recruitment" | "find" | "applications";
 
@@ -617,71 +618,70 @@ function FilterModal({
   onClose: () => void;
 }) {
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="slide"
-      onRequestClose={onClose}
+    <BottomSheetModal
+      open={visible}
+      closeOnBackdrop={false}
+      backdropColor="rgba(0, 0, 0, 0.45)"
+      maxHeight="85%"
+      onClose={onClose}
     >
-      <View style={styles.modalBackdrop}>
-        <View style={styles.filterSheet}>
-          <View style={styles.filterSheetHeader}>
-            <Text style={styles.filterSheetTitle}>필터</Text>
+      <View style={styles.filterSheet}>
+        <View style={styles.filterSheetHeader}>
+          <Text style={styles.filterSheetTitle}>필터</Text>
 
-            <Pressable hitSlop={8} onPress={onClose}>
-              <X size={24} color={colors.neutral900} />
-            </Pressable>
-          </View>
+          <Pressable hitSlop={8} onPress={onClose}>
+            <X size={24} color={colors.neutral900} />
+          </Pressable>
+        </View>
 
-          <FlatList
-            data={FILTER_GROUPS}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.filterSheetContent}
-            renderItem={({ item }) => (
-              <View style={styles.filterGroup}>
-                <Text style={styles.filterGroupTitle}>{item.title}</Text>
+        <FlatList
+          data={FILTER_GROUPS}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.filterSheetContent}
+          renderItem={({ item }) => (
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterGroupTitle}>{item.title}</Text>
 
-                <View style={styles.filterOptions}>
-                  {item.options.map((option) => {
-                    const selected = values[item.id] === option;
+              <View style={styles.filterOptions}>
+                {item.options.map((option) => {
+                  const selected = values[item.id] === option;
 
-                    return (
-                      <Pressable
-                        key={option}
+                  return (
+                    <Pressable
+                      key={option}
+                      style={[
+                        styles.filterOption,
+                        selected && styles.filterOptionSelected,
+                      ]}
+                      onPress={() => onChange(item.id, option)}
+                    >
+                      <Text
                         style={[
-                          styles.filterOption,
-                          selected && styles.filterOptionSelected,
+                          styles.filterOptionText,
+                          selected && styles.filterOptionTextSelected,
                         ]}
-                        onPress={() => onChange(item.id, option)}
                       >
-                        <Text
-                          style={[
-                            styles.filterOptionText,
-                            selected && styles.filterOptionTextSelected,
-                          ]}
-                        >
-                          {option}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                        {option}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
-          />
+            </View>
+          )}
+        />
 
-          <View style={styles.filterFooter}>
-            <Pressable style={styles.resetButton} onPress={onReset}>
-              <Text style={styles.resetText}>초기화</Text>
-            </Pressable>
+        <View style={styles.filterFooter}>
+          <Pressable style={styles.resetButton} onPress={onReset}>
+            <Text style={styles.resetText}>초기화</Text>
+          </Pressable>
 
-            <Pressable style={styles.applyButton} onPress={onApply}>
-              <Text style={styles.applyText}>적용하기</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.applyButton} onPress={onApply}>
+            <Text style={styles.applyText}>적용하기</Text>
+          </Pressable>
         </View>
       </View>
-    </Modal>
+    </BottomSheetModal>
   );
 }
 
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   },
 
   filterSheet: {
-    maxHeight: "85%",
+    flexShrink: 1,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     backgroundColor: colors.white,
