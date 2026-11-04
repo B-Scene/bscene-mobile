@@ -188,6 +188,14 @@ export interface LiveCoPublisher {
   whepUrl: string;
 }
 
+export interface LiveCoHostRequester {
+  userId: number;
+
+  nickname:
+    | string
+    | null;
+}
+
 export interface EnterLiveResponse {
   liveId: number;
 
@@ -237,6 +245,10 @@ export interface EnterLiveResponse {
 
   coPublishers?:
     LiveCoPublisher[];
+
+  coPublisher?:
+    | LiveCoPublisher[]
+    | null;
 }
 
 export interface CreateLiveRequest {
@@ -334,6 +346,9 @@ export interface LiveReservationResponse {
 
   cohostCandidates?:
     LiveReservationCoHostCandidate[];
+
+  coHostCandidates?:
+    LiveReservationCoHostCandidate[];
 }
 
 export interface UpdateLiveReservationRequest {
@@ -349,9 +364,7 @@ export interface UpdateLiveReservationRequest {
 
   scheduledAt: string;
 
-  coHost?: number[];
-
-  cohosts?:
+  coHost?:
     | number[]
     | null;
 }

@@ -10,19 +10,23 @@ import {
     getLiveChatWebSocketUrl,
 } from "@/api/live/live";
 
+import {
+    createClientMsgId,
+} from "@/shared/utils/createClientMsgId";
+
 import type {
     LiveChatMessage,
     LiveChatServerFrame,
 } from "@/types/live/live";
 
 const HEARTBEAT_INTERVAL =
-  15_000;
+  20_000;
 
 const HEARTBEAT_TIMEOUT =
-  35_000;
+  30_000;
 
 const MAX_RECONNECT_DELAY =
-  10_000;
+  30_000;
 
 type Timer =
   ReturnType<
@@ -436,9 +440,7 @@ export function useLiveChatSocket({
             },
 
             clientMsgId:
-              `${Date.now()}-${Math.random()
-                .toString(16)
-                .slice(2)}`,
+              createClientMsgId(),
           }),
         );
 
