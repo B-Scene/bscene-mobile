@@ -20,7 +20,9 @@ const formatPerformanceDateTime = (dateValue?: string, timeValue?: string) => {
   if (!dateValue) return "일정 미정";
 
   const date = new Date(
-    timeValue && !dateValue.includes("T") ? `${dateValue}T${timeValue}` : dateValue,
+    timeValue && !dateValue.includes("T")
+      ? `${dateValue}T${timeValue}`
+      : dateValue,
   );
 
   if (Number.isNaN(date.getTime())) {
@@ -84,7 +86,7 @@ export function FollowedBandsScreen() {
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       </ListState>
@@ -167,7 +169,9 @@ function FollowedBandRow({ item }: { item: FollowedBandItem }) {
         style={styles.compactButton}
         onPress={() => {
           if (bandId == null) return;
-          router.push(`/fan/bands/${bandId}` as Parameters<typeof router.push>[0]);
+          router.push(
+            `/fan/bands/${bandId}` as Parameters<typeof router.push>[0],
+          );
         }}
       />
     </AppCard>
@@ -228,7 +232,7 @@ function PerformanceList({
           ListFooterComponent={
             isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       </ListState>

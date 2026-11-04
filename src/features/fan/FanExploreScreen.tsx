@@ -56,7 +56,9 @@ export function FanExploreScreen() {
   const [region, setRegion] = useState<string | undefined>();
   const genresQuery = useGenres();
   const regionsQuery = useRegions();
-  const recommendedQuery = useRecommendedExploreBandsInfiniteQuery({ size: 20 });
+  const recommendedQuery = useRecommendedExploreBandsInfiniteQuery({
+    size: 20,
+  });
   const searchParams = {
     keyword,
     sort,
@@ -100,12 +102,12 @@ export function FanExploreScreen() {
             kind: "PERFORMANCE",
             item: mapExplorePerformance(item, index),
           }))
-        : (contentSearchQuery.data?.pages.flatMap((page) => page.items) ?? []).map(
-            (item, index) => ({
-              kind: "POST",
-              item: mapExploreContent(item, index),
-            }),
-          )
+        : (
+            contentSearchQuery.data?.pages.flatMap((page) => page.items) ?? []
+          ).map((item, index) => ({
+            kind: "POST",
+            item: mapExploreContent(item, index),
+          }))
     : (recommendedQuery.data?.pages.flatMap((page) => page.items) ?? []).map(
         (item, index) => ({
           kind: "BAND",
@@ -123,7 +125,9 @@ export function FanExploreScreen() {
 
   return (
     <View style={styles.root}>
-      <ExploreHeader onSearchPress={() => setIsSearchOpen((current) => !current)} />
+      <ExploreHeader
+        onSearchPress={() => setIsSearchOpen((current) => !current)}
+      />
 
       <ExploreFilterBar
         sort={sort}
@@ -158,7 +162,11 @@ export function FanExploreScreen() {
         <View style={styles.stateWrap}>
           <AppState
             loading
-            title={isSearching ? "검색 결과를 불러오는 중이에요" : "추천 밴드를 불러오는 중이에요"}
+            title={
+              isSearching
+                ? "검색 결과를 불러오는 중이에요"
+                : "추천 밴드를 불러오는 중이에요"
+            }
           />
         </View>
       ) : query.isError ? (
@@ -203,14 +211,16 @@ export function FanExploreScreen() {
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>
-                {isSearching ? "검색 결과가 없어요" : "조건에 맞는 밴드가 없어요"}
+                {isSearching
+                  ? "검색 결과가 없어요"
+                  : "조건에 맞는 밴드가 없어요"}
               </Text>
             </View>
           }
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       )}
@@ -263,11 +273,21 @@ function ExploreFilterBar({
           selected
           onPress={onToggleSort}
         />
-        <FilterChip label={genreLabel ?? "장르"} selected={Boolean(genreLabel)} />
-        <FilterChip label={regionLabel ?? "지역"} selected={Boolean(regionLabel)} />
+        <FilterChip
+          label={genreLabel ?? "장르"}
+          selected={Boolean(genreLabel)}
+        />
+        <FilterChip
+          label={regionLabel ?? "지역"}
+          selected={Boolean(regionLabel)}
+        />
         <FilterChip label="유형" />
         {hasFilters ? (
-          <FilterChip label="초기화" selected={false} onPress={onClearFilters} />
+          <FilterChip
+            label="초기화"
+            selected={false}
+            onPress={onClearFilters}
+          />
         ) : null}
       </ScrollView>
 
@@ -335,7 +355,9 @@ function SearchPanel({
             key={item.code}
             label={item.name}
             selected={genre === item.code}
-            onPress={() => onGenreChange(genre === item.code ? undefined : item.code)}
+            onPress={() =>
+              onGenreChange(genre === item.code ? undefined : item.code)
+            }
           />
         ))}
       </ScrollView>
@@ -406,7 +428,8 @@ function ResultRow({ result }: { result: ExploreResultItem }) {
 function BandRow({ item }: { item: ExploreBandItem }) {
   const followMutation = useFollowExploreBand();
   const unfollowMutation = useUnfollowExploreBand();
-  const isFollowPending = followMutation.isPending || unfollowMutation.isPending;
+  const isFollowPending =
+    followMutation.isPending || unfollowMutation.isPending;
 
   const toggleFollow = async () => {
     if (item.bandId == null) return;

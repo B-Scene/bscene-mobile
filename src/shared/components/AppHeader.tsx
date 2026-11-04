@@ -1,6 +1,12 @@
 import { router } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from "react-native";
 
 import { colors } from "@/shared/constants/theme";
 
@@ -27,7 +33,14 @@ export function AppHeader({
             accessibilityRole="button"
             accessibilityLabel="뒤로가기"
             hitSlop={12}
-            onPress={onBack ?? router.back}
+            onPress={() => {
+              if (onBack) {
+                onBack();
+                return;
+              }
+
+              router.back();
+            }}
             style={styles.iconButton}
           >
             <ChevronLeft size={24} color={colors.neutral900} />

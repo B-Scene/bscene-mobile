@@ -65,7 +65,7 @@ export function FanConcertListScreen() {
           ListFooterComponent={
             query.isFetchingNextPage ? (
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : null
+            ) : undefined
           }
         />
       )}
@@ -96,7 +96,10 @@ function ConcertRow({ item }: { item: ConcertListItem }) {
       await addInterestMutation.mutateAsync(item.performanceId);
     } catch (error) {
       if (isAlreadyInterestedPerformanceError(error)) {
-        await invalidatePerformanceInterestQueries(queryClient, item.performanceId);
+        await invalidatePerformanceInterestQueries(
+          queryClient,
+          item.performanceId,
+        );
         return;
       }
       Alert.alert("관심 공연", "관심 공연 등록에 실패했어요.");
@@ -129,7 +132,9 @@ function ConcertRow({ item }: { item: ConcertListItem }) {
           variant="ghost"
           onPress={() =>
             router.push(
-              `/fan/home/concerts/${item.id}` as Parameters<typeof router.push>[0],
+              `/fan/home/concerts/${item.id}` as Parameters<
+                typeof router.push
+              >[0],
             )
           }
         />

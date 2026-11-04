@@ -4,16 +4,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import {
-  AppState,
-  type AppStateStatus,
-} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 import {
   createChatRoom,
@@ -44,22 +36,17 @@ export const sessionChatKeys = {
   roomList: (params: ChatRoomsParams) =>
     [...sessionChatKeys.rooms(), params] as const,
 
-  roomInfiniteLists: () =>
-    [...sessionChatKeys.all, "roomInfinite"] as const,
+  roomInfiniteLists: () => [...sessionChatKeys.all, "roomInfinite"] as const,
 
   roomInfiniteList: (params: ChatRoomsParams) =>
     [...sessionChatKeys.roomInfiniteLists(), params] as const,
 
   details: () => [...sessionChatKeys.all, "detail"] as const,
 
-  detail: (
-    chatRoomId: number,
-    params: ChatRoomDetailParams,
-  ) =>
+  detail: (chatRoomId: number, params: ChatRoomDetailParams) =>
     [...sessionChatKeys.details(), chatRoomId, params] as const,
 
-  wsTicket: () =>
-    [...sessionChatKeys.all, "wsTicket"] as const,
+  wsTicket: () => [...sessionChatKeys.all, "wsTicket"] as const,
 };
 
 const PING_INTERVAL_MS = 20_000;
@@ -67,16 +54,11 @@ const PONG_TIMEOUT_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
 const createClientMsgId = () => {
-  return `${Date.now()}-${Math.random()
-    .toString(16)
-    .slice(2)}`;
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
 const getReconnectDelay = (attempt: number) => {
-  return Math.min(
-    1000 * 2 ** attempt,
-    MAX_RECONNECT_DELAY_MS,
-  );
+  return Math.min(1000 * 2 ** attempt, MAX_RECONNECT_DELAY_MS);
 };
 
 type TimeoutHandle = ReturnType<typeof setTimeout>;
@@ -88,23 +70,15 @@ interface UseSessionDirectMessageSocketParams {
 
   onMessage?: (
     message: DirectMessageData,
-    frame: Extract<
-      DirectMessageServerFrame,
-      { type: "dm.message" }
-    >,
+    frame: Extract<DirectMessageServerFrame, { type: "dm.message" }>,
   ) => void;
 
   onRead?: (
     readData: DirectMessageReadData,
-    frame: Extract<
-      DirectMessageServerFrame,
-      { type: "dm.read" }
-    >,
+    frame: Extract<DirectMessageServerFrame, { type: "dm.read" }>,
   ) => void;
 
-  onError?: (
-    frame: DirectMessageErrorFrame,
-  ) => void;
+  onError?: (frame: DirectMessageErrorFrame) => void;
 
   onConnected?: () => void;
 }
@@ -113,8 +87,7 @@ export const useCreateChatRoomMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (body: CreateChatRoomRequest) =>
-      createChatRoom(body),
+    mutationFn: (body: CreateChatRoomRequest) => createChatRoom(body),
 
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -124,9 +97,7 @@ export const useCreateChatRoomMutation = () => {
   });
 };
 
-export const useChatRoomsQuery = (
-  params: ChatRoomsParams = {},
-) => {
+export const useChatRoomsQuery = (params: ChatRoomsParams = {}) => {
   return useQuery({
     queryKey: sessionChatKeys.roomList(params),
     queryFn: () => getChatRooms(params),
@@ -134,30 +105,22 @@ export const useChatRoomsQuery = (
   });
 };
 
-export const useInfiniteChatRoomsQuery = (
-  params: ChatRoomsParams = {},
-) => {
+export const useInfiniteChatRoomsQuery = (params: ChatRoomsParams = {}) => {
   return useInfiniteQuery({
-    queryKey:
-      sessionChatKeys.roomInfiniteList(params),
+    queryKey: sessionChatKeys.roomInfiniteList(params),
 
     queryFn: ({ pageParam }) =>
       getChatRooms({
         ...params,
-        cursorId:
-          pageParam,
+        cursorId: pageParam,
       }),
 
-    initialPageParam:
-      undefined as number | undefined,
+    initialPageParam: undefined as number | undefined,
 
     getNextPageParam: (lastPage) =>
-      lastPage.hasNext
-        ? lastPage.nextCursor ?? undefined
-        : undefined,
+      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
 
-    staleTime:
-      1000 * 15,
+    staleTime: 1000 * 15,
   });
 };
 
@@ -166,12 +129,8 @@ export const useChatRoomDetailQuery = (
   params: ChatRoomDetailParams = {},
 ) => {
   return useQuery({
-    queryKey: sessionChatKeys.detail(
-      chatRoomId,
-      params,
-    ),
-    queryFn: () =>
-      getChatRoomDetail(chatRoomId, params),
+    queryKey: sessionChatKeys.detail(chatRoomId, params),
+    queryFn: () => getChatRoomDetail(chatRoomId, params),
     enabled: chatRoomId > 0,
     staleTime: 1000 * 10,
   });
@@ -185,10 +144,7 @@ export const useLeaveChatRoomMutation = () => {
 
     onSuccess: (_result, chatRoomId) => {
       queryClient.removeQueries({
-        queryKey: [
-          ...sessionChatKeys.details(),
-          chatRoomId,
-        ],
+        queryKey: [...sessionChatKeys.details(), chatRoomId],
       });
 
       queryClient.invalidateQueries({
@@ -198,12 +154,11 @@ export const useLeaveChatRoomMutation = () => {
   });
 };
 
-export const useIssueChatWebSocketTicketMutation =
-  () => {
-    return useMutation({
-      mutationFn: issueChatWebSocketTicket,
-    });
-  };
+export const useIssueChatWebSocketTicketMutation = () => {
+  return useMutation({
+    mutationFn: issueChatWebSocketTicket,
+  });
+};
 
 export const useSessionDirectMessageSocket = ({
   chatRoomId,
@@ -215,63 +170,45 @@ export const useSessionDirectMessageSocket = ({
 }: UseSessionDirectMessageSocketParams) => {
   const socketRef = useRef<WebSocket | null>(null);
 
-  const reconnectTimerRef =
-    useRef<TimeoutHandle | null>(null);
+  const reconnectTimerRef = useRef<TimeoutHandle | null>(null);
 
-  const pingTimerRef =
-    useRef<IntervalHandle | null>(null);
+  const pingTimerRef = useRef<IntervalHandle | null>(null);
 
-  const pongTimeoutRef =
-    useRef<TimeoutHandle | null>(null);
+  const pongTimeoutRef = useRef<TimeoutHandle | null>(null);
 
   const shouldReconnectRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
   const connectionGenerationRef = useRef(0);
 
-  const ticketRequestRef = useRef<
-    ReturnType<typeof issueChatWebSocketTicket> | null
-  >(null);
+  const ticketRequestRef = useRef<ReturnType<
+    typeof issueChatWebSocketTicket
+  > | null>(null);
 
-  const connectSocketRef =
-    useRef<() => Promise<void>>(
-      async () => undefined,
-    );
+  const connectSocketRef = useRef<() => Promise<void>>(async () => undefined);
 
   const onMessageRef = useRef(onMessage);
   const onReadRef = useRef(onRead);
   const onErrorRef = useRef(onError);
   const onConnectedRef = useRef(onConnected);
 
-  const [isConnected, setIsConnected] =
-    useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
-  const [
-    lastErrorMessage,
-    setLastErrorMessage,
-  ] = useState("");
+  const [lastErrorMessage, setLastErrorMessage] = useState("");
 
   useEffect(() => {
     onMessageRef.current = onMessage;
     onReadRef.current = onRead;
     onErrorRef.current = onError;
     onConnectedRef.current = onConnected;
-  }, [
-    onConnected,
-    onError,
-    onMessage,
-    onRead,
-  ]);
+  }, [onConnected, onError, onMessage, onRead]);
 
-  const clearReconnectTimer =
-    useCallback(() => {
-      if (reconnectTimerRef.current) {
-        clearTimeout(
-          reconnectTimerRef.current,
-        );
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
 
-        reconnectTimerRef.current = null;
-      }
-    }, []);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
 
   const clearHeartbeat = useCallback(() => {
     if (pingTimerRef.current) {
@@ -280,43 +217,32 @@ export const useSessionDirectMessageSocket = ({
     }
 
     if (pongTimeoutRef.current) {
-      clearTimeout(
-        pongTimeoutRef.current,
-      );
+      clearTimeout(pongTimeoutRef.current);
 
       pongTimeoutRef.current = null;
     }
   }, []);
 
-  const sendRawFrame = useCallback(
-    (frame: DirectMessageClientFrame) => {
-      const socket = socketRef.current;
+  const sendRawFrame = useCallback((frame: DirectMessageClientFrame) => {
+    const socket = socketRef.current;
 
-      if (
-        !socket ||
-        socket.readyState !== WebSocket.OPEN
-      ) {
-        setLastErrorMessage(
-          "쪽지 서버에 연결 중이에요. 잠시 후 다시 시도해 주세요.",
-        );
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setLastErrorMessage(
+        "쪽지 서버에 연결 중이에요. 잠시 후 다시 시도해 주세요.",
+      );
 
-        return false;
-      }
+      return false;
+    }
 
-      socket.send(JSON.stringify(frame));
+    socket.send(JSON.stringify(frame));
 
-      return true;
-    },
-    [],
-  );
+    return true;
+  }, []);
 
   const sendPing = useCallback(() => {
     const socket = socketRef.current;
 
-    if (
-      !socket ||
-      socket.readyState !== WebSocket.OPEN
-    ) {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
@@ -329,48 +255,31 @@ export const useSessionDirectMessageSocket = ({
     );
 
     if (pongTimeoutRef.current) {
-      clearTimeout(
-        pongTimeoutRef.current,
-      );
+      clearTimeout(pongTimeoutRef.current);
     }
 
-    pongTimeoutRef.current = setTimeout(
-      () => {
-        setLastErrorMessage(
-          "쪽지 서버 응답이 없어 재연결합니다.",
-        );
+    pongTimeoutRef.current = setTimeout(() => {
+      setLastErrorMessage("쪽지 서버 응답이 없어 재연결합니다.");
 
-        const currentSocket =
-          socketRef.current;
+      const currentSocket = socketRef.current;
 
-        if (
-          currentSocket &&
-          (currentSocket.readyState ===
-            WebSocket.OPEN ||
-            currentSocket.readyState ===
-              WebSocket.CONNECTING)
-        ) {
-          currentSocket.close();
-        }
-      },
-      PONG_TIMEOUT_MS,
-    );
+      if (
+        currentSocket &&
+        (currentSocket.readyState === WebSocket.OPEN ||
+          currentSocket.readyState === WebSocket.CONNECTING)
+      ) {
+        currentSocket.close();
+      }
+    }, PONG_TIMEOUT_MS);
   }, []);
 
-  const startHeartbeat =
-    useCallback(() => {
-      clearHeartbeat();
+  const startHeartbeat = useCallback(() => {
+    clearHeartbeat();
 
-      pingTimerRef.current = setInterval(
-        () => {
-          sendPing();
-        },
-        PING_INTERVAL_MS,
-      );
-    }, [
-      clearHeartbeat,
-      sendPing,
-    ]);
+    pingTimerRef.current = setInterval(() => {
+      sendPing();
+    }, PING_INTERVAL_MS);
+  }, [clearHeartbeat, sendPing]);
 
   const closeSocket = useCallback(() => {
     shouldReconnectRef.current = false;
@@ -388,10 +297,8 @@ export const useSessionDirectMessageSocket = ({
       socket.onclose = null;
 
       if (
-        socket.readyState ===
-          WebSocket.OPEN ||
-        socket.readyState ===
-          WebSocket.CONNECTING
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING
       ) {
         socket.close();
       }
@@ -399,281 +306,193 @@ export const useSessionDirectMessageSocket = ({
 
     socketRef.current = null;
     setIsConnected(false);
-  }, [
-    clearHeartbeat,
-    clearReconnectTimer,
-  ]);
+  }, [clearHeartbeat, clearReconnectTimer]);
 
-  const connectSocket =
-    useCallback(async () => {
+  const connectSocket = useCallback(async () => {
+    if (!enabled || (chatRoomId !== undefined && chatRoomId <= 0)) {
+      return;
+    }
+
+    const currentSocket = socketRef.current;
+
+    if (
+      currentSocket &&
+      (currentSocket.readyState === WebSocket.OPEN ||
+        currentSocket.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+
+    shouldReconnectRef.current = true;
+    setLastErrorMessage("");
+
+    const connectionGeneration = connectionGenerationRef.current + 1;
+
+    connectionGenerationRef.current = connectionGeneration;
+
+    try {
+      const ticketRequest =
+        ticketRequestRef.current ?? issueChatWebSocketTicket();
+
+      ticketRequestRef.current = ticketRequest;
+
+      const ticketResult = await ticketRequest;
+
+      if (ticketRequestRef.current === ticketRequest) {
+        ticketRequestRef.current = null;
+      }
+
       if (
-        !enabled ||
-        (chatRoomId !== undefined &&
-          chatRoomId <= 0)
+        !shouldReconnectRef.current ||
+        connectionGeneration !== connectionGenerationRef.current
       ) {
         return;
       }
 
-      const currentSocket =
-        socketRef.current;
+      const socketUrl = getChatWebSocketUrl(ticketResult.ticket);
 
-      if (
-        currentSocket &&
-        (currentSocket.readyState ===
-          WebSocket.OPEN ||
-          currentSocket.readyState ===
-            WebSocket.CONNECTING)
-      ) {
-        return;
-      }
+      const subprotocol = ticketResult.subprotocol || "dm.v1";
 
-      shouldReconnectRef.current = true;
-      setLastErrorMessage("");
+      const socket = new WebSocket(socketUrl, subprotocol);
 
-      const connectionGeneration =
-        connectionGenerationRef.current + 1;
+      socketRef.current = socket;
 
-      connectionGenerationRef.current =
-        connectionGeneration;
+      socket.onopen = () => {
+        reconnectAttemptRef.current = 0;
+        setIsConnected(true);
+        setLastErrorMessage("");
+        startHeartbeat();
+      };
 
-      try {
-        const ticketRequest =
-          ticketRequestRef.current ??
-          issueChatWebSocketTicket();
-
-        ticketRequestRef.current =
-          ticketRequest;
-
-        const ticketResult =
-          await ticketRequest;
-
-        if (
-          ticketRequestRef.current ===
-          ticketRequest
-        ) {
-          ticketRequestRef.current = null;
-        }
-
-        if (
-          !shouldReconnectRef.current ||
-          connectionGeneration !==
-            connectionGenerationRef.current
-        ) {
-          return;
-        }
-
-        const socketUrl =
-          getChatWebSocketUrl(
-            ticketResult.ticket,
-          );
-
-        const subprotocol =
-          ticketResult.subprotocol ||
-          "dm.v1";
-
-        const socket = new WebSocket(
-          socketUrl,
-          subprotocol,
-        );
-
-        socketRef.current = socket;
-
-        socket.onopen = () => {
-          reconnectAttemptRef.current = 0;
-          setIsConnected(true);
-          setLastErrorMessage("");
-          startHeartbeat();
-        };
-
-        socket.onmessage = (event) => {
-          try {
-            if (
-              typeof event.data !== "string"
-            ) {
-              return;
-            }
-
-            const frame = JSON.parse(
-              event.data,
-            ) as DirectMessageServerFrame;
-
-            if (
-              frame.type ===
-              "system.event"
-            ) {
-              if (
-                frame.data.event ===
-                "connected"
-              ) {
-                onConnectedRef.current?.();
-              }
-
-              return;
-            }
-
-            if (frame.type === "pong") {
-              if (
-                pongTimeoutRef.current
-              ) {
-                clearTimeout(
-                  pongTimeoutRef.current,
-                );
-
-                pongTimeoutRef.current =
-                  null;
-              }
-
-              return;
-            }
-
-            if (
-              frame.type ===
-              "dm.message"
-            ) {
-              if (
-                chatRoomId !== undefined &&
-                frame.data.chatRoomId !==
-                  chatRoomId
-              ) {
-                return;
-              }
-
-              onMessageRef.current?.(
-                frame.data,
-                frame,
-              );
-
-              return;
-            }
-
-            if (
-              frame.type === "dm.read"
-            ) {
-              if (
-                chatRoomId !== undefined &&
-                frame.data.chatRoomId !==
-                  chatRoomId
-              ) {
-                return;
-              }
-
-              onReadRef.current?.(
-                frame.data,
-                frame,
-              );
-
-              return;
-            }
-
-            if (
-              frame.type ===
-              "system.error"
-            ) {
-              const message =
-                frame.data.message ||
-                "쪽지 처리 중 오류가 발생했어요.";
-
-              setLastErrorMessage(
-                message,
-              );
-
-              onErrorRef.current?.(
-                frame,
-              );
-            }
-          } catch {
-            setLastErrorMessage(
-              "쪽지 응답을 처리하지 못했어요.",
-            );
-          }
-        };
-
-        socket.onerror = () => {
-          setLastErrorMessage(
-            "쪽지 WebSocket 연결 중 오류가 발생했어요.",
-          );
-        };
-
-        socket.onclose = () => {
-          if (
-            socketRef.current === socket
-          ) {
-            socketRef.current = null;
-          }
-
-          clearHeartbeat();
-          setIsConnected(false);
-
-          if (
-            !shouldReconnectRef.current
-          ) {
+      socket.onmessage = (event) => {
+        try {
+          if (typeof event.data !== "string") {
             return;
           }
 
-          const delay =
-            getReconnectDelay(
-              reconnectAttemptRef.current,
-            );
+          const frame = JSON.parse(event.data) as DirectMessageServerFrame;
 
-          reconnectAttemptRef.current += 1;
+          if (frame.type === "system.event") {
+            if (frame.data.event === "connected") {
+              onConnectedRef.current?.();
+            }
 
-          clearReconnectTimer();
+            return;
+          }
 
-          reconnectTimerRef.current =
-            setTimeout(() => {
-              void connectSocketRef.current();
-            }, delay);
-        };
-      } catch {
-        ticketRequestRef.current = null;
+          if (frame.type === "pong") {
+            if (pongTimeoutRef.current) {
+              clearTimeout(pongTimeoutRef.current);
 
-        if (
-          !shouldReconnectRef.current ||
-          connectionGeneration !==
-            connectionGenerationRef.current
-        ) {
+              pongTimeoutRef.current = null;
+            }
+
+            return;
+          }
+
+          if (frame.type === "dm.message") {
+            if (
+              chatRoomId !== undefined &&
+              frame.data.chatRoomId !== chatRoomId
+            ) {
+              return;
+            }
+
+            onMessageRef.current?.(frame.data, frame);
+
+            return;
+          }
+
+          if (frame.type === "dm.read") {
+            if (
+              chatRoomId !== undefined &&
+              frame.data.chatRoomId !== chatRoomId
+            ) {
+              return;
+            }
+
+            onReadRef.current?.(frame.data, frame);
+
+            return;
+          }
+
+          if (frame.type === "system.error") {
+            const message =
+              frame.data.message || "쪽지 처리 중 오류가 발생했어요.";
+
+            setLastErrorMessage(message);
+
+            onErrorRef.current?.(frame);
+          }
+        } catch {
+          setLastErrorMessage("쪽지 응답을 처리하지 못했어요.");
+        }
+      };
+
+      socket.onerror = () => {
+        setLastErrorMessage("쪽지 WebSocket 연결 중 오류가 발생했어요.");
+      };
+
+      socket.onclose = () => {
+        if (socketRef.current === socket) {
+          socketRef.current = null;
+        }
+
+        clearHeartbeat();
+        setIsConnected(false);
+
+        if (!shouldReconnectRef.current) {
           return;
         }
 
-        setIsConnected(false);
-
-        setLastErrorMessage(
-          "쪽지 WebSocket 연결 티켓 발급에 실패했어요.",
-        );
-
-        const delay =
-          getReconnectDelay(
-            reconnectAttemptRef.current,
-          );
+        const delay = getReconnectDelay(reconnectAttemptRef.current);
 
         reconnectAttemptRef.current += 1;
 
         clearReconnectTimer();
 
-        reconnectTimerRef.current =
-          setTimeout(() => {
-            void connectSocketRef.current();
-          }, delay);
+        reconnectTimerRef.current = setTimeout(() => {
+          void connectSocketRef.current();
+        }, delay);
+      };
+    } catch {
+      ticketRequestRef.current = null;
+
+      if (
+        !shouldReconnectRef.current ||
+        connectionGeneration !== connectionGenerationRef.current
+      ) {
+        return;
       }
-    }, [
-      chatRoomId,
-      clearHeartbeat,
-      clearReconnectTimer,
-      enabled,
-      startHeartbeat,
-    ]);
+
+      setIsConnected(false);
+
+      setLastErrorMessage("쪽지 WebSocket 연결 티켓 발급에 실패했어요.");
+
+      const delay = getReconnectDelay(reconnectAttemptRef.current);
+
+      reconnectAttemptRef.current += 1;
+
+      clearReconnectTimer();
+
+      reconnectTimerRef.current = setTimeout(() => {
+        void connectSocketRef.current();
+      }, delay);
+    }
+  }, [
+    chatRoomId,
+    clearHeartbeat,
+    clearReconnectTimer,
+    enabled,
+    startHeartbeat,
+  ]);
 
   useEffect(() => {
-    connectSocketRef.current =
-      connectSocket;
+    connectSocketRef.current = connectSocket;
   }, [connectSocket]);
 
   useEffect(() => {
-    if (
-      !enabled ||
-      (chatRoomId !== undefined &&
-        chatRoomId <= 0)
-    ) {
+    if (!enabled || (chatRoomId !== undefined && chatRoomId <= 0)) {
       return;
     }
 
@@ -685,121 +504,74 @@ export const useSessionDirectMessageSocket = ({
     return () => {
       closeSocket();
     };
-  }, [
-    chatRoomId,
-    closeSocket,
-    enabled,
-  ]);
+  }, [chatRoomId, closeSocket, enabled]);
 
   useEffect(() => {
-    if (
-      !enabled ||
-      (chatRoomId !== undefined &&
-        chatRoomId <= 0)
-    ) {
+    if (!enabled || (chatRoomId !== undefined && chatRoomId <= 0)) {
       return;
     }
 
-    let previousState: AppStateStatus =
-      AppState.currentState;
+    let previousState = AppState.currentState;
 
-    const subscription =
-      AppState.addEventListener(
-        "change",
-        (nextState) => {
-          const becameActive =
-            previousState !== "active" &&
-            nextState === "active";
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const becameActive = previousState !== "active" && nextState === "active";
 
-          previousState = nextState;
+      previousState = nextState;
 
-          if (
-            !becameActive ||
-            !shouldReconnectRef.current
-          ) {
-            return;
-          }
+      if (!becameActive || !shouldReconnectRef.current) {
+        return;
+      }
 
-          const socket =
-            socketRef.current;
+      const socket = socketRef.current;
 
-          if (
-            socket &&
-            socket.readyState ===
-              WebSocket.OPEN
-          ) {
-            sendPing();
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        sendPing();
 
-            return;
-          }
+        return;
+      }
 
-          if (
-            socket &&
-            socket.readyState ===
-              WebSocket.CONNECTING
-          ) {
-            return;
-          }
+      if (socket && socket.readyState === WebSocket.CONNECTING) {
+        return;
+      }
 
-          if (
-            ticketRequestRef.current
-          ) {
-            return;
-          }
+      if (ticketRequestRef.current) {
+        return;
+      }
 
-          reconnectAttemptRef.current = 0;
-          clearReconnectTimer();
+      reconnectAttemptRef.current = 0;
+      clearReconnectTimer();
 
-          void connectSocketRef.current();
-        },
-      );
+      void connectSocketRef.current();
+    });
 
     return () => {
       subscription.remove();
     };
-  }, [
-    chatRoomId,
-    clearReconnectTimer,
-    enabled,
-    sendPing,
-  ]);
+  }, [chatRoomId, clearReconnectTimer, enabled, sendPing]);
 
   const sendMessage = useCallback(
     (content: string) => {
-      if (
-        chatRoomId === undefined ||
-        chatRoomId <= 0
-      ) {
-        setLastErrorMessage(
-          "쪽지방 정보를 찾을 수 없어요.",
-        );
+      if (chatRoomId === undefined || chatRoomId <= 0) {
+        setLastErrorMessage("쪽지방 정보를 찾을 수 없어요.");
 
         return null;
       }
 
-      const trimmedContent =
-        content.trim();
+      const trimmedContent = content.trim();
 
       if (!trimmedContent) {
-        setLastErrorMessage(
-          "쪽지 내용을 입력해 주세요.",
-        );
+        setLastErrorMessage("쪽지 내용을 입력해 주세요.");
 
         return null;
       }
 
-      if (
-        trimmedContent.length > 2000
-      ) {
-        setLastErrorMessage(
-          "쪽지는 최대 2,000자까지 입력할 수 있어요.",
-        );
+      if (trimmedContent.length > 2000) {
+        setLastErrorMessage("쪽지는 최대 2,000자까지 입력할 수 있어요.");
 
         return null;
       }
 
-      const clientMsgId =
-        createClientMsgId();
+      const clientMsgId = createClientMsgId();
 
       const sent = sendRawFrame({
         type: "dm.send",
@@ -812,14 +584,9 @@ export const useSessionDirectMessageSocket = ({
         clientMsgId,
       });
 
-      return sent
-        ? clientMsgId
-        : null;
+      return sent ? clientMsgId : null;
     },
-    [
-      chatRoomId,
-      sendRawFrame,
-    ],
+    [chatRoomId, sendRawFrame],
   );
 
   const sendRead = useCallback(
@@ -843,10 +610,7 @@ export const useSessionDirectMessageSocket = ({
         clientMsgId: null,
       });
     },
-    [
-      chatRoomId,
-      sendRawFrame,
-    ],
+    [chatRoomId, sendRawFrame],
   );
 
   return {
@@ -866,139 +630,99 @@ export const useSessionChatRoomListSocket = ({
 } = {}) => {
   const queryClient = useQueryClient();
 
-  const currentUserId =
-    useAuthStore(
-      (state) => state.user?.userId,
-    );
+  const currentUserId = useAuthStore((state) => state.user?.userId);
 
-  const handleMessage =
-    useCallback(
-      (message: DirectMessageData) => {
-        const cachedRoomLists =
-          queryClient.getQueriesData<ChatRoomsResponse>({
-            queryKey:
-              sessionChatKeys.rooms(),
-          });
+  const handleMessage = useCallback(
+    (message: DirectMessageData) => {
+      const cachedRoomLists = queryClient.getQueriesData<ChatRoomsResponse>({
+        queryKey: sessionChatKeys.rooms(),
+      });
 
-        let hasMatchingRoom = false;
+      let hasMatchingRoom = false;
 
-        cachedRoomLists.forEach(
-          ([queryKey, cachedRooms]) => {
-            if (!cachedRooms) {
-              return;
-            }
-
-            const roomIndex =
-              cachedRooms.content.findIndex(
-                (room) =>
-                  room.chatRoomId ===
-                  message.chatRoomId,
-              );
-
-            const queryParams =
-              queryKey[2];
-
-            const filter =
-              typeof queryParams ===
-                "object" &&
-              queryParams !== null &&
-              "filter" in queryParams
-                ? (
-                    queryParams as ChatRoomsParams
-                  ).filter
-                : undefined;
-
-            const receivedFromCounterpart =
-              currentUserId == null ||
-              message.senderId !==
-                currentUserId;
-
-            if (roomIndex < 0) {
-              if (
-                filter !== "UNREAD" ||
-                receivedFromCounterpart
-              ) {
-                void queryClient.invalidateQueries({
-                  queryKey,
-                  exact: true,
-                });
-              }
-
-              return;
-            }
-
-            hasMatchingRoom = true;
-
-            const existingRoom =
-              cachedRooms.content[
-                roomIndex
-              ];
-
-            const updatedRoom = {
-              ...existingRoom,
-
-              lastMessage:
-                message.content,
-
-              lastMessageAt:
-                message.createdAt,
-
-              unreadCount:
-                receivedFromCounterpart
-                  ? existingRoom.unreadCount +
-                    1
-                  : existingRoom.unreadCount,
-            };
-
-            queryClient.setQueryData<ChatRoomsResponse>(
-              queryKey,
-              {
-                ...cachedRooms,
-
-                content: [
-                  updatedRoom,
-
-                  ...cachedRooms.content.filter(
-                    (room) =>
-                      room.chatRoomId !==
-                      message.chatRoomId,
-                  ),
-                ],
-              },
-            );
-          },
-        );
-
-        if (!hasMatchingRoom) {
-          void queryClient.invalidateQueries({
-            queryKey:
-              sessionChatKeys.rooms(),
-          });
+      cachedRoomLists.forEach(([queryKey, cachedRooms]) => {
+        if (!cachedRooms) {
+          return;
         }
 
-        void queryClient.invalidateQueries({
-          queryKey:
-            sessionChatKeys.roomInfiniteLists(),
+        const roomIndex = cachedRooms.content.findIndex(
+          (room) => room.chatRoomId === message.chatRoomId,
+        );
+
+        const queryParams = queryKey[2];
+
+        const filter =
+          typeof queryParams === "object" &&
+          queryParams !== null &&
+          "filter" in queryParams
+            ? (queryParams as ChatRoomsParams).filter
+            : undefined;
+
+        const receivedFromCounterpart =
+          currentUserId == null || message.senderId !== currentUserId;
+
+        if (roomIndex < 0) {
+          if (filter !== "UNREAD" || receivedFromCounterpart) {
+            void queryClient.invalidateQueries({
+              queryKey,
+              exact: true,
+            });
+          }
+
+          return;
+        }
+
+        hasMatchingRoom = true;
+
+        const existingRoom = cachedRooms.content[roomIndex];
+
+        const updatedRoom = {
+          ...existingRoom,
+
+          lastMessage: message.content,
+
+          lastMessageAt: message.createdAt,
+
+          unreadCount: receivedFromCounterpart
+            ? existingRoom.unreadCount + 1
+            : existingRoom.unreadCount,
+        };
+
+        queryClient.setQueryData<ChatRoomsResponse>(queryKey, {
+          ...cachedRooms,
+
+          content: [
+            updatedRoom,
+
+            ...cachedRooms.content.filter(
+              (room) => room.chatRoomId !== message.chatRoomId,
+            ),
+          ],
         });
-      },
-      [
-        currentUserId,
-        queryClient,
-      ],
-    );
-
-  const refreshRoomLists =
-    useCallback(() => {
-      void queryClient.invalidateQueries({
-        queryKey:
-          sessionChatKeys.rooms(),
       });
 
+      if (!hasMatchingRoom) {
+        void queryClient.invalidateQueries({
+          queryKey: sessionChatKeys.rooms(),
+        });
+      }
+
       void queryClient.invalidateQueries({
-        queryKey:
-          sessionChatKeys.roomInfiniteLists(),
+        queryKey: sessionChatKeys.roomInfiniteLists(),
       });
-    }, [queryClient]);
+    },
+    [currentUserId, queryClient],
+  );
+
+  const refreshRoomLists = useCallback(() => {
+    void queryClient.invalidateQueries({
+      queryKey: sessionChatKeys.rooms(),
+    });
+
+    void queryClient.invalidateQueries({
+      queryKey: sessionChatKeys.roomInfiniteLists(),
+    });
+  }, [queryClient]);
 
   return useSessionDirectMessageSocket({
     enabled,

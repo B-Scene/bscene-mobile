@@ -1,12 +1,6 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
   useInfiniteChatRoomsQuery,
@@ -71,18 +65,12 @@ export function BandSessionMailboxScreen() {
   useSessionChatRoomListSocket();
 
   const rooms = useMemo(
-    () =>
-      query.data?.pages.flatMap(
-        (page) => page.content,
-      ) ?? [],
+    () => query.data?.pages.flatMap((page) => page.content) ?? [],
     [query.data?.pages],
   );
 
   const loadMore = () => {
-    if (
-      !query.hasNextPage ||
-      query.isFetchingNextPage
-    ) {
+    if (!query.hasNextPage || query.isFetchingNextPage) {
       return;
     }
 
@@ -123,7 +111,11 @@ export function BandSessionMailboxScreen() {
         </View>
       ) : rooms.length === 0 ? (
         <AppState
-          title={filter === "UNREAD" ? "읽지 않은 쪽지가 없어요" : "주고받은 쪽지가 없어요"}
+          title={
+            filter === "UNREAD"
+              ? "읽지 않은 쪽지가 없어요"
+              : "주고받은 쪽지가 없어요"
+          }
           description="세션 모집 또는 지원 과정에서 대화를 시작하면 여기에 표시돼요."
         />
       ) : (
@@ -139,14 +131,12 @@ export function BandSessionMailboxScreen() {
           onEndReachedThreshold={0.4}
           ListFooterComponent={
             query.isFetchingNextPage ? (
-              <Text style={styles.footer}>
-                이전 쪽지를 불러오고 있어요
-              </Text>
+              <Text style={styles.footer}>이전 쪽지를 불러오고 있어요</Text>
             ) : query.hasNextPage ? (
               <Text style={styles.footer}>
                 아래로 스크롤하면 이전 쪽지를 더 불러와요
               </Text>
-            ) : null
+            ) : undefined
           }
         />
       )}
@@ -182,11 +172,7 @@ function MailboxTab({
   );
 }
 
-function ChatRoomCard({
-  room,
-}: {
-  room: ChatRoomListItem;
-}) {
+function ChatRoomCard({ room }: { room: ChatRoomListItem }) {
   const status = getStatus(room.applicationStatus);
   const isDeclined = status === "declined";
   const hasUnread = room.unreadCount > 0;
@@ -246,18 +232,16 @@ function ChatRoomCard({
         </Text>
 
         {!room.canSend ? (
-          <Text style={styles.disabledText}>현재 메시지를 보낼 수 없는 대화입니다.</Text>
+          <Text style={styles.disabledText}>
+            현재 메시지를 보낼 수 없는 대화입니다.
+          </Text>
         ) : null}
       </View>
     </Pressable>
   );
 }
 
-function MessageStatusBadge({
-  status,
-}: {
-  status: "accepted" | "declined";
-}) {
+function MessageStatusBadge({ status }: { status: "accepted" | "declined" }) {
   const isAccepted = status === "accepted";
 
   return (

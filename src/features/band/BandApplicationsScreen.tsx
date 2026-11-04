@@ -1,12 +1,6 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useReceivedApplicationsQuery } from "@/hooks/api/user/useReceivedApplications";
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -110,7 +104,11 @@ export function BandApplicationsScreen() {
         />
       ) : posts.length === 0 ? (
         <AppState
-          title={status === "OPEN" ? "진행중인 공고가 없어요" : "마감된 공고가 없어요"}
+          title={
+            status === "OPEN"
+              ? "진행중인 공고가 없어요"
+              : "마감된 공고가 없어요"
+          }
           description={
             status === "OPEN"
               ? "진행중인 모집 공고 지원자가 여기에 표시돼요."
@@ -137,8 +135,10 @@ export function BandApplicationsScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListFooterComponent={
             query.isFetchingNextPage ? (
-              <Text style={styles.footerText}>다음 지원자를 불러오는 중이에요</Text>
-            ) : null
+              <Text style={styles.footerText}>
+                다음 지원자를 불러오는 중이에요
+              </Text>
+            ) : undefined
           }
         />
       )}
@@ -196,11 +196,7 @@ function RecruitmentApplicationCard({
   );
 }
 
-function ApplicantRow({
-  applicant,
-}: {
-  applicant: ReceivedApplicant;
-}) {
+function ApplicantRow({ applicant }: { applicant: ReceivedApplicant }) {
   return (
     <View style={styles.applicantRow}>
       <Avatar
