@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { router } from "expo-router";
 import {
-  Alert,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 
@@ -24,12 +25,15 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
-import { useOnboardingStatus } from "@/hooks/api/onboarding/useOnboarding";
 import { BSceneLogo } from "@/features/onboarding/BSceneBrandAssets";
-import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
+import { ModeSwitchSheet } from "@/features/my/ModeSwitchSheet";
+import { PulseView } from "@/features/post/PostDetailParts";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
-import { colors } from "@/shared/constants/theme";
+import { Toast } from "@/shared/components/Toast";
+import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import type {
   FanHomeConcert,
   FanHomeNewsItem,
@@ -69,6 +73,9 @@ type ConcertCardItem = {
   day: string;
   thumbnailUrl?: string | null;
 };
+
+const NEWS_CARD_WIDTH = 200;
+const NEWS_CARD_GAP = 12;
 
 const MONTH_LABELS = [
   "JAN",
@@ -355,7 +362,6 @@ const getPendingPerformanceTitle = (
 
 export function FanTabHomeScreen() {
   const fanHomeQuery = useFanHomeQuery();
-  const onboardingStatusQuery = useOnboardingStatus();
   const upcomingQuery = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
   const notificationsQuery = useNotificationsInfiniteQuery();
   const pendingParticipationQuery = usePendingPerformanceParticipationQuery();
@@ -369,6 +375,9 @@ export function FanTabHomeScreen() {
   const [participationError, setParticipationError] = useState<string | null>(
     null,
   );
+  const [isModeSwitchOpen, setIsModeSwitchOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const closeToast = useCallback(() => setToastMessage(null), []);
   const home = mapHomeResponse(fanHomeQuery.data);
   const upcomingConcerts =
     upcomingQuery.data?.pages
@@ -401,37 +410,6 @@ export function FanTabHomeScreen() {
   const retry = () => {
     void fanHomeQuery.refetch();
     void upcomingQuery.refetch();
-  };
-
-  const handleModeSwitch = () => {
-    const canUseBandMode =
-      onboardingStatusQuery.data?.availableModes.includes("BAND") ?? false;
-
-    if (onboardingStatusQuery.isLoading) {
-      Alert.alert("모드 전환", "사용 가능한 모드를 확인하는 중이에요.");
-      return;
-    }
-
-    if (!canUseBandMode) {
-      Alert.alert(
-        "모드 전환",
-        "밴드 모드가 아직 활성화되어 있지 않아요. 온보딩에서 밴드 모드를 추가한 뒤 이용해 주세요.",
-      );
-      return;
-    }
-
-    Alert.alert("모드 전환", "밴드 모드로 이동할까요?", [
-      {
-        text: "취소",
-        style: "cancel",
-      },
-      {
-        text: "전환",
-        onPress: () => {
-          router.replace("/band/home");
-        },
-      },
-    ]);
   };
 
   const handleNotificationPress = () => {
@@ -478,128 +456,125 @@ export function FanTabHomeScreen() {
   };
 
   return (
-    <Screen contentStyle={styles.container}>
-      <HomeHeader
-        hasUnreadNotification={hasUnreadNotification}
-        onModeSwitch={handleModeSwitch}
-        onNotificationPress={handleNotificationPress}
-      />
-
-      {isLoading ? (
-        <AppState loading title="팬 홈을 불러오는 중이에요" />
-      ) : isError ? (
-        <AppState
-          title="홈 정보를 불러오지 못했어요"
-          description="네트워크 상태나 로그인 상태를 확인한 뒤 다시 시도해 주세요."
-          actionLabel="다시 시도"
-          onAction={retry}
-        />
-      ) : (
-        <View style={styles.content}>
-          {!home.hasFollowingBands ? (
-            <EmptyFollowCard />
-          ) : (
-            <Section title="팔로우한 밴드 소식" onMorePress={undefined}>
-              {home.news.length > 0 ? (
-                <NewsCarousel items={home.news} />
-              ) : (
-                <InlineEmpty text="새로운 밴드 소식이 없어요" />
-              )}
-            </Section>
-          )}
-
-          {home.recommendedBands.length > 0 ? (
-            <Section
-              title="이런 밴드는 어때요?"
-              description="관심사 장르 · 지역 기반 추천"
-              onMorePress={() =>
-                router.push("/fan/explore" as Parameters<typeof router.push>[0])
-              }
-            >
-              <BandRecommendationStrip
-                bands={home.recommendedBands}
-                onFollowChanged={() => {
-                  void fanHomeQuery.refetch();
-                }}
-              />
-            </Section>
-          ) : null}
-
-          <Section
-            title={home.hasFollowingBands ? "다가오는 공연" : "이런 공연은 어때요?"}
-            description={
-              home.hasFollowingBands ? undefined : "지금 인기 있는 공연을 추천해드릴게요!"
-            }
-            onMorePress={() =>
-              router.push(
-                "/fan/home/concerts" as Parameters<typeof router.push>[0],
-              )
-            }
-          >
-            {concerts.length > 0 ? (
-              <View style={styles.concertList}>
-                {concerts.slice(0, 4).map((item) => (
-                  <ConcertCard key={item.id} item={item} />
-                ))}
-              </View>
-            ) : (
-              <InlineEmpty text="표시할 공연이 없어요" />
-            )}
-          </Section>
-        </View>
-      )}
-
-      <Modal
-        animationType="fade"
-        transparent
-        visible={Boolean(currentPendingPerformance) && !isParticipationModalDismissed}
-        onRequestClose={() => setIsParticipationModalDismissed(true)}
+    <Screen edges={["top"]} scroll={false} contentStyle={styles.screen}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.container}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>공연은 재미있게 보셨나요?</Text>
-            <Text style={styles.modalDescription}>
-              {currentPendingPerformanceTitle
-                ? `${currentPendingPerformanceTitle}에 참여했다면\n'참여했어요'를 눌러주세요`
-                : "참여했다면\n'참여했어요'를 눌러주세요"}
-            </Text>
-            {participationError ? (
-              <Text style={styles.modalError}>{participationError}</Text>
-            ) : null}
-            <View style={styles.modalActions}>
+        <HomeHeader
+          hasUnreadNotification={hasUnreadNotification}
+          onModeSwitch={() => setIsModeSwitchOpen(true)}
+          onNotificationPress={handleNotificationPress}
+        />
+
+        <View style={styles.content}>
+          {isLoading ? (
+            <LoadingBlock />
+          ) : isError ? (
+            <View style={styles.messageBlock}>
+              <Text style={styles.errorText}>홈 정보를 불러오지 못했어요</Text>
               <Pressable
                 accessibilityRole="button"
-                disabled={isParticipationResponding}
-                style={[styles.modalButton, styles.modalCancelButton]}
-                onPress={() => void handleParticipationDelete()}
+                style={styles.retryButton}
+                onPress={retry}
               >
-                <Text style={styles.modalCancelText}>
-                  {deleteParticipationMutation.isPending ? "처리 중" : "불참했어요"}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={isParticipationResponding}
-                style={[styles.modalButton, styles.modalConfirmButton]}
-                onPress={() => void handleParticipationComplete()}
-              >
-                <Text style={styles.modalConfirmText}>
-                  {completeParticipationMutation.isPending
-                    ? "처리 중"
-                    : "참여했어요"}
-                </Text>
+                <Text style={styles.retryText}>다시 시도</Text>
               </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.modalDismissButton}
-              onPress={() => setIsParticipationModalDismissed(true)}
-            >
-              <Text style={styles.modalDismissText}>나중에 하기</Text>
-            </Pressable>
-          </View>
+          ) : (
+            <>
+              <Section title="팔로우한 밴드 소식">
+                {!home.hasFollowingBands ? (
+                  <EmptyFollowCard />
+                ) : home.news.length > 0 ? (
+                  <NewsCarousel items={home.news} />
+                ) : (
+                  <InlineEmpty text="새로운 밴드 소식이 없어요" />
+                )}
+              </Section>
+
+              {home.recommendedBands.length > 0 ? (
+                <Section
+                  title="이런 밴드는 어때요?"
+                  description="관심사 장르 · 지역 기반 추천"
+                  onMorePress={() =>
+                    router.push("/fan/explore" as Parameters<typeof router.push>[0])
+                  }
+                >
+                  <BandRecommendationStrip
+                    bands={home.recommendedBands}
+                    onFollowChanged={() => {
+                      void fanHomeQuery.refetch();
+                    }}
+                    onToast={setToastMessage}
+                  />
+                </Section>
+              ) : null}
+
+              <Section
+                title={
+                  home.hasFollowingBands ? "다가오는 공연" : "이런 공연은 어때요?"
+                }
+                description={
+                  home.hasFollowingBands
+                    ? undefined
+                    : "지금 인기 있는 공연을 추천해드릴게요!"
+                }
+                onMorePress={() =>
+                  router.push(
+                    "/fan/home/concerts" as Parameters<typeof router.push>[0],
+                  )
+                }
+              >
+                {concerts.length > 0 ? (
+                  <View style={styles.concertList}>
+                    {concerts.slice(0, 4).map((item) => (
+                      <ConcertCard key={item.id} item={item} />
+                    ))}
+                  </View>
+                ) : (
+                  <InlineEmpty text="표시할 공연이 없어요" />
+                )}
+              </Section>
+            </>
+          )}
         </View>
-      </Modal>
+      </ScrollView>
+
+      <ConfirmModal
+        open={Boolean(currentPendingPerformance) && !isParticipationModalDismissed}
+        title="공연은 재미있게 보셨나요?"
+        description={[
+          currentPendingPerformanceTitle
+            ? `${currentPendingPerformanceTitle}에 참여했다면`
+            : "참여했다면",
+          "'참여했어요'를 눌러주세요",
+          participationError,
+        ]
+          .filter(Boolean)
+          .join("\n")}
+        cancelLabel={
+          deleteParticipationMutation.isPending ? "처리 중" : "불참했어요"
+        }
+        confirmLabel={
+          completeParticipationMutation.isPending ? "처리 중" : "참여했어요"
+        }
+        onCancel={() => void handleParticipationDelete()}
+        onConfirm={() => void handleParticipationComplete()}
+        onBackdropPress={() => setIsParticipationModalDismissed(true)}
+      />
+
+      <ModeSwitchSheet
+        open={isModeSwitchOpen}
+        onClose={() => setIsModeSwitchOpen(false)}
+      />
+
+      <Toast
+        open={toastMessage !== null}
+        message={toastMessage}
+        tone={toastMessage?.includes("실패") ? "error" : "success"}
+        onClose={closeToast}
+      />
     </Screen>
   );
 }
@@ -668,7 +643,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <View style={styles.section}>
+    <View>
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleGroup}>
           <Text style={styles.sectionTitle}>{title}</Text>
@@ -684,7 +659,9 @@ function Section({
             onPress={onMorePress}
           >
             <Text style={styles.moreText}>더보기</Text>
-            <ArrowIcon />
+            <View style={styles.moreIcon}>
+              <AppIcon name="concertArrow" size={24} />
+            </View>
           </Pressable>
         ) : null}
       </View>
@@ -712,22 +689,69 @@ function EmptyFollowCard() {
         </Pressable>
       </View>
 
-      <SpeakerIllustration />
+      <Image
+        source={require("../../../assets/images/home/speaker.png")}
+        resizeMode="contain"
+        style={styles.speaker}
+      />
     </View>
   );
 }
 
 function NewsCarousel({ items }: { items: NewsCardItem[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const maxOffset = contentSize.width - layoutMeasurement.width;
+
+    if (maxOffset <= 0) {
+      setActiveIndex(0);
+      return;
+    }
+
+    setActiveIndex(
+      Math.min(
+        items.length - 1,
+        Math.max(
+          0,
+          Math.round((contentOffset.x / maxOffset) * (items.length - 1)),
+        ),
+      ),
+    );
+  };
+
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.newsScroll}
-    >
-      {items.map((item) => (
-        <NewsCard key={item.id} item={item} />
-      ))}
-    </ScrollView>
+    <View>
+      <ScrollView
+        horizontal
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={NEWS_CARD_WIDTH + NEWS_CARD_GAP}
+        style={styles.bleed}
+        contentContainerStyle={styles.newsScroll}
+        onScroll={handleScroll}
+      >
+        {items.map((item) => (
+          <NewsCard key={item.id} item={item} />
+        ))}
+      </ScrollView>
+
+      {items.length > 1 ? (
+        <View style={styles.newsDots}>
+          {items.map((item, index) => (
+            <View
+              key={item.id}
+              style={[
+                styles.newsDot,
+                index === activeIndex && styles.newsDotActive,
+              ]}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -735,6 +759,7 @@ function NewsCard({ item }: { item: NewsCardItem }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${item.title} 상세보기`}
       disabled={item.detailId == null}
       style={styles.newsCard}
       onPress={() => {
@@ -745,7 +770,7 @@ function NewsCard({ item }: { item: NewsCardItem }) {
       }}
     >
       <View style={styles.newsHeader}>
-        <Avatar imageUrl={item.profileImageUrl} label={item.bandName} size={38} />
+        <ProfileImage imageUrl={item.profileImageUrl} size={36} variant="band" />
         <View style={styles.newsTitleGroup}>
           <Text numberOfLines={1} style={styles.newsBandName}>
             {item.bandName}
@@ -757,19 +782,26 @@ function NewsCard({ item }: { item: NewsCardItem }) {
       </View>
 
       {item.contentImageUrl ? (
-        <Image source={{ uri: item.contentImageUrl }} style={styles.newsImage} />
+        <Image
+          source={{ uri: item.contentImageUrl }}
+          resizeMode="cover"
+          style={styles.newsImage}
+        />
       ) : null}
 
-      <Text numberOfLines={3} style={styles.newsText}>
+      <Text numberOfLines={2} style={styles.newsText}>
         {item.title}
       </Text>
 
       {item.tags.length > 0 ? (
         <View style={styles.tagRow}>
-          {item.tags.slice(0, 2).map((tag) => (
-            <Text key={tag} numberOfLines={1} style={styles.tagText}>
-              #{tag}
-            </Text>
+          {item.tags.map((tag) => (
+            <View
+              key={tag}
+              style={[styles.tagChip, tag.trim().length === 2 && styles.tagChipShort]}
+            >
+              <Text style={styles.tagText}>{tag}</Text>
+            </View>
           ))}
         </View>
       ) : null}
@@ -780,130 +812,139 @@ function NewsCard({ item }: { item: NewsCardItem }) {
 function BandRecommendationStrip({
   bands,
   onFollowChanged,
+  onToast,
 }: {
   bands: BandCardItem[];
   onFollowChanged: () => void;
+  onToast: (message: string) => void;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   const followMutation = useFollowExploreBand();
   const unfollowMutation = useUnfollowExploreBand();
   const [followOverrides, setFollowOverrides] = useState<Record<string, boolean>>(
     {},
   );
   const [pendingBandId, setPendingBandId] = useState<number | null>(null);
+  const [unfollowTarget, setUnfollowTarget] = useState<BandCardItem | null>(null);
   const isFollowPending = followMutation.isPending || unfollowMutation.isPending;
+  const itemWidth = (windowWidth - 40 - 36) / 4;
 
-  const toggleFollow = (band: BandCardItem) => {
+  const runFollowChange = (band: BandCardItem, nextIsFollowing: boolean) => {
     const bandId = band.bandId;
 
-    if (bandId == null || pendingBandId === bandId) return;
+    if (bandId == null) return;
 
-    const isFollowing = followOverrides[band.id] ?? band.isFollowing;
-    const previousIsFollowing = isFollowing;
-    const nextIsFollowing = !isFollowing;
+    setPendingBandId(bandId);
+    setFollowOverrides((currentOverrides) => ({
+      ...currentOverrides,
+      [band.id]: nextIsFollowing,
+    }));
 
-    const runMutation = () => {
-      setPendingBandId(bandId);
-      setFollowOverrides((currentOverrides) => ({
-        ...currentOverrides,
-        [band.id]: nextIsFollowing,
-      }));
+    const mutation = nextIsFollowing ? followMutation : unfollowMutation;
 
-      const mutation = nextIsFollowing ? followMutation : unfollowMutation;
+    mutation.mutate(bandId, {
+      onSuccess: () => {
+        onFollowChanged();
+        onToast(
+          nextIsFollowing
+            ? `${band.name}를 팔로우했어요`
+            : `${band.name} 팔로우를 취소했어요`,
+        );
+      },
+      onError: () => {
+        setFollowOverrides((currentOverrides) => ({
+          ...currentOverrides,
+          [band.id]: !nextIsFollowing,
+        }));
+        onToast(
+          nextIsFollowing
+            ? "밴드 팔로우에 실패했어요"
+            : "팔로우 취소에 실패했어요",
+        );
+      },
+      onSettled: () => {
+        setPendingBandId(null);
+      },
+    });
+  };
 
-      mutation.mutate(bandId, {
-        onSuccess: onFollowChanged,
-        onError: () => {
-          setFollowOverrides((currentOverrides) => ({
-            ...currentOverrides,
-            [band.id]: previousIsFollowing,
-          }));
-          Alert.alert("밴드 팔로우", "팔로우 상태를 변경하지 못했어요.");
-        },
-        onSettled: () => {
-          setPendingBandId(null);
-        },
-      });
-    };
+  const toggleFollow = (band: BandCardItem) => {
+    if (band.bandId == null || pendingBandId === band.bandId) return;
 
-    if (isFollowing) {
-      Alert.alert(
-        "팔로우를 취소할까요?",
-        "이 밴드의 소식이 홈피드에서 사라져요.",
-        [
-          {
-            text: "취소",
-            style: "cancel",
-          },
-          {
-            text: "확인",
-            style: "destructive",
-            onPress: runMutation,
-          },
-        ],
-      );
+    if (followOverrides[band.id] ?? band.isFollowing) {
+      setUnfollowTarget(band);
       return;
     }
 
-    runMutation();
+    runFollowChange(band, true);
   };
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.bandStrip}
-    >
-      {bands.map((band) => {
-        const isFollowing = followOverrides[band.id] ?? band.isFollowing;
-        const isBandPending = isFollowPending && pendingBandId === band.bandId;
+    <>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.bleed}
+        contentContainerStyle={styles.bandStrip}
+      >
+        {bands.map((band) => {
+          const isFollowing = followOverrides[band.id] ?? band.isFollowing;
+          const isBandPending = isFollowPending && pendingBandId === band.bandId;
 
-        return (
-          <View key={band.id} style={styles.recommendBand}>
-            <Pressable
-              accessibilityRole="button"
-              disabled={band.bandId == null}
-              style={styles.recommendBandLink}
-              onPress={() => {
-                if (band.bandId == null) return;
-                router.push(
-                  `/fan/bands/${band.bandId}` as Parameters<
-                    typeof router.push
-                  >[0],
-                );
-              }}
-            >
-              <Avatar imageUrl={band.imageUrl} label={band.name} size={52} />
-              <Text numberOfLines={1} style={styles.recommendBandName}>
-                {band.name}
-              </Text>
-              <Text numberOfLines={1} style={styles.recommendBandMeta}>
-                {band.meta}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={band.bandId == null || isBandPending}
-              style={[
-                styles.followButton,
-                isFollowing && styles.followButtonActive,
-                isBandPending && styles.followButtonDisabled,
-              ]}
-              onPress={() => toggleFollow(band)}
-            >
-              <Text
-                style={[
-                  styles.followButtonText,
-                  isFollowing && styles.followButtonTextActive,
-                ]}
+          return (
+            <View key={band.id} style={[styles.recommendBand, { width: itemWidth }]}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={band.bandId == null}
+                style={styles.recommendBandLink}
+                onPress={() => {
+                  if (band.bandId == null) return;
+                  router.push(
+                    `/fan/bands/${band.bandId}` as Parameters<
+                      typeof router.push
+                    >[0],
+                  );
+                }}
               >
-                {isBandPending ? "처리중" : isFollowing ? "팔로잉" : "팔로우"}
-              </Text>
-            </Pressable>
-          </View>
-        );
-      })}
-    </ScrollView>
+                <ProfileImage imageUrl={band.imageUrl} size={52} variant="band" />
+                <Text numberOfLines={1} style={styles.recommendBandName}>
+                  {band.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.recommendBandMeta}>
+                  {band.meta}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={band.bandId == null || isBandPending}
+                style={[
+                  styles.followButton,
+                  (band.bandId == null || isBandPending) &&
+                    styles.followButtonDisabled,
+                ]}
+                onPress={() => toggleFollow(band)}
+              >
+                <Text style={styles.followButtonText}>
+                  {isFollowing ? "팔로잉" : "팔로우"}
+                </Text>
+              </Pressable>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <ConfirmModal
+        open={unfollowTarget !== null}
+        title="팔로우를 취소할까요?"
+        description={"이 밴드의 소식이\n홈피드에서 사라져요"}
+        onCancel={() => setUnfollowTarget(null)}
+        onConfirm={() => {
+          if (unfollowTarget) runFollowChange(unfollowTarget, false);
+          setUnfollowTarget(null);
+        }}
+      />
+    </>
   );
 }
 
@@ -911,6 +952,7 @@ function ConcertCard({ item }: { item: ConcertCardItem }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={`${item.title} 상세보기`}
       style={styles.concertCard}
       onPress={() =>
         router.push(
@@ -918,31 +960,65 @@ function ConcertCard({ item }: { item: ConcertCardItem }) {
         )
       }
     >
-      <View style={styles.dateBadge}>
-        <Text style={styles.dateMonth}>{item.month}</Text>
-        <Text style={styles.dateDay}>{item.day}</Text>
-      </View>
+      {item.thumbnailUrl ? (
+        <Image
+          source={{ uri: item.thumbnailUrl }}
+          resizeMode="cover"
+          style={styles.concertThumbnail}
+        />
+      ) : (
+        <View
+          style={[
+            styles.dateBadge,
+            item.status === "준비중" && styles.dateBadgePending,
+          ]}
+        >
+          <Text style={styles.dateMonth}>{item.month}</Text>
+          <Text style={styles.dateDay}>{item.day}</Text>
+        </View>
+      )}
 
       <View style={styles.concertText}>
-        <Text numberOfLines={1} style={styles.concertTitle}>
-          {item.title}
-        </Text>
-        <Text numberOfLines={1} style={styles.concertLocation}>
-          {item.location}
-        </Text>
-        <Text style={styles.concertMeta}>{item.dateTime}</Text>
+        <View style={styles.concertTitleGroup}>
+          <Text numberOfLines={1} style={styles.concertTitle}>
+            {item.title}
+          </Text>
+          <View style={styles.concertLocation}>
+            <AppIcon name="concertLocation" size={14} />
+            <Text numberOfLines={1} style={styles.concertVenue}>
+              {item.location}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.concertMeta}>
+          <Text numberOfLines={1} style={styles.concertDateTime}>
+            {item.dateTime}
+          </Text>
+          <Text style={styles.concertDivider}>|</Text>
+          <Text style={styles.concertStatus}>{item.status}</Text>
+        </View>
       </View>
 
-      <Text style={styles.concertStatus}>{item.status}</Text>
+      <AppIcon name="concertArrow" size={24} />
     </Pressable>
   );
 }
 
 function InlineEmpty({ text }: { text: string }) {
   return (
-    <View style={styles.inlineEmpty}>
-      <Text style={styles.inlineEmptyText}>{text}</Text>
+    <View style={styles.messageBlock}>
+      <Text style={styles.emptyText}>{text}</Text>
     </View>
+  );
+}
+
+function LoadingBlock() {
+  return (
+    <PulseView style={styles.loadingList}>
+      {[0, 1, 2].map((item) => (
+        <View key={item} style={styles.loadingCard} />
+      ))}
+    </PulseView>
   );
 }
 
@@ -990,65 +1066,30 @@ function NotificationBellIcon({ hasUnread }: { hasUnread: boolean }) {
           strokeLinejoin="round"
         />
         <Circle cx={12} cy={4} r={1} stroke={colors.neutral900} strokeWidth={2} />
-      </Svg>
-      {hasUnread ? <View style={styles.unreadDot} /> : null}
-    </View>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M10 17L15 12"
-        stroke={colors.neutral400}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M15 12L10 7"
-        stroke={colors.neutral400}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function SpeakerIllustration() {
-  return (
-    <View style={styles.speaker}>
-      <Svg width={87} height={90} viewBox="0 0 87 90" fill="none">
-        <Circle cx={40} cy={45} r={29} fill={colors.primary50} />
-        <Path
-          d="M26 52H18C16.895 52 16 51.105 16 50V40C16 38.895 16.895 38 18 38H26L41 27V63L26 52Z"
-          fill={colors.primary400}
-        />
-        <Path
-          d="M50 36C53.2 39.2 53.2 50.8 50 54M58 28C65 35 65 55 58 62"
-          stroke={colors.primary400}
-          strokeWidth={5}
-          strokeLinecap="round"
-        />
+        {hasUnread ? <Circle cx={23} cy={2} r={2} fill={colors.primary400} /> : null}
       </Svg>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   container: {
     paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 104,
+    paddingBottom: 24,
     backgroundColor: colors.white,
   },
   header: {
-    minHeight: 48,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginHorizontal: -20,
+    paddingHorizontal: 24,
+    backgroundColor: colors.white,
   },
   headerIconButton: {
     width: 24,
@@ -1067,379 +1108,323 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
   },
-  unreadDot: {
-    position: "absolute",
-    top: 1,
-    right: 1,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: colors.primary400,
-  },
   content: {
-    marginTop: 32,
     gap: 32,
-  },
-  section: {
-    gap: 16,
+    marginTop: 32,
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 16,
+    marginBottom: 16,
   },
   sectionTitleGroup: {
     flex: 1,
   },
   sectionTitle: {
+    ...textStyles.label1,
     color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 20,
   },
   sectionDescription: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
+    ...textStyles.caption2,
     marginTop: 4,
+    color: colors.neutral600,
   },
   moreButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 1,
+    gap: 2,
+    paddingTop: 2,
   },
   moreText: {
+    ...textStyles.body1,
     color: colors.neutral400,
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
+  },
+  moreIcon: {
+    opacity: 0.35,
   },
   emptyFollowCard: {
-    minHeight: 139,
-    borderRadius: 12,
-    backgroundColor: colors.primary0,
+    ...shadows.card,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 18,
+    borderRadius: 12,
+    backgroundColor: colors.primary0,
     paddingHorizontal: 19,
     paddingTop: 25,
     paddingBottom: 24,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 2,
   },
   emptyFollowCopy: {
     flex: 1,
     minWidth: 0,
   },
   emptyFollowTitle: {
+    ...textStyles.label1,
     color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 20,
   },
   emptyFollowDescription: {
-    color: colors.neutral700,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
+    ...textStyles.caption2,
     marginTop: 5,
+    color: colors.neutral700,
   },
   exploreButton: {
     alignSelf: "flex-start",
+    marginTop: 12,
     borderRadius: 8,
     backgroundColor: colors.primary400,
-    marginTop: 12,
     paddingHorizontal: 17,
     paddingVertical: 7,
   },
   exploreButtonText: {
+    ...textStyles.caption3,
     color: colors.white,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
   },
   speaker: {
     width: 87,
     height: 90,
   },
+  bleed: {
+    marginHorizontal: -20,
+  },
   newsScroll: {
-    gap: 12,
-    paddingRight: 20,
-    paddingBottom: 3,
+    gap: NEWS_CARD_GAP,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   newsCard: {
-    width: 280,
+    width: NEWS_CARD_WIDTH,
+    height: 238,
+    gap: 12,
     borderRadius: 12,
     backgroundColor: colors.white,
-    padding: 14,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    padding: 12,
+    boxShadow: "0px 0px 10px 1px rgba(20, 20, 20, 0.12)",
   },
   newsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   newsTitleGroup: {
     flex: 1,
     minWidth: 0,
   },
   newsBandName: {
+    ...textStyles.caption3,
     color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
   },
   newsMeta: {
+    ...textStyles.body5,
     color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
   },
   newsImage: {
     width: "100%",
-    height: 112,
-    borderRadius: 10,
-    backgroundColor: colors.neutral200,
-    marginTop: 12,
+    height: 82,
+    borderRadius: 8,
+    backgroundColor: colors.neutral300,
   },
   newsText: {
+    ...textStyles.caption2,
     color: colors.neutral900,
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
-    marginTop: 12,
   },
   tagRow: {
+    height: 20,
     flexDirection: "row",
-    gap: 6,
-    marginTop: 10,
+    gap: 4,
+    overflow: "hidden",
+    marginTop: "auto",
+  },
+  tagChip: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    backgroundColor: colors.primary50,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  tagChipShort: {
+    minWidth: 32,
   },
   tagText: {
+    ...textStyles.body5,
     color: colors.primary400,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
+  },
+  newsDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 4,
+  },
+  newsDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.neutral400,
+  },
+  newsDotActive: {
+    backgroundColor: colors.primary300,
   },
   bandStrip: {
     gap: 12,
-    paddingRight: 20,
-    paddingBottom: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 4,
   },
   recommendBand: {
-    width: 76,
     alignItems: "center",
   },
   recommendBandLink: {
+    width: "100%",
     alignItems: "center",
-    alignSelf: "stretch",
   },
   recommendBandName: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
-    marginTop: 8,
+    ...textStyles.body1,
     maxWidth: "100%",
+    marginTop: 8,
+    color: colors.neutral900,
   },
   recommendBandMeta: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
+    ...textStyles.caption2,
     maxWidth: "100%",
+    color: colors.neutral600,
   },
   followButton: {
     alignSelf: "stretch",
-    borderWidth: 1,
-    borderColor: colors.primary400,
-    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
-    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary400,
     paddingVertical: 4,
-  },
-  followButtonActive: {
-    backgroundColor: colors.primary400,
   },
   followButtonDisabled: {
     opacity: 0.6,
   },
   followButtonText: {
+    ...textStyles.caption3,
     color: colors.primary400,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-  },
-  followButtonTextActive: {
-    color: colors.white,
   },
   concertList: {
     gap: 12,
   },
   concertCard: {
-    minHeight: 86,
-    borderRadius: 12,
-    backgroundColor: colors.white,
+    ...shadows.card,
+    height: 86,
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    padding: 14,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    gap: 16,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  concertThumbnail: {
+    width: 50,
+    height: 62,
+    borderRadius: 8,
+    backgroundColor: colors.neutral300,
   },
   dateBadge: {
-    width: 54,
-    height: 58,
-    borderRadius: 10,
-    backgroundColor: colors.primary300,
+    width: 50,
+    height: 62,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: colors.primary300,
+  },
+  dateBadgePending: {
+    backgroundColor: colors.neutral300,
   },
   dateMonth: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
+    color: "#FFFDFB",
+    fontSize: 16,
+    fontWeight: "500",
+    lineHeight: 16,
   },
   dateDay: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: "700",
-    lineHeight: 28,
+    marginTop: 4,
+    color: "#FFFDFB",
+    fontSize: 24,
+    fontWeight: "600",
+    lineHeight: 24,
   },
   concertText: {
     flex: 1,
     minWidth: 0,
+    gap: 5,
+  },
+  concertTitleGroup: {
+    gap: 3,
   },
   concertTitle: {
+    ...textStyles.body1,
     color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
   },
   concertLocation: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  concertVenue: {
+    ...textStyles.caption2,
+    flexShrink: 1,
+    color: colors.neutral700,
   },
   concertMeta: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  concertDateTime: {
+    ...textStyles.body5,
+    flexShrink: 1,
+    color: colors.neutral500,
+  },
+  concertDivider: {
+    ...textStyles.body5,
+    color: colors.neutral400,
   },
   concertStatus: {
+    ...textStyles.body5,
     color: colors.primary500,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 18,
   },
-  inlineEmpty: {
-    minHeight: 86,
-    borderRadius: 12,
+  messageBlock: {
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.neutral100,
-    padding: 16,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
   },
-  inlineEmptyText: {
+  emptyText: {
+    ...textStyles.body3,
     color: colors.neutral600,
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  modalOverlay: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(20, 20, 20, 0.42)",
-    padding: 24,
-  },
-  modalCard: {
-    width: "100%",
-    borderRadius: 18,
-    backgroundColor: colors.white,
-    padding: 24,
-  },
-  modalTitle: {
-    color: colors.neutral900,
-    fontSize: 20,
-    fontWeight: "800",
-    lineHeight: 26,
     textAlign: "center",
   },
-  modalDescription: {
+  errorText: {
+    ...textStyles.body3,
     color: colors.neutral700,
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 22,
+    textAlign: "center",
+  },
+  retryButton: {
     marginTop: 12,
-    textAlign: "center",
-  },
-  modalError: {
-    color: colors.error,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 18,
-    marginTop: 10,
-    textAlign: "center",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 24,
-  },
-  modalButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalCancelButton: {
-    backgroundColor: colors.neutral200,
-  },
-  modalConfirmButton: {
+    borderRadius: 8,
     backgroundColor: colors.primary400,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
-  modalCancelText: {
-    color: colors.neutral700,
-    fontSize: 15,
-    fontWeight: "800",
-    lineHeight: 20,
-  },
-  modalConfirmText: {
+  retryText: {
+    ...textStyles.caption3,
     color: colors.white,
-    fontSize: 15,
-    fontWeight: "800",
-    lineHeight: 20,
   },
-  modalDismissButton: {
-    alignItems: "center",
-    marginTop: 14,
-    paddingVertical: 6,
+  loadingList: {
+    gap: 12,
   },
-  modalDismissText: {
-    color: colors.neutral500,
-    fontSize: 13,
-    fontWeight: "600",
-    lineHeight: 18,
+  loadingCard: {
+    width: "100%",
+    maxWidth: 348,
+    height: 86,
+    borderRadius: 12,
+    backgroundColor: colors.neutral100,
   },
 });

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -34,10 +35,25 @@ import {
   AppState,
 } from "@/shared/components/AppState";
 import {
-  Avatar,
-} from "@/shared/components/Avatar";
+  ModeSwitchSheet,
+} from "@/features/my/ModeSwitchSheet";
+import {
+  AppIcon,
+} from "@/shared/components/AppIcon";
+import {
+  ConfirmModal,
+} from "@/shared/components/ConfirmModal";
+import {
+  ProfileImage,
+} from "@/shared/components/ProfileImage";
+import {
+  getGenreLabel,
+  getRegionLabel,
+} from "@/shared/constants/bandLabels";
 import {
   colors,
+  shadows,
+  textStyles,
 } from "@/shared/constants/theme";
 import type {
   MusicLinksResponse,
@@ -71,6 +87,13 @@ const HOME_TABS: {
     label: "음원",
   },
 ];
+
+const ETC_PLATFORM_LABELS: Record<string, string> = {
+  MELON: "Melon",
+  GENIE: "genie",
+  BUGS: "Bugs",
+  APPLE_MUSIC: "Apple Music",
+};
 
 const MONTH_ABBREVIATIONS = [
   "JAN",
@@ -184,6 +207,12 @@ export function BandHomeScreen() {
       "content",
     );
 
+  const [
+    isModeSwitchOpen,
+    setIsModeSwitchOpen,
+  ] =
+    useState(false);
+
   const activeBandQuery =
     useActiveBandId();
 
@@ -243,28 +272,6 @@ export function BandHomeScreen() {
     }
   };
 
-  const handleModeSwitch =
-    () => {
-      Alert.alert(
-        "모드 전환",
-        "팬 모드로 이동할까요?",
-        [
-          {
-            text: "취소",
-            style: "cancel",
-          },
-          {
-            text: "전환",
-            onPress: () => {
-              router.replace(
-                "/fan/home",
-              );
-            },
-          },
-        ],
-      );
-    };
-
   const openContentCreate =
     () => {
       router.push(
@@ -299,8 +306,8 @@ export function BandHomeScreen() {
       }
     >
       <HomeHeader
-        onModeSwitch={
-          handleModeSwitch
+        onModeSwitch={() =>
+          setIsModeSwitchOpen(true)
         }
       />
 
@@ -483,9 +490,27 @@ export function BandHomeScreen() {
             </View>
           </>
         ) : (
-          <NoBandState />
+          <NoBandState
+            activeTab={
+              activeTab
+            }
+            onTabChange={
+              setActiveTab
+            }
+          />
         )}
       </ScrollView>
+
+      <ModeSwitchSheet
+        open={
+          isModeSwitchOpen
+        }
+        onClose={() =>
+          setIsModeSwitchOpen(
+            false,
+          )
+        }
+      />
     </SafeAreaView>
   );
 }
@@ -572,12 +597,12 @@ function BandProfileSection({
           styles.profileLeft
         }
       >
-        <Avatar
+        <ProfileImage
           imageUrl={
             imageUrl
           }
-          label={name}
           size={72}
+          variant="band"
         />
 
         <View
@@ -600,9 +625,9 @@ function BandProfileSection({
               styles.bandSubtitle
             }
           >
-            {genre}
+            {getGenreLabel(genre)}
             {" · "}
-            {region}
+            {getRegionLabel(region)}
             {" · "}
             멤버{" "}
             {memberCount}명
@@ -644,19 +669,48 @@ function StatRow({
   performanceCount: number;
   contentCount: number;
 }) {
+  const { width } =
+    useWindowDimensions();
+
+  const dividerStyle = {
+    marginHorizontal:
+      Math.min(
+        38,
+        Math.max(
+          16,
+          width * 0.04,
+        ),
+      ),
+  };
+
   return (
     <View
-      style={
-        styles.statsCard
-      }
+      style={[
+        styles.statsCard,
+
+        {
+          paddingHorizontal:
+            Math.min(
+              40,
+              Math.max(
+                16,
+                width * 0.06,
+              ),
+            ),
+        },
+      ]}
     >
       <Pressable
         style={
           styles.statItem
         }
-        onPress={() => {
-          // 팔로워 상세 route는 이후 화면 parity 단계에서 연결
-        }}
+        onPress={() =>
+          router.push(
+            "/band/my/followers" as Parameters<
+              typeof router.push
+            >[0],
+          )
+        }
       >
         <Text
           style={
@@ -676,9 +730,10 @@ function StatRow({
       </Pressable>
 
       <View
-        style={
-          styles.statDivider
-        }
+        style={[
+          styles.statDivider,
+          dividerStyle,
+        ]}
       />
 
       <View
@@ -704,9 +759,10 @@ function StatRow({
       </View>
 
       <View
-        style={
-          styles.statDivider
-        }
+        style={[
+          styles.statDivider,
+          dividerStyle,
+        ]}
       />
 
       <View
@@ -878,6 +934,14 @@ function ContentSection({
       bandId,
     );
 
+  const [
+    deleteTargetId,
+    setDeleteTargetId,
+  ] =
+    useState<number | null>(
+      null,
+    );
+
   if (isLoading) {
     return (
       <AppState
@@ -916,41 +980,29 @@ function ContentSection({
     );
   }
 
-  const confirmDelete =
-    (
-      postId: number,
-    ) => {
-      Alert.alert(
-        "콘텐츠를 삭제할까요?",
-        "삭제된 콘텐츠는 복구할 수 없어요",
-        [
-          {
-            text: "취소",
-            style: "cancel",
-          },
-          {
-            text: "삭제",
-            style:
-              "destructive",
-            onPress:
-              () => {
-                deleteMutation.mutate(
-                  postId,
-                  {
-                    onError:
-                      () => {
-                        Alert.alert(
-                          "콘텐츠 삭제",
-                          "콘텐츠를 삭제하지 못했어요.",
-                        );
-                      },
-                  },
-                );
-              },
-          },
-        ],
-      );
-    };
+  const deletePost = () => {
+    if (
+      deleteTargetId === null
+    ) {
+      return;
+    }
+
+    deleteMutation.mutate(
+      deleteTargetId,
+      {
+        onError: () => {
+          Alert.alert(
+            "콘텐츠 삭제",
+            "콘텐츠를 삭제하지 못했어요.",
+          );
+        },
+      },
+    );
+
+    setDeleteTargetId(
+      null,
+    );
+  };
 
   return (
     <View
@@ -985,15 +1037,13 @@ function ContentSection({
                   )
                 }
               >
-                <Avatar
-                  imageUrl={
-                    bandImageUrl
-                  }
-                  label={
-                    bandName
-                  }
-                  size={36}
-                />
+                <ProfileImage
+                    imageUrl={
+                      bandImageUrl
+                    }
+                    size={36}
+                    variant="band"
+                  />
 
                 <View
                   style={
@@ -1021,15 +1071,15 @@ function ContentSection({
                       styles.postMeta
                     }
                   >
-                    {
-                      genre
-                    }
-                    {" · "}
-                    {
-                      region
-                    }
-                    {" · "}
-                    {formatRelativeCreatedAt(
+                    {getGenreLabel(
+                        genre,
+                      )}
+                      {" · "}
+                      {getRegionLabel(
+                        region,
+                      )}
+                      {" · "}
+                      {formatRelativeCreatedAt(
                       post.createdAt,
                     )}
                   </Text>
@@ -1056,7 +1106,7 @@ function ContentSection({
                 <SmallActionButton
                   label="삭제"
                   onPress={() =>
-                    confirmDelete(
+                    setDeleteTargetId(
                       post.postId,
                     )
                   }
@@ -1097,13 +1147,10 @@ function ContentSection({
                         styles.videoPlayButton
                       }
                     >
-                      <Text
-                        style={
-                          styles.videoPlayText
-                        }
-                      >
-                        ▶
-                      </Text>
+                      <AppIcon
+                        name="homePlay"
+                        size={36}
+                      />
                     </View>
                   ) : null}
                 </View>
@@ -1125,6 +1172,24 @@ function ContentSection({
           </View>
         ),
       )}
+
+      <ConfirmModal
+        open={
+          deleteTargetId !== null
+        }
+        tone="orange"
+        title="콘텐츠를 삭제할까요?"
+        description="삭제된 콘텐츠는 복구할 수 없어요"
+        confirmLabel="삭제"
+        onCancel={() =>
+          setDeleteTargetId(
+            null,
+          )
+        }
+        onConfirm={
+          deletePost
+        }
+      />
     </View>
   );
 }
@@ -1150,6 +1215,14 @@ function ScheduleSection({
   const deleteMutation =
     useDeleteBandPerformance(
       bandId,
+    );
+
+  const [
+    deleteTargetId,
+    setDeleteTargetId,
+  ] =
+    useState<number | null>(
+      null,
     );
 
   if (isLoading) {
@@ -1191,42 +1264,29 @@ function ScheduleSection({
     );
   }
 
-  const confirmDelete =
-    (
-      performanceId:
-        number,
-    ) => {
-      Alert.alert(
-        "공연을 삭제할까요?",
-        "삭제된 공연 정보는 복구할 수 없어요",
-        [
-          {
-            text: "취소",
-            style: "cancel",
-          },
-          {
-            text: "삭제",
-            style:
-              "destructive",
-            onPress:
-              () => {
-                deleteMutation.mutate(
-                  performanceId,
-                  {
-                    onError:
-                      () => {
-                        Alert.alert(
-                          "공연 삭제",
-                          "공연 일정을 삭제하지 못했어요.",
-                        );
-                      },
-                  },
-                );
-              },
-          },
-        ],
-      );
-    };
+  const deletePerformance = () => {
+    if (
+      deleteTargetId === null
+    ) {
+      return;
+    }
+
+    deleteMutation.mutate(
+      deleteTargetId,
+      {
+        onError: () => {
+          Alert.alert(
+            "공연 삭제",
+            "공연 일정을 삭제하지 못했어요.",
+          );
+        },
+      },
+    );
+
+    setDeleteTargetId(
+      null,
+    );
+  };
 
   return (
     <View
@@ -1326,7 +1386,10 @@ function ScheduleSection({
                       styles.locationRow
                     }
                   >
-                    <LocationPinIcon />
+                    <AppIcon
+                        name="concertLocation"
+                        size={14}
+                      />
 
                     <Text
                       numberOfLines={
@@ -1396,7 +1459,7 @@ function ScheduleSection({
                 <SmallActionButton
                   label="삭제"
                   onPress={() =>
-                    confirmDelete(
+                    setDeleteTargetId(
                       performance.performanceId,
                     )
                   }
@@ -1406,6 +1469,24 @@ function ScheduleSection({
           );
         },
       )}
+
+      <ConfirmModal
+        open={
+          deleteTargetId !== null
+        }
+        tone="orange"
+        title="공연을 삭제할까요?"
+        description="삭제된 공연 정보는 복구할 수 없어요"
+        confirmLabel="삭제"
+        onCancel={() =>
+          setDeleteTargetId(
+            null,
+          )
+        }
+        onConfirm={
+          deletePerformance
+        }
+      />
     </View>
   );
 }
@@ -1453,50 +1534,49 @@ function MusicSection({
         "Spotify",
       url:
         musicLinks?.spotifyUrl,
-      tone:
-        "#1DB954",
+      icon: "spotify",
     },
     {
       label:
         "YouTube",
       url:
         musicLinks?.youtubeUrl,
-      tone:
-        "#FF0033",
+      icon: "youtube",
     },
     {
       label:
         "SoundCloud",
       url:
         musicLinks?.soundcloudUrl,
-      tone:
-        "#FF7700",
+      icon: "soundcloud",
     },
     {
       label:
-        musicLinks?.etcPlatform ??
-        "기타",
+        musicLinks?.etcPlatform
+          ? (ETC_PLATFORM_LABELS[
+              musicLinks.etcPlatform
+            ] ??
+            musicLinks.etcPlatform)
+          : "기타",
       url:
         musicLinks?.etcUrl,
-      tone:
-        colors.neutral600,
+      icon: "other",
     },
     {
       label:
         "기타",
       url:
         musicLinks?.otherUrl,
-      tone:
-        colors.neutral600,
+      icon: "other",
     },
   ].filter(
     (
       item,
     ): item is {
-      label: string;
-      url: string;
-      tone: string;
-    } =>
+        label: string;
+        url: string;
+        icon: string;
+      } =>
       Boolean(item.url),
   );
 
@@ -1551,24 +1631,11 @@ function MusicSection({
                 )
               }
             >
-              <View
-                style={[
-                  styles.musicIcon,
-
-                  {
-                    backgroundColor:
-                      link.tone,
-                  },
-                ]}
-              >
-                <Text
-                  style={
-                    styles.musicIconText
-                  }
-                >
-                  ♪
-                </Text>
-              </View>
+              <MusicLinkIcon
+                    type={
+                      link.icon
+                    }
+                  />
 
               <View
                 style={
@@ -1599,13 +1666,11 @@ function MusicSection({
                 </Text>
               </View>
 
-              <Text
-                style={
-                  styles.musicArrow
-                }
-              >
-                ›
-              </Text>
+              <AppIcon
+                  name="homeArrowRight"
+                  width={8}
+                  height={15}
+                />
             </Pressable>
           ),
         )}
@@ -1624,13 +1689,10 @@ function MusicSection({
               styles.musicAddIcon
             }
           >
-            <Text
-              style={
-                styles.musicAddIconText
-              }
-            >
-              +
-            </Text>
+            <AppIcon
+                  name="musicPlus"
+                  size={24}
+                />
           </View>
 
           <View
@@ -1657,6 +1719,54 @@ function MusicSection({
           </View>
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+function MusicLinkIcon({
+  type,
+}: {
+  type: string;
+}) {
+  if (type === "spotify") {
+    return (
+      <AppIcon
+        name="spotify"
+        size={35}
+      />
+    );
+  }
+
+  if (type === "soundcloud") {
+    return (
+      <AppIcon
+        name="soundcloud"
+        size={35}
+      />
+    );
+  }
+
+  if (type === "youtube") {
+    return (
+      <Image
+        source={require("../../../assets/images/band/youtube.png")}
+        style={
+          styles.musicImage
+        }
+      />
+    );
+  }
+
+  return (
+    <View
+      style={
+        styles.musicAddIcon
+      }
+    >
+      <AppIcon
+        name="homeMusicNote"
+        size={20}
+      />
     </View>
   );
 }
@@ -1717,31 +1827,37 @@ function EmptyState({
   );
 }
 
-function NoBandState() {
+function NoBandState({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab:
+    BandHomeTab;
+  onTabChange:
+    (
+      tab:
+        BandHomeTab,
+    ) => void;
+}) {
+  const openBandCreate =
+    () => {
+      Alert.alert(
+        "밴드 등록",
+        "밴드 등록 화면은 이후 원본 디자인 이식 단계에서 연결할게요.",
+      );
+    };
+
   return (
-    <View
-      style={
-        styles.noBandWrapper
-      }
-    >
+    <>
       <View
         style={
           styles.noBandProfile
         }
       >
-        <View
-          style={
-            styles.defaultAvatar
-          }
-        >
-          <Text
-            style={
-              styles.defaultAvatarText
-            }
-          >
-            ♪
-          </Text>
-        </View>
+        <ProfileImage
+          size={72}
+          variant="band"
+        />
 
         <View
           style={
@@ -1753,8 +1869,7 @@ function NoBandState() {
               styles.noBandTitle
             }
           >
-            등록된 밴드가
-            없어요
+            등록된 밴드가 없어요
           </Text>
 
           <Text
@@ -1769,20 +1884,65 @@ function NoBandState() {
         </View>
       </View>
 
-      <EmptyState
-        title="등록된 밴드가 없어요"
-        description={
-          "밴드를 등록하면 콘텐츠, 공연, 라이브 등\n다양한 활동을 관리할 수 있어요"
-        }
-        actionLabel="밴드 등록하기"
-        onAction={() => {
-          Alert.alert(
-            "밴드 등록",
-            "밴드 등록 화면은 이후 원본 디자인 이식 단계에서 연결할게요.",
-          );
-        }}
+      <StatRow
+        followerCount={0}
+        performanceCount={0}
+        contentCount={0}
       />
-    </View>
+
+      <View
+        style={
+          styles.registrationButtons
+        }
+      >
+        <RegistrationButton
+          label="콘텐츠 등록"
+          onPress={
+            openBandCreate
+          }
+        />
+
+        <RegistrationButton
+          label="일정 등록"
+          onPress={
+            openBandCreate
+          }
+        />
+
+        <RegistrationButton
+          label="음원 등록"
+          onPress={
+            openBandCreate
+          }
+        />
+      </View>
+
+      <BandHomeTabs
+        activeTab={
+          activeTab
+        }
+        onChange={
+          onTabChange
+        }
+      />
+
+      <View
+        style={
+          styles.tabContent
+        }
+      >
+        <EmptyState
+          title="등록된 밴드가 없어요"
+          description={
+            "밴드를 등록하면 콘텐츠, 공연, 라이브 등\n다양한 활동을 관리할 수 있어요"
+          }
+          actionLabel="밴드 등록하기"
+          onAction={
+            openBandCreate
+          }
+        />
+      </View>
+    </>
   );
 }
 
@@ -1889,37 +2049,6 @@ function NotificationBellIcon() {
   );
 }
 
-function LocationPinIcon() {
-  return (
-    <Svg
-      width={14}
-      height={14}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <Path
-        d="M20 10C20 15 12 22 12 22C12 22 4 15 4 10C4 5.582 7.582 2 12 2C16.418 2 20 5.582 20 10Z"
-        stroke={
-          colors.neutral700
-        }
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      <Circle
-        cx={12}
-        cy={10}
-        r={2.5}
-        stroke={
-          colors.neutral700
-        }
-        strokeWidth={2}
-      />
-    </Svg>
-  );
-}
-
 const styles =
   StyleSheet.create({
     safeArea: {
@@ -1942,12 +2071,10 @@ const styles =
     },
 
     headerIconButton: {
-      width: 32,
-      height: 32,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
     },
 
     headerLogo: {
@@ -1964,7 +2091,7 @@ const styles =
     scrollContent: {
       paddingHorizontal: 20,
       paddingTop: 24,
-      paddingBottom: 32,
+      paddingBottom: 24,
     },
 
     profileSection: {
@@ -1992,21 +2119,13 @@ const styles =
     },
 
     bandName: {
-      color:
-        colors.neutral900,
-      fontSize: 18,
-      fontWeight:
-        "700",
-      lineHeight: 22,
+      ...textStyles.label1,
+      color: colors.neutral900,
     },
 
     bandSubtitle: {
-      color:
-        colors.neutral700,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      ...textStyles.caption2,
+      color: colors.neutral700,
     },
 
     profileEditButton: {
@@ -2019,34 +2138,18 @@ const styles =
     },
 
     profileEditText: {
-      color:
-        colors.neutral600,
-      fontSize: 11,
-      fontWeight:
-        "500",
+      ...textStyles.caption3,
+      color: colors.neutral600,
     },
 
     statsCard: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+      ...shadows.card,
+      flexDirection: "row",
+      alignItems: "center",
       marginTop: 16,
       paddingVertical: 16,
-      paddingHorizontal: 16,
       borderRadius: 16,
-      backgroundColor:
-        colors.white,
-
-      shadowColor:
-        "#000000",
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
+      backgroundColor: colors.white,
     },
 
     statItem: {
@@ -2059,29 +2162,19 @@ const styles =
     },
 
     statValue: {
-      color:
-        colors.neutral900,
-      fontSize: 18,
-      fontWeight:
-        "700",
-      lineHeight: 22,
+      ...textStyles.label1,
+      color: colors.neutral900,
     },
 
     statLabel: {
-      color:
-        colors.neutral600,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      ...textStyles.body5,
+      color: colors.neutral600,
     },
 
     statDivider: {
       width: 1,
       height: 40,
-      backgroundColor:
-        colors.neutral300,
-      marginHorizontal: 10,
+      backgroundColor: colors.neutral300,
     },
 
     registrationButtons: {
@@ -2105,11 +2198,8 @@ const styles =
     },
 
     registrationButtonText: {
-      color:
-        colors.white,
-      fontSize: 14,
-      fontWeight:
-        "500",
+      ...textStyles.body1,
+      color: colors.white,
     },
 
     pressed: {
@@ -2137,10 +2227,7 @@ const styles =
     },
 
     tabText: {
-      fontSize: 14,
-      fontWeight:
-        "500",
-      lineHeight: 20,
+      ...textStyles.body1,
     },
 
     activeTabText: {
@@ -2186,22 +2273,12 @@ const styles =
     },
 
     postCard: {
+      ...shadows.card,
       gap: 16,
       paddingVertical: 12,
       paddingHorizontal: 16,
       borderRadius: 12,
-      backgroundColor:
-        colors.white,
-
-      shadowColor:
-        "#000000",
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
+      backgroundColor: colors.white,
     },
 
     postHeader: {
@@ -2228,21 +2305,13 @@ const styles =
     },
 
     postBandName: {
-      color:
-        colors.neutral900,
-      fontSize: 11,
-      fontWeight:
-        "500",
-      lineHeight: 16,
+      ...textStyles.caption3,
+      color: colors.neutral900,
     },
 
     postMeta: {
-      color:
-        colors.neutral700,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      ...textStyles.caption2,
+      color: colors.neutral700,
     },
 
     postActions: {
@@ -2272,11 +2341,8 @@ const styles =
     },
 
     smallActionText: {
-      color:
-        colors.neutral600,
-      fontSize: 11,
-      fontWeight:
-        "500",
+      ...textStyles.caption3,
+      color: colors.neutral600,
     },
 
     postMediaWrapper: {
@@ -2298,64 +2364,33 @@ const styles =
     },
 
     videoPlayButton: {
-      position:
-        "absolute",
+      position: "absolute",
       left: "50%",
       top: "50%",
       width: 36,
       height: 36,
       marginLeft: -18,
       marginTop: -18,
-      borderRadius: 18,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        "rgba(0,0,0,0.55)",
     },
 
-    videoPlayText: {
-      color:
-        colors.white,
-      fontSize: 15,
-      marginLeft: 2,
-    },
 
     postCaption: {
+      ...textStyles.caption2,
       marginTop: 8,
-      color:
-        colors.neutral900,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      color: colors.neutral900,
     },
 
     performanceCard: {
-      minHeight: 86,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      justifyContent:
-        "space-between",
-      gap: 12,
+      ...shadows.card,
+      height: 86,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderRadius: 12,
-      backgroundColor:
-        colors.white,
-
-      shadowColor:
-        "#000000",
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
+      backgroundColor: colors.white,
     },
 
     performanceMain: {
@@ -2390,22 +2425,18 @@ const styles =
     },
 
     dateMonth: {
-      color:
-        colors.white,
+      color: "#FFFDFB",
       fontSize: 16,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      fontWeight: "500",
+      lineHeight: 16,
     },
 
     dateDay: {
       marginTop: 4,
-      color:
-        colors.white,
+      color: "#FFFDFB",
       fontSize: 24,
-      fontWeight:
-        "600",
-      lineHeight: 26,
+      fontWeight: "600",
+      lineHeight: 24,
     },
 
     performanceText: {
@@ -2415,12 +2446,8 @@ const styles =
     },
 
     performanceTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 14,
-      fontWeight:
-        "500",
-      lineHeight: 20,
+      ...textStyles.body1,
+      color: colors.neutral900,
     },
 
     locationRow: {
@@ -2432,43 +2459,31 @@ const styles =
     },
 
     performanceLocation: {
+      ...textStyles.caption2,
       flex: 1,
-      color:
-        colors.neutral700,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      color: colors.neutral700,
     },
 
     performanceMetaRow: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+      flexDirection: "row",
+      alignItems: "center",
       gap: 4,
+      marginTop: 2,
     },
 
     performanceDate: {
-      color:
-        colors.neutral500,
-      fontSize: 11,
-      fontWeight:
-        "500",
+      ...textStyles.body5,
+      color: colors.neutral500,
     },
 
     metaDivider: {
-      color:
-        colors.neutral400,
-      fontSize: 11,
+      ...textStyles.body5,
+      color: colors.neutral400,
     },
 
     performanceStatus: {
-      color:
-        colors.secondary500,
-      fontSize: 11,
-      fontWeight:
-        "500",
+      ...textStyles.body5,
+      color: colors.secondary500,
     },
 
     performanceActions: {
@@ -2482,12 +2497,8 @@ const styles =
     },
 
     musicDescription: {
-      color:
-        colors.neutral600,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      ...textStyles.caption2,
+      color: colors.neutral600,
     },
 
     musicList: {
@@ -2496,25 +2507,21 @@ const styles =
     },
 
     musicCard: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+      ...shadows.card,
+      flexDirection: "row",
+      alignItems: "center",
       gap: 25,
-      padding: 12,
+      paddingVertical: 12,
+      paddingLeft: 12,
+      paddingRight: 15,
       borderRadius: 12,
-      backgroundColor:
-        colors.white,
+      backgroundColor: colors.white,
+    },
 
-      shadowColor:
-        "#000000",
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 3,
+    musicImage: {
+      width: 35,
+      height: 35,
+      borderRadius: 8,
     },
 
     musicAddCard: {
@@ -2522,23 +2529,7 @@ const styles =
         colors.neutral300,
     },
 
-    musicIcon: {
-      width: 35,
-      height: 35,
-      borderRadius: 8,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
 
-    musicIconText: {
-      color:
-        colors.white,
-      fontSize: 20,
-      fontWeight:
-        "700",
-    },
 
     musicAddIcon: {
       width: 35,
@@ -2552,12 +2543,6 @@ const styles =
         colors.neutral400,
     },
 
-    musicAddIconText: {
-      color:
-        colors.white,
-      fontSize: 24,
-      lineHeight: 26,
-    },
 
     musicText: {
       flex: 1,
@@ -2565,86 +2550,49 @@ const styles =
     },
 
     musicLabel: {
-      color:
-        colors.neutral900,
-      fontSize: 11,
-      fontWeight:
-        "500",
-      lineHeight: 16,
+      ...textStyles.caption3,
+      color: colors.neutral900,
     },
 
     musicUrl: {
-      color:
-        colors.neutral600,
-      fontSize: 12,
-      fontWeight:
-        "500",
-      lineHeight: 18,
+      ...textStyles.caption2,
+      color: colors.neutral600,
     },
 
-    musicArrow: {
-      color:
-        colors.neutral600,
-      fontSize: 26,
-      lineHeight: 28,
-    },
 
     emptyState: {
       minHeight: 320,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      paddingHorizontal: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
     },
 
     emptyTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 18,
-      fontWeight:
-        "700",
-      textAlign:
-        "center",
+      ...textStyles.label1,
+      color: colors.neutral900,
+      textAlign: "center",
     },
 
     emptyDescription: {
-      marginTop: 12,
-      color:
-        colors.neutral600,
-      fontSize: 14,
-      fontWeight:
-        "500",
-      lineHeight: 20,
-      textAlign:
-        "center",
+      ...textStyles.caption1,
+      color: colors.neutral600,
+      textAlign: "center",
     },
 
     emptyButton: {
-      marginTop: 24,
-      minWidth: 120,
-      height: 42,
+      width: 110,
+      height: 38,
       borderRadius: 8,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      paddingHorizontal: 20,
-      backgroundColor:
-        colors.secondary500,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.secondary400,
     },
 
     emptyButtonText: {
-      color:
-        colors.white,
-      fontSize: 14,
-      fontWeight:
-        "700",
+      ...textStyles.body1,
+      color: colors.white,
     },
 
-    noBandWrapper: {
-      gap: 24,
-    },
 
     noBandProfile: {
       flexDirection:
@@ -2654,43 +2602,21 @@ const styles =
       gap: 12,
     },
 
-    defaultAvatar: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        colors.neutral300,
-    },
 
-    defaultAvatarText: {
-      color:
-        colors.neutral600,
-      fontSize: 28,
-    },
 
     noBandText: {
       gap: 8,
     },
 
     noBandTitle: {
-      color:
-        colors.neutral900,
+      color: "#000000",
       fontSize: 20,
-      fontWeight:
-        "700",
-      lineHeight: 24,
+      fontWeight: "700",
+      lineHeight: 20,
     },
 
     noBandDescription: {
-      color:
-        colors.neutral700,
-      fontSize: 14,
-      fontWeight:
-        "500",
-      lineHeight: 20,
+      ...textStyles.caption1,
+      color: colors.neutral700,
     },
   });
