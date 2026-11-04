@@ -483,7 +483,17 @@ export function FanTabHomeScreen() {
             </View>
           ) : (
             <>
-              <Section title="팔로우한 밴드 소식">
+              <Section
+                title="팔로우한 밴드 소식"
+                onMorePress={
+                  home.hasFollowingBands
+                    ? () =>
+                        router.push(
+                          "/fan/home/news" as Parameters<typeof router.push>[0],
+                        )
+                    : undefined
+                }
+              >
                 {!home.hasFollowingBands ? (
                   <EmptyFollowCard />
                 ) : home.news.length > 0 ? (
@@ -607,11 +617,13 @@ function HomeHeader({
       <View style={styles.headerActions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="공연 목록"
+          accessibilityLabel="공연 캘린더"
           hitSlop={12}
           style={styles.headerIconButton}
           onPress={() =>
-            router.push("/fan/home/concerts" as Parameters<typeof router.push>[0])
+            router.push(
+              "/fan/home/concerts/calendar" as Parameters<typeof router.push>[0],
+            )
           }
         >
           <CalendarIcon />

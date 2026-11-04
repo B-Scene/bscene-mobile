@@ -803,72 +803,46 @@ function PlayIcon({ color }: { color: string }) {
   );
 }
 
-export function ExploreNewsCard({
-  content,
-  keyword,
-  postId,
-}: {
-  content: FanExploreContent;
-  keyword: string;
-  postId: number | null;
-}) {
-  const info =
-    typeof content.content === "object" && content.content != null
-      ? content.content
-      : (content.post ?? content.detail ?? content);
-  const mediaUrls = Array.from(
-    new Set([
-      ...toStringList(info.mediaUrls),
-      ...toStringList(info.mediaUrl),
-      ...toStringList(info.imageUrls),
-      ...toStringList(info.images),
-      ...toStringList(info.imageUrl),
-    ]),
-  );
-  const mediaType = String(
-    info.mediaType ?? info.contentType ?? info.type ?? "",
-  ).toUpperCase();
-  const variant =
-    mediaType === "VIDEO"
-      ? "video"
-      : mediaUrls.length > 1
-        ? "gallery"
-        : mediaUrls.length === 1
-          ? "image"
-          : "text";
-  const body =
-    (typeof info.content === "string" ? info.content : null) ??
-    info.contentText ??
-    info.body ??
-    info.text ??
-    "";
-  const videoThumbnailUrl = info.videoThumbnailUrl ?? info.thumbnailUrl;
-  const meta = [
-    info.genre ? getGenreLabel(info.genre) : null,
-    info.region ? getRegionLabel(info.region) : null,
-    formatPostedAgo(info.createdAt),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const tags = Array.isArray(info.tags) ? info.tags : [];
+export type FollowedNewsVariant = "gallery" | "video" | "image" | "text";
 
+export function FollowedNewsCard({
+  variant,
+  profileImageUrl,
+  bandName,
+  meta,
+  content,
+  mediaUrls,
+  videoThumbnailUrl,
+  tags,
+  accessibilityLabel,
+  disabled,
+  onPress,
+}: {
+  variant: FollowedNewsVariant;
+  profileImageUrl?: string | null;
+  bandName: string;
+  meta: string;
+  content: string;
+  mediaUrls: string[];
+  videoThumbnailUrl?: string | null;
+  tags: string[];
+  accessibilityLabel: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${info.title || body || "게시물"} 상세보기`}
-      disabled={postId == null}
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
       style={styles.newsCard}
-      onPress={() => router.push(`/fan/explore/contents/${postId}` as Href)}
+      onPress={onPress}
     >
       <View style={styles.newsHeader}>
-        <ProfileImage
-          imageUrl={info.profileImageUrl ?? info.bandProfileImageUrl}
-          size={36}
-          variant="band"
-        />
+        <ProfileImage imageUrl={profileImageUrl} size={36} variant="band" />
         <View style={styles.flexText}>
           <Text numberOfLines={1} style={styles.newsBandName}>
-            {info.bandName ?? info.name ?? keyword}
+            {bandName}
           </Text>
           <Text numberOfLines={1} style={styles.newsMeta}>
             {meta}
@@ -934,7 +908,7 @@ export function ExploreNewsCard({
       <Text
         style={[styles.newsContent, variant !== "text" && styles.newsContentMedia]}
       >
-        {body}
+        {content}
       </Text>
 
       {tags.length > 0 ? (
@@ -947,6 +921,70 @@ export function ExploreNewsCard({
         </View>
       ) : null}
     </Pressable>
+  );
+}
+
+export function ExploreNewsCard({
+  content,
+  keyword,
+  postId,
+}: {
+  content: FanExploreContent;
+  keyword: string;
+  postId: number | null;
+}) {
+  const info =
+    typeof content.content === "object" && content.content != null
+      ? content.content
+      : (content.post ?? content.detail ?? content);
+  const mediaUrls = Array.from(
+    new Set([
+      ...toStringList(info.mediaUrls),
+      ...toStringList(info.mediaUrl),
+      ...toStringList(info.imageUrls),
+      ...toStringList(info.images),
+      ...toStringList(info.imageUrl),
+    ]),
+  );
+  const mediaType = String(
+    info.mediaType ?? info.contentType ?? info.type ?? "",
+  ).toUpperCase();
+  const variant =
+    mediaType === "VIDEO"
+      ? "video"
+      : mediaUrls.length > 1
+        ? "gallery"
+        : mediaUrls.length === 1
+          ? "image"
+          : "text";
+  const body =
+    (typeof info.content === "string" ? info.content : null) ??
+    info.contentText ??
+    info.body ??
+    info.text ??
+    "";
+  const meta = [
+    info.genre ? getGenreLabel(info.genre) : null,
+    info.region ? getRegionLabel(info.region) : null,
+    formatPostedAgo(info.createdAt),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <FollowedNewsCard
+      variant={variant}
+      profileImageUrl={info.profileImageUrl ?? info.bandProfileImageUrl}
+      bandName={info.bandName ?? info.name ?? keyword}
+      meta={meta}
+      content={body}
+      mediaUrls={mediaUrls}
+      videoThumbnailUrl={info.videoThumbnailUrl ?? info.thumbnailUrl}
+      tags={Array.isArray(info.tags) ? info.tags : []}
+      accessibilityLabel={`${info.title || body || "게시물"} 상세보기`}
+      disabled={postId == null}
+      onPress={() => router.push(`/fan/explore/contents/${postId}` as Href)}
+    />
   );
 }
 

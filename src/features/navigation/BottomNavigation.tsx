@@ -107,6 +107,8 @@ const ACTIVE_COLOR = {
 
 // 웹에서 하단 탭을 표시하지 않는 경로
 const HIDDEN_NAV_PREFIXES = [
+  "/fan/home/notifications",
+  "/band/home/notifications",
   "/fan/home/concerts/",
   "/fan/explore/contents/",
   "/band/live/now",
@@ -145,6 +147,7 @@ export function BottomNavigation({
     ACTIVE_COLOR[mode];
 
   if (
+    pathname !== "/fan/home/concerts/calendar" &&
     HIDDEN_NAV_PREFIXES.some((prefix) =>
       pathname.startsWith(prefix),
     )

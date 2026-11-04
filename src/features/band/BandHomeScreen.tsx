@@ -38,6 +38,12 @@ import {
   ModeSwitchSheet,
 } from "@/features/my/ModeSwitchSheet";
 import {
+  isBandNotification,
+} from "@/features/notification/NotificationList";
+import {
+  useNotificationsInfiniteQuery,
+} from "@/hooks/api/notification/useNotification";
+import {
   AppIcon,
 } from "@/shared/components/AppIcon";
 import {
@@ -213,6 +219,24 @@ export function BandHomeScreen() {
   ] =
     useState(false);
 
+  const notificationsQuery =
+    useNotificationsInfiniteQuery();
+
+  const hasUnreadNotification =
+    (
+      notificationsQuery.data?.pages.flatMap(
+        (page) =>
+          page.items,
+      ) ?? []
+    )
+      .filter(
+        isBandNotification,
+      )
+      .some(
+        (notification) =>
+          !notification.isRead,
+      );
+
   const activeBandQuery =
     useActiveBandId();
 
@@ -306,6 +330,9 @@ export function BandHomeScreen() {
       }
     >
       <HomeHeader
+        hasUnreadNotification={
+          hasUnreadNotification
+        }
         onModeSwitch={() =>
           setIsModeSwitchOpen(true)
         }
@@ -516,8 +543,11 @@ export function BandHomeScreen() {
 }
 
 function HomeHeader({
+  hasUnreadNotification,
   onModeSwitch,
 }: {
+  hasUnreadNotification:
+    boolean;
   onModeSwitch:
     () => void;
 }) {
@@ -560,12 +590,19 @@ function HomeHeader({
         style={
           styles.headerIconButton
         }
-        onPress={() => {
-          // 현재 모바일에는 알림 목록 전용 route가 없어서
-          // 디자인만 원본과 동일하게 유지한다.
-        }}
+        onPress={() =>
+          router.push(
+            "/band/home/notifications" as Parameters<
+              typeof router.push
+            >[0],
+          )
+        }
       >
-        <NotificationBellIcon />
+        <NotificationBellIcon
+          hasUnread={
+            hasUnreadNotification
+          }
+        />
       </Pressable>
     </View>
   );
@@ -2008,7 +2045,11 @@ function SwapIcon() {
   );
 }
 
-function NotificationBellIcon() {
+function NotificationBellIcon({
+  hasUnread,
+}: {
+  hasUnread: boolean;
+}) {
   return (
     <Svg
       width={25}
@@ -2045,6 +2086,14 @@ function NotificationBellIcon() {
         }
         strokeWidth={2}
       />
+      {hasUnread ? (
+        <Circle
+          cx={23}
+          cy={2}
+          r={2}
+          fill={colors.secondary400}
+        />
+      ) : null}
     </Svg>
   );
 }
