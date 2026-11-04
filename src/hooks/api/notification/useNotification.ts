@@ -1,3 +1,8 @@
+import { bandKeys } from "@/hooks/api/band/useBand";
+import { bandManagementKeys } from "@/hooks/api/band/useBandManagement";
+import { bandMyPageKeys } from "@/hooks/api/user/useBandMyPage";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
+import { respondBandNotificationInvite } from "@/api/band/notificationInvite";
 import {
   useInfiniteQuery,
   useMutation,
@@ -79,6 +84,20 @@ export const useUpdateNotificationSetting = () => {
       queryClient.invalidateQueries({
         queryKey: notificationKeys.settings({ mode: params.mode }),
       });
+    },
+  });
+};
+
+export const useRespondBandNotificationInvite = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: respondBandNotificationInvite,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      void queryClient.invalidateQueries({ queryKey: bandKeys.all });
+      void queryClient.invalidateQueries({ queryKey: bandManagementKeys.all });
+      void queryClient.invalidateQueries({ queryKey: bandMyPageKeys.all });
+      void queryClient.invalidateQueries({ queryKey: myProfilesKeys.all });
     },
   });
 };

@@ -1,351 +1,206 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 
 import type { BandMemberPart } from "@/api/band/bandManagement";
 import {
   ActionNotificationCard,
   BandInviteCard,
-  getBandInviteBandId,
   getBandInviteBandName,
   isSelectablePart,
   RoleCompleteModal,
   RoleInputModal,
 } from "@/features/notification/BandNotificationCards";
+import { NotificationList } from "@/features/notification/NotificationList";
+import { useBandMemberProfileQuery } from "@/hooks/api/band/useBandManagement";
+import { liveKeys, useRespondCoHostInvitationMutation } from "@/hooks/api/live/useLive";
 import {
-  isBandNotification,
-  NotificationList,
-} from "@/features/notification/NotificationList";
-import {
-  useAcceptBandInviteMutation,
-  useBandMemberProfileQuery,
-  useRejectBandInviteMutation,
-} from "@/hooks/api/band/useBandManagement";
-import { useRespondCoHostInvitationMutation } from "@/hooks/api/live/useLive";
-import {
+  notificationKeys,
   useMarkNotificationAsRead,
   useNotificationsInfiniteQuery,
+  useRespondBandNotificationInvite,
 } from "@/hooks/api/notification/useNotification";
 import { useFinalizeApplicationSubmissionMutation } from "@/hooks/api/session/useSessionApplication";
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
-import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
 import { getNotificationDeepLink } from "@/shared/utils/notificationDeepLink";
 import type { NotificationItem } from "@/types/notification";
 
-type RoleActionKind = "bandInvite" | "sessionFinalize";
+import {
+  getBandNotificationAction,
+  isBandNotification,
+  type NotificationAction,
+} from "./notificationActions";
 
 type PendingRoleAction = {
-  kind: RoleActionKind;
-  notification: NotificationItem;
+  item: NotificationItem;
+  action: NotificationAction;
 };
 
-const isCoHostInviteType = (type: string) =>
-  (type.includes("CO_HOST") || type.includes("COHOST")) &&
-  (type.includes("INVITE") || type.includes("INVITATION"));
-
-const isCoHostInviteNotification = (notification: NotificationItem) => {
-  const type = notification.type.toUpperCase();
-
-  if (isCoHostInviteType(type)) return true;
-  if (type !== "LIVE") return false;
-
-  const content = `${notification.title} ${notification.body}`
-    .trim()
-    .toUpperCase();
-  const hasCoHostKeyword =
-    content.includes("CO_HOST") ||
-    content.includes("COHOST") ||
-    content.includes("공동 진행") ||
-    content.includes("공동 송출");
-  const hasInviteKeyword =
-    content.includes("INVITE") ||
-    content.includes("INVITATION") ||
-    content.includes("초대");
-
-  return hasCoHostKeyword && hasInviteKeyword;
-};
-
-const getLiveIdFromDeepLink = (deepLink?: string | null) => {
-  if (!deepLink) return null;
-
-  const queryLiveId = deepLink.match(
-    /[?&](?:coHostInviteLiveId|coHostInvitationLiveId|liveId|referenceId)=(\d+)/,
-  )?.[1];
-
-  return queryLiveId ?? deepLink.match(/\/lives?\/(\d+)(?=[/?#]|$)/i)?.[1] ?? null;
-};
-
-const getCoHostInviteLiveId = (notification: NotificationItem) => {
-  const liveId = Number(
-    getLiveIdFromDeepLink(notification.deepLink) ?? notification.referenceId,
-  );
-
-  return Number.isFinite(liveId) && liveId > 0 ? liveId : null;
-};
-
-const isSessionAcceptedNotification = (notification: NotificationItem) =>
-  notification.type === "SESSION" &&
-  notification.title === "세션 지원이 수락되었어요";
-
-const getSubmissionId = (notification: NotificationItem) => {
-  const submissionId = Number(notification.referenceId);
-
-  return notification.referenceId != null && Number.isFinite(submissionId)
-    ? submissionId
-    : null;
+type CompletedRoleAction = {
+  kind: "bandInvite" | "sessionFinalize";
+  bandName: string;
 };
 
 export function BandNotificationListScreen() {
   const query = useNotificationsInfiniteQuery();
-  const markAsReadMutation = useMarkNotificationAsRead();
-  const acceptInvite = useAcceptBandInviteMutation();
-  const rejectInvite = useRejectBandInviteMutation();
-  const finalizeApplication = useFinalizeApplicationSubmissionMutation();
-  const respondCoHostInvitation = useRespondCoHostInvitationMutation();
+  const queryClient = useQueryClient();
+  const read = useMarkNotificationAsRead();
+  const bandInvite = useRespondBandNotificationInvite();
+  const coHost = useRespondCoHostInvitationMutation();
+  const finalize = useFinalizeApplicationSubmissionMutation();
   const { activeBand } = useActiveBandId();
   const activeProfile = useBandMemberProfileQuery(
     activeBand?.bandMemberProfileId ?? null,
   ).data;
-  const [pendingRoleAction, setPendingRoleAction] =
-    useState<PendingRoleAction | null>(null);
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-  const [completed, setCompleted] = useState<{
-    kind: RoleActionKind;
-    bandName: string;
-  } | null>(null);
-  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
-  const notifications =
-    query.data?.pages
-      .flatMap((page) => page.items)
-      .filter(isBandNotification) ?? [];
-  const isActionPending =
-    acceptInvite.isPending ||
-    rejectInvite.isPending ||
-    finalizeApplication.isPending ||
-    respondCoHostInvitation.isPending;
+  const [selected, setSelected] = useState<PendingRoleAction | null>(null);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const [completedIds, setCompletedIds] = useState<number[]>([]);
+  const [completedRole, setCompletedRole] = useState<CompletedRoleAction | null>(null);
+  const items = query.data?.pages.flatMap((page) => page.items).filter(isBandNotification) ?? [];
 
-  const markAsRead = (notification: NotificationItem) => {
-    if (!notification.isRead) {
-      markAsReadMutation.mutate(notification.notificationId);
-    }
-  };
+  const respond = async (
+    item: NotificationItem,
+    action: NotificationAction,
+    accept: boolean,
+    nickname = "",
+    part?: BandMemberPart,
+  ) => {
+    if (inFlight.current || completedIds.includes(item.notificationId)) return;
+    if (accept && action.kind !== "coHostInvite" && (!nickname.trim() || !part)) return;
 
-  const openNotification = (notification: NotificationItem) => {
-    markAsRead(notification);
-
-    const targetPath = getNotificationDeepLink({ ...notification }, "band");
-
-    if (!targetPath) return;
-
-    if (/^https?:\/\//i.test(targetPath)) {
-      Alert.alert("알림", "앱에서 열 수 없는 외부 링크예요.");
-      return;
-    }
-
-    router.push(targetPath as Parameters<typeof router.push>[0]);
-  };
-
-  const openRoleModal = (action: PendingRoleAction) => {
-    markAsRead(action.notification);
-    setPendingRoleAction(action);
-    setIsRoleModalOpen(true);
-  };
-
-  const closeRoleModal = () => {
-    setIsRoleModalOpen(false);
-    setPendingRoleAction(null);
-  };
-
-  const rejectBandInvite = async (notification: NotificationItem) => {
-    const bandId = getBandInviteBandId(notification);
-
-    if (bandId == null) return;
-
-    markAsRead(notification);
-
+    inFlight.current = true;
+    setBusy(true);
     try {
-      await rejectInvite.mutateAsync({ bandId });
-      void query.refetch();
-    } catch (error) {
-      Alert.alert(
-        "알림",
-        getApiErrorMessage(
-          error,
-          "거절 처리에 실패했어요. 잠시 후 다시 시도해주세요.",
-        ),
-      );
-    }
-  };
-
-  const rejectCoHostInvite = async (notification: NotificationItem) => {
-    const liveId = getCoHostInviteLiveId(notification);
-
-    if (liveId == null) return;
-
-    markAsRead(notification);
-
-    try {
-      await respondCoHostInvitation.mutateAsync({ liveId, isAccepted: false });
-      void query.refetch();
-    } catch (error) {
-      Alert.alert(
-        "알림",
-        getApiErrorMessage(
-          error,
-          "거절 처리에 실패했어요. 잠시 후 다시 시도해주세요.",
-        ),
-      );
-    }
-  };
-
-  const acceptCoHostInvite = (notification: NotificationItem) => {
-    const liveId = getCoHostInviteLiveId(notification);
-
-    markAsRead(notification);
-
-    if (liveId == null) return;
-
-    router.push(
-      `/band/live/room/${liveId}?coHostInvite=accept` as Parameters<
-        typeof router.push
-      >[0],
-    );
-  };
-
-  const rejectSessionApplication = async (notification: NotificationItem) => {
-    const applySubmissionId = getSubmissionId(notification);
-
-    if (applySubmissionId == null) return;
-
-    markAsRead(notification);
-
-    try {
-      await finalizeApplication.mutateAsync({
-        applySubmissionId,
-        body: { isAccepted: false },
-      });
-      void query.refetch();
-    } catch (error) {
-      Alert.alert(
-        "알림",
-        getApiErrorMessage(
-          error,
-          "거절 처리에 실패했어요. 잠시 후 다시 시도해주세요.",
-        ),
-      );
-    }
-  };
-
-  const confirmRole = async (nickname: string, part: BandMemberPart) => {
-    const action = pendingRoleAction;
-
-    if (!action) return;
-
-    const { kind, notification } = action;
-
-    try {
-      if (kind === "bandInvite") {
-        const bandId = getBandInviteBandId(notification);
-
-        if (bandId == null) return;
-
-        await acceptInvite.mutateAsync({ bandId, body: { nickname, part } });
+      if (action.kind === "bandInvite") {
+        await bandInvite.mutateAsync({
+          bandId: action.targetId,
+          profile: accept && part ? { nickname: nickname.trim(), part } : undefined,
+        });
+      } else if (action.kind === "coHostInvite") {
+        await coHost.mutateAsync({ liveId: action.targetId, isAccepted: accept });
+        void queryClient.invalidateQueries({ queryKey: liveKeys.all });
       } else {
-        const applySubmissionId = getSubmissionId(notification);
-
-        if (applySubmissionId == null) return;
-
-        await finalizeApplication.mutateAsync({
-          applySubmissionId,
-          body: { isAccepted: true, nickname, part },
+        await finalize.mutateAsync({
+          applySubmissionId: action.targetId,
+          body: accept && part
+            ? { isAccepted: true, nickname: nickname.trim(), part }
+            : { isAccepted: false },
         });
       }
-    } catch (error) {
-      Alert.alert(
-        "알림",
-        getApiErrorMessage(
-          error,
-          kind === "bandInvite"
-            ? "초대 수락에 실패했어요. 잠시 후 다시 시도해주세요."
-            : "최종 확정에 실패했어요. 잠시 후 다시 시도해주세요.",
-        ),
-      );
-      return;
-    }
 
-    void query.refetch();
-    closeRoleModal();
-    setCompleted({
-      kind,
-      bandName: kind === "bandInvite" ? getBandInviteBandName(notification) : "",
-    });
-    setIsCompleteModalOpen(true);
+      setCompletedIds((current) => [...current, item.notificationId]);
+      setSelected(null);
+      try {
+        await read.mutateAsync(item.notificationId);
+      } catch {
+        Alert.alert("처리는 완료됐어요", "읽음 상태를 저장하지 못했어요. 새로고침 후 확인해주세요.");
+      }
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+      void query.refetch();
+
+      if (accept && action.kind !== "coHostInvite") {
+        setCompletedRole({
+          kind: action.kind,
+          bandName: action.kind === "bandInvite" ? getBandInviteBandName(item) : "",
+        });
+      } else {
+        Alert.alert("알림", accept ? "수락했어요." : "거절했어요.");
+      }
+    } catch (error) {
+      Alert.alert("처리 실패", error instanceof Error ? error.message : "잠시 후 다시 시도해주세요.");
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   };
 
-  const renderCard = (notification: NotificationItem) => {
-    if (notification.type === "BAND_INVITE" && notification.bandInvite) {
+  const openNotification = (item: NotificationItem) => {
+    if (getBandNotificationAction(item) && !completedIds.includes(item.notificationId)) return;
+    if (!item.isRead) {
+      read.mutate(item.notificationId, {
+        onError: () => Alert.alert("알림", "읽음 상태를 저장하지 못했어요."),
+      });
+    }
+    const target = getNotificationDeepLink({ ...item }, "band");
+    if (target && target.split(/[?#]/)[0] !== "/band/notifications") {
+      router.push(target as Parameters<typeof router.push>[0]);
+    }
+  };
+
+  const confirmReject = (item: NotificationItem, action: NotificationAction) => {
+    if (inFlight.current) return;
+    Alert.alert("거절", "이 요청을 거절할까요?", [
+      { text: "취소", style: "cancel" },
+      { text: "거절", style: "destructive", onPress: () => void respond(item, action, false) },
+    ]);
+  };
+
+  const accept = (item: NotificationItem, action: NotificationAction) => {
+    if (inFlight.current) return;
+    if (action.kind === "coHostInvite") {
+      Alert.alert("공동 진행 초대", "초대를 수락할까요?", [
+        { text: "취소", style: "cancel" },
+        { text: "수락", onPress: () => void respond(item, action, true) },
+      ]);
+    } else {
+      setSelected({ item, action });
+    }
+  };
+
+  const renderCard = (item: NotificationItem) => {
+    const action = completedIds.includes(item.notificationId)
+      ? null
+      : getBandNotificationAction(item);
+
+    if (item.type === "BAND_INVITE" && item.bandInvite) {
       return (
         <BandInviteCard
-          notification={notification}
-          disabled={isActionPending}
-          onPress={() => openNotification(notification)}
-          onReject={() => void rejectBandInvite(notification)}
-          onAccept={() => openRoleModal({ kind: "bandInvite", notification })}
+          notification={{ ...item, actionable: action?.kind === "bandInvite" }}
+          disabled={busy}
+          onPress={() => openNotification(item)}
+          onReject={() => { if (action) confirmReject(item, action); }}
+          onAccept={() => { if (action) accept(item, action); }}
         />
       );
     }
+    if (!action) return null;
 
-    if (isCoHostInviteNotification(notification)) {
-      return (
-        <ActionNotificationCard
-          notification={notification}
-          disabled={isActionPending}
-          onReject={() => void rejectCoHostInvite(notification)}
-          onAccept={() => acceptCoHostInvite(notification)}
-        />
-      );
-    }
-
-    if (isSessionAcceptedNotification(notification)) {
-      return (
-        <ActionNotificationCard
-          notification={notification}
-          disabled={isActionPending}
-          onReject={() => void rejectSessionApplication(notification)}
-          onAccept={() =>
-            openRoleModal({ kind: "sessionFinalize", notification })
-          }
-        />
-      );
-    }
-
-    return null;
+    return (
+      <ActionNotificationCard
+        notification={item}
+        disabled={busy}
+        onReject={() => confirmReject(item, action)}
+        onAccept={() => accept(item, action)}
+      />
+    );
   };
 
   return (
     <NotificationList
       tone="band"
       query={query}
-      notifications={notifications}
+      notifications={items}
       onPressItem={openNotification}
       renderCard={renderCard}
+      onBack={() => router.canGoBack() ? router.back() : router.replace("/band/home")}
     >
       <RoleInputModal
-        open={isRoleModalOpen}
+        open={selected !== null}
         initialActivityName={activeProfile?.nickname ?? ""}
-        initialPart={
-          isSelectablePart(activeProfile?.part) ? activeProfile.part : ""
-        }
-        submitting={isActionPending}
-        onClose={closeRoleModal}
-        onConfirm={(nickname, part) => void confirmRole(nickname, part)}
+        initialPart={isSelectablePart(activeProfile?.part) ? activeProfile.part : ""}
+        submitting={busy}
+        onClose={() => { if (!inFlight.current) setSelected(null); }}
+        onConfirm={(nickname, part) => {
+          if (selected) void respond(selected.item, selected.action, true, nickname, part);
+        }}
       />
-
       <RoleCompleteModal
-        open={isCompleteModalOpen}
-        kind={completed?.kind ?? "bandInvite"}
-        bandName={completed?.bandName ?? ""}
-        onClose={() => setIsCompleteModalOpen(false)}
+        open={completedRole !== null}
+        kind={completedRole?.kind ?? "bandInvite"}
+        bandName={completedRole?.bandName ?? ""}
+        onClose={() => setCompletedRole(null)}
       />
     </NotificationList>
   );

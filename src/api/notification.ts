@@ -158,6 +158,25 @@ const normalizeNotificationItem = (
       `알림 ${index + 1}`,
     body: toStringOrEmpty(value.body ?? value.content ?? value.message),
     isRead: toBoolean(value.isRead ?? value.read ?? value.readStatus),
+    actionable: toBoolean(value.actionable) ||
+      (isRecord(value.bandInvite) && toBoolean(value.bandInvite.actionable)),
+    bandInvite: isRecord(value.bandInvite) ? {
+      ...value.bandInvite,
+      bandInviteId: toNumberOrNull(value.bandInvite.bandInviteId),
+      bandMemberId: toNumberOrNull(value.bandInvite.bandMemberId),
+      bandId: toNumberOrNull(value.bandInvite.bandId),
+      bandName: toStringOrEmpty(value.bandInvite.bandName),
+      bandProfileImageUrl: toStringOrNull(value.bandInvite.bandProfileImageUrl),
+      actionable: toBoolean(value.bandInvite.actionable),
+      position: toStringOrNull(value.bandInvite.position),
+      part: toStringOrNull(value.bandInvite.part),
+      role: toStringOrNull(value.bandInvite.role),
+      genre: toStringOrNull(value.bandInvite.genre),
+      region: toStringOrNull(value.bandInvite.region),
+      memberCount: toNumberOrNull(value.bandInvite.memberCount),
+      acceptedMemberCount: toNumberOrNull(value.bandInvite.acceptedMemberCount),
+      profileImageUrl: toStringOrNull(value.bandInvite.profileImageUrl),
+    } : null,
     createdAt:
       toStringOrEmpty(value.createdAt ?? value.createdDate ?? value.timeStamp) ||
       new Date().toISOString(),
@@ -166,10 +185,6 @@ const normalizeNotificationItem = (
       toNumberOrNull(value.referenceId) ??
       toStringOrNull(value.referenceId),
     deepLink: toStringOrNull(value.deepLink ?? value.deeplink ?? value.path),
-    actionable:
-      toBoolean(value.actionable) ||
-      toBoolean(isRecord(value.bandInvite) ? value.bandInvite.actionable : null),
-    bandInvite: isRecord(value.bandInvite) ? value.bandInvite : null,
   };
 };
 

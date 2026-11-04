@@ -39,7 +39,7 @@ import {
 } from "@/features/my/ModeSwitchSheet";
 import {
   isBandNotification,
-} from "@/features/notification/NotificationList";
+} from "@/features/band/notificationActions";
 import {
   useNotificationsInfiniteQuery,
 } from "@/hooks/api/notification/useNotification";
@@ -590,13 +590,7 @@ function HomeHeader({
         style={
           styles.headerIconButton
         }
-        onPress={() =>
-          router.push(
-            "/band/home/notifications" as Parameters<
-              typeof router.push
-            >[0],
-          )
-        }
+        onPress={() => router.push("/band/notifications" as Parameters<typeof router.push>[0])}
       >
         <NotificationBellIcon
           hasUnread={

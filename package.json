@@ -53,7 +53,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "qa:notifications": "node --test tests/notificationBridge.test.cjs && node scripts/qa-notification-routes.cjs"
   },
   "private": true
 }

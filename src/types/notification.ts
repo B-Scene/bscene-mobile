@@ -17,16 +17,18 @@ export interface RegisterPushTokenRequest {
 export interface NotificationBandInvite {
   bandInviteId?: number | null;
   bandMemberId?: number | null;
-  bandId?: number | null;
-  bandName?: string | null;
+  bandId: number | null;
+  bandName: string;
+  bandProfileImageUrl: string | null;
+  actionable: boolean;
   position?: string | null;
   part?: string | null;
   role?: string | null;
   genre?: string | null;
   region?: string | null;
   memberCount?: number | null;
+  acceptedMemberCount?: number | null;
   profileImageUrl?: string | null;
-  bandProfileImageUrl?: string | null;
   [key: string]: unknown;
 }
 
@@ -36,12 +38,12 @@ export interface NotificationItem {
   title: string;
   body: string;
   isRead: boolean;
+  actionable?: boolean;
+  bandInvite?: NotificationBandInvite | null;
   createdAt: string;
   mode?: NotificationSettingsMode | null;
   referenceId?: number | string | null;
   deepLink?: string | null;
-  actionable?: boolean;
-  bandInvite?: NotificationBandInvite | null;
 }
 
 export interface GetNotificationsParams {

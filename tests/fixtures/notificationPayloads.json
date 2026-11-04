@@ -1,0 +1,209 @@
+{
+  "serverRepository": "B-Scene/bscene-server",
+  "serverCommit": "efe3c1c",
+  "note": "Server main DTO-derived payloads with synthetic test IDs. Not captured device traffic. Mobile regression rows cover fallback mapping.",
+  "cases": [
+    {
+      "name": "공연 등록/리마인더",
+      "mode": "fan",
+      "data": {
+        "type": "PERFORMANCE",
+        "referenceId": "42",
+        "deepLink": "/fan/home/concerts/42"
+      },
+      "expected": "/fan/home/concerts/42",
+      "source": "PerformancePushMessage.created/reminder"
+    },
+    {
+      "name": "게시물 등록",
+      "mode": "fan",
+      "data": {
+        "type": "POST",
+        "referenceId": "42",
+        "deepLink": "/fan/explore/contents/42"
+      },
+      "expected": "/fan/explore/contents/42",
+      "source": "PostPushMessage.created"
+    },
+    {
+      "name": "새 지원서 도착",
+      "mode": "band",
+      "data": {
+        "type": "SESSION",
+        "referenceId": "42",
+        "deepLink": "/band/my/applications/42"
+      },
+      "expected": "/band/my/applications/42",
+      "source": "SessionPushMessage.applicationSubmitted"
+    },
+    {
+      "name": "새 쪽지",
+      "mode": "band",
+      "data": {
+        "type": "MESSAGE",
+        "referenceId": "42",
+        "deepLink": "/band/session/messages/42"
+      },
+      "expected": "/band/session/messages/42",
+      "source": "ChatPushMessage.received"
+    },
+    {
+      "name": "팬 Live 예약/리마인더",
+      "mode": "fan",
+      "data": {
+        "type": "LIVE",
+        "referenceId": "42",
+        "deepLink": "/fan/live/scheduled"
+      },
+      "expected": "/fan/live/scheduled",
+      "source": "StreamPushMessage.scheduled/reminder"
+    },
+    {
+      "name": "팬 Live 시작",
+      "mode": "fan",
+      "data": {
+        "type": "LIVE",
+        "referenceId": "42",
+        "deepLink": "/fan/live/room/42"
+      },
+      "expected": "/fan/live/room/42",
+      "source": "StreamPushMessage.started"
+    },
+    {
+      "name": "팬 Live 다시보기",
+      "mode": "fan",
+      "data": {
+        "type": "LIVE",
+        "referenceId": "42",
+        "deepLink": "/fan/live/replays/42"
+      },
+      "expected": "/fan/live/replays/42",
+      "source": "StreamPushMessage.replayReady"
+    },
+    {
+      "name": "밴드 Live 예약/시작",
+      "mode": "band",
+      "data": {
+        "type": "LIVE",
+        "referenceId": "42",
+        "deepLink": "/band/live"
+      },
+      "expected": "/band/live",
+      "source": "StreamPushMessage.scheduled/started"
+    },
+    {
+      "name": "밴드 초대",
+      "mode": "band",
+      "data": {
+        "type": "BAND_INVITE",
+        "referenceId": "42",
+        "deepLink": "/band/notifications"
+      },
+      "expected": "/band/notifications",
+      "source": "BandPushMessage.memberInvited"
+    },
+    {
+      "name": "세션 지원 결과",
+      "mode": "band",
+      "data": {
+        "type": "SESSION",
+        "referenceId": "42",
+        "deepLink": "/band/notifications"
+      },
+      "expected": "/band/notifications",
+      "source": "SessionPushMessage.applicationDecisionForApplicant"
+    },
+    {
+      "name": "Live 공동 진행 초대",
+      "mode": "band",
+      "data": {
+        "type": "LIVE",
+        "referenceId": "42",
+        "deepLink": "/band/notifications"
+      },
+      "expected": "/band/notifications",
+      "source": "StreamPushMessage.coHostInvited"
+    },
+    {
+      "name": "세션 모집 마감",
+      "mode": "band",
+      "data": {
+        "type": "SESSION",
+        "referenceId": "42",
+        "deepLink": "/band/profile/postings"
+      },
+      "expected": "/band/session/recruitments/42",
+      "source": "SessionPushMessage.deadlineReminder"
+    },
+    {
+      "name": "명시적 모바일 링크 query 보존",
+      "mode": "band",
+      "data": {
+        "deepLink": "bscenemobile://band/live/room/42?coHostInvite=1&requesterUserId=7"
+      },
+      "expected": "/band/live/room/42?coHostInvite=1&requesterUserId=7",
+      "source": "mobile regression"
+    },
+    {
+      "name": "공연 referenceId fallback",
+      "mode": "fan",
+      "data": {
+        "type": "PERFORMANCE",
+        "referenceId": "42"
+      },
+      "expected": "/fan/home/concerts/42",
+      "source": "mobile regression"
+    },
+    {
+      "name": "콘텐츠 referenceId fallback",
+      "mode": "band",
+      "data": {
+        "type": "POST",
+        "referenceId": "42"
+      },
+      "expected": "/band/home/contents/42",
+      "source": "mobile regression"
+    },
+    {
+      "name": "밴드 referenceId fallback",
+      "mode": "fan",
+      "data": {
+        "type": "BAND",
+        "referenceId": "42"
+      },
+      "expected": "/fan/bands/42",
+      "source": "mobile regression"
+    },
+    {
+      "name": "세션 모집 referenceId fallback",
+      "mode": "band",
+      "data": {
+        "type": "SESSION_RECRUITMENT",
+        "referenceId": "42"
+      },
+      "expected": "/band/session/recruitments/42",
+      "source": "mobile regression"
+    },
+    {
+      "name": "지원서 referenceId fallback",
+      "mode": "band",
+      "data": {
+        "type": "SESSION_APPLICATION",
+        "referenceId": "42"
+      },
+      "expected": "/band/my/applications/42",
+      "source": "mobile regression"
+    },
+    {
+      "name": "세션 모집 웹 경로 query 보존",
+      "mode": "band",
+      "data": {
+        "type": "SESSION",
+        "referenceId": "42",
+        "deepLink": "bscenemobile://band/profile/postings?notificationId=7#detail"
+      },
+      "expected": "/band/session/recruitments/42?notificationId=7#detail",
+      "source": "mobile regression"
+    }
+  ]
+}

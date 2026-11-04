@@ -16,8 +16,6 @@
         "NSPhotoLibraryUsageDescription": "프로필 및 콘텐츠 이미지를 선택하기 위해 사진 접근 권한이 필요합니다.",
         "UIBackgroundModes": [
           "audio",
-          "remote-notification",
-          "audio",
           "remote-notification"
         ],
         "ITSAppUsesNonExemptEncryption": false

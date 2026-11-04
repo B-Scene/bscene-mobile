@@ -20,16 +20,7 @@ const TONES = {
   },
 } as const;
 
-export const isBandNotification = (notification: NotificationItem) => {
-  const type = notification.type.toUpperCase();
-  const isPostRegistration =
-    type.includes("POST") || type.includes("CONTENT") || type.includes("NEWS");
-
-  return (
-    !isPostRegistration &&
-    (notification.mode == null || notification.mode === "BAND")
-  );
-};
+export { isBandNotification } from "@/features/band/notificationActions";
 
 export const formatNotificationTime = (createdAt: string) => {
   const createdDate = new Date(createdAt);
@@ -106,12 +97,14 @@ export function NotificationList({
   onPressItem,
   renderCard,
   children,
+  onBack,
 }: {
   tone: NotificationTone;
   query: {
     isLoading: boolean;
     isError: boolean;
     isFetchingNextPage: boolean;
+    isRefetching?: boolean;
     hasNextPage: boolean;
     fetchNextPage: () => unknown;
     refetch: () => unknown;
@@ -120,6 +113,7 @@ export function NotificationList({
   onPressItem: (notification: NotificationItem) => void;
   renderCard?: (notification: NotificationItem) => ReactElement | null;
   children?: ReactNode;
+  onBack?: () => void;
 }) {
   const { accent, background } = TONES[tone];
 
@@ -129,7 +123,7 @@ export function NotificationList({
       scroll={false}
       contentStyle={{ ...styles.container, backgroundColor: background }}
     >
-      <AppHeader title="알림" style={styles.header} />
+      <AppHeader title="알림" style={styles.header} onBack={onBack} />
 
       {query.isLoading ? (
         <View style={styles.list}>
@@ -158,6 +152,8 @@ export function NotificationList({
       ) : (
         <FlatList
           data={notifications}
+          refreshing={query.isRefetching ?? false}
+          onRefresh={() => void query.refetch()}
           keyExtractor={(item) => String(item.notificationId)}
           contentContainerStyle={styles.list}
           ListFooterComponent={
