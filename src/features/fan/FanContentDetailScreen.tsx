@@ -8,10 +8,11 @@ import {
 } from "react";
 import {
   Alert,
+  Pressable,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   useFanExplorePostCommentsInfiniteQuery,
@@ -26,22 +27,33 @@ import {
   useUnlikeFanExplorePost,
 } from "@/hooks/api/fan/useFanExplore";
 
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
+import {
+  getPostBackground,
+  PostArticle,
+  PostAuthor,
+  PostBody,
+  PostCommentComposer,
+  PostCommentError,
+  PostCommentGroup,
+  PostCommentItem,
+  PostCommentMessage,
+  PostCommentSection,
+  PostDetailError,
+  PostDetailSkeleton,
+  PostMedia,
+  PostStats,
+} from "@/features/post/PostDetailParts";
 import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { AppTextInput } from "@/shared/components/AppTextInput";
-import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
 import { Screen } from "@/shared/components/Screen";
 import {
   colors,
-  spacing,
+  textStyles,
 } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 import type {
   FanExplorePostDetail,
+  NormalizedFanExplorePostComment,
 } from "@/types/fan/explore";
 
 const parseRouteId = (
@@ -82,55 +94,26 @@ const normalizeStringList = (
 
 const getMediaUrls = (
   post: FanExplorePostDetail,
-) => [
-  ...normalizeStringList(
-    post.mediaUrls,
-  ),
+) =>
+  Array.from(
+    new Set([
+      ...normalizeStringList(
+        post.mediaUrls,
+      ),
 
-  ...normalizeStringList(
-    post.mediaUrl,
-  ),
+      ...normalizeStringList(
+        post.mediaUrl,
+      ),
 
-  ...normalizeStringList(
-    post.imageUrls,
-  ),
+      ...normalizeStringList(
+        post.imageUrls,
+      ),
 
-  ...normalizeStringList(
-    post.images,
-  ),
-];
-
-const formatDate = (
-  value?: string | null,
-) => {
-  if (!value) {
-    return "";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime(),
-    )
-  ) {
-    return value;
-  }
-
-  const year =
-    date.getFullYear();
-
-  const month = String(
-    date.getMonth() + 1,
-  ).padStart(2, "0");
-
-  const day = String(
-    date.getDate(),
-  ).padStart(2, "0");
-
-  return `${year}.${month}.${day}.`;
-};
+      ...normalizeStringList(
+        post.images,
+      ),
+    ]),
+  );
 
 export function FanContentDetailScreen() {
   const params =
@@ -518,480 +501,302 @@ export function FanContentDetailScreen() {
       void commentsQuery.fetchNextPage();
     };
 
+  const insets =
+    useSafeAreaInsets();
+
+  const mediaType =
+    post?.type ??
+    post?.mediaType ??
+    post?.contentType;
+
+  const commentCount =
+    post?.commentCount ??
+    comments.length;
+
+  const commentIds =
+    new Set(
+      comments.map(
+        (comment) =>
+          comment.commentId,
+      ),
+    );
+
+  const separateMyComments =
+    myComments.filter(
+      (comment) =>
+        comment.commentId == null ||
+        !commentIds.has(
+          comment.commentId,
+        ),
+    );
+
+  const renderComment = (
+    comment: NormalizedFanExplorePostComment,
+    isEditable: boolean,
+  ) => (
+    <PostCommentItem
+      key={`${comment.commentId}-${comment.createdAt}`}
+      tone="fan"
+      comment={comment}
+      isEditable={isEditable}
+      isEditing={
+        comment.commentId != null &&
+        comment.commentId ===
+          editingCommentId
+      }
+      editValue={
+        editingCommentText
+      }
+      isSavePending={
+        updateCommentMutation.isPending
+      }
+      onStartEdit={() =>
+        beginEditComment(
+          comment.commentId,
+          comment.content,
+        )
+      }
+      onCancelEdit={cancelEdit}
+      onEditValueChange={
+        setEditingCommentText
+      }
+      onSubmitEdit={() =>
+        void saveEdit()
+      }
+      onDelete={() =>
+        deleteComment(
+          comment.commentId,
+        )
+      }
+    />
+  );
+
   return (
     <Screen
-      contentStyle={
-        styles.container
-      }
+      edges={[
+        "top",
+        "left",
+        "right",
+      ]}
+      contentStyle={{
+        ...styles.container,
+        paddingBottom:
+          insets.bottom,
+      }}
     >
-      <AppHeader title="콘텐츠 상세" />
+      <AppHeader
+        title=""
+        style={styles.header}
+      />
 
       {postQuery.isLoading ? (
-        <AppState
-          loading
-          title="콘텐츠를 불러오는 중이에요"
-        />
+        <PostDetailSkeleton />
       ) : postQuery.isError ||
         !post ? (
-        <AppState
-          title="콘텐츠를 불러오지 못했어요"
+        <PostDetailError
+          tone="fan"
           description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
-          actionLabel="다시 시도"
-          onAction={() =>
+          onRetry={() =>
             void postQuery.refetch()
           }
         />
       ) : (
         <>
-          <AppCard
-            style={
-              styles.heroCard
-            }
-          >
-            <View
-              style={
-                styles.authorRow
+          <PostArticle>
+            <PostAuthor
+              bandName={
+                post.bandName ??
+                "밴드"
               }
-            >
-              <Avatar
-                imageUrl={
-                  post.profileImageUrl ??
-                  post.band
-                    ?.profileImageUrl
-                }
-                label={
-                  post.bandName ??
-                  "밴드"
-                }
-                size={48}
-              />
-
-              <View
-                style={
-                  styles.authorText
-                }
-              >
-                <Text
-                  style={
-                    styles.bandName
-                  }
-                >
-                  {post.bandName ??
-                    "밴드"}
-                </Text>
-
-                <Text
-                  style={
-                    styles.meta
-                  }
-                >
-                  {[
-                    post.genre,
-                    post.region,
-                    formatDate(
-                      post.createdAt,
-                    ),
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </View>
-
-              {post.bandId ? (
-                <AppButton
-                  label="밴드"
-                  variant="ghost"
-                  style={
-                    styles.compactButton
-                  }
-                  onPress={() =>
-                    router.push(
-                      `/fan/bands/${post.bandId}` as Parameters<
-                        typeof router.push
-                      >[0],
-                    )
-                  }
-                />
-              ) : null}
-            </View>
-
-            <Badge
-              label={String(
-                post.type ??
-                  "콘텐츠",
-              )}
-              tone="yellow"
+              imageUrl={
+                post.profileImageUrl ??
+                post.band
+                  ?.profileImageUrl
+              }
+              createdAt={
+                post.createdAt
+              }
+              onPress={
+                post.bandId
+                  ? () =>
+                      router.push(
+                        `/fan/bands/${post.bandId}` as Parameters<
+                          typeof router.push
+                        >[0],
+                      )
+                  : undefined
+              }
             />
 
-            <Text
-              style={
-                styles.title
-              }
-            >
-              {post.title ??
-                "콘텐츠"}
-            </Text>
-
-            {contentText ? (
-              <Text
-                style={
-                  styles.body
+            {mediaType !== "TEXT" &&
+            mediaUrls.length > 0 ? (
+              <PostMedia
+                tone="fan"
+                imageUrls={
+                  mediaUrls
                 }
-              >
-                {contentText}
-              </Text>
+                isVideo={
+                  mediaType ===
+                  "VIDEO"
+                }
+                videoPosterUrl={
+                  post.thumbnailUrl ??
+                  post.videoThumbnailUrl
+                }
+              />
             ) : null}
-          </AppCard>
 
-          {mediaUrls.length >
-          0 ? (
-            <AppCard
-              style={
-                styles.section
-              }
-            >
-              <Text
-                style={
-                  styles.sectionTitle
-                }
-              >
-                미디어
-              </Text>
-
-              {mediaUrls.map(
-                (url) => (
-                  <Text
-                    key={url}
-                    numberOfLines={
-                      1
-                    }
-                    style={
-                      styles.mediaUrl
-                    }
-                  >
-                    {url}
-                  </Text>
-                ),
-              )}
-            </AppCard>
-          ) : null}
-
-          <View
-            style={
-              styles.actionRow
-            }
-          >
-            <AppButton
-              label={`${
+            <PostStats
+              isLiked={
                 post.isLiked
-                  ? "좋아요 취소"
-                  : "좋아요"
-              } · ${(
+              }
+              likeCount={
                 post.likeCount ??
                 0
-              ).toLocaleString()}`}
-              variant={
-                post.isLiked
-                  ? "secondary"
-                  : "ghost"
               }
-              loading={
+              commentCount={
+                commentCount
+              }
+              likeDisabled={
                 isLikePending
               }
-              style={
-                styles.actionButton
-              }
-              onPress={() =>
+              onLikePress={() =>
                 void toggleLike()
               }
             />
 
-            <AppButton
-              label={`댓글 · ${(
-                post.commentCount ??
-                comments.length
-              ).toLocaleString()}`}
-              variant="ghost"
-              style={
-                styles.actionButton
+            <PostBody
+              tone="fan"
+              title={
+                post.title ??
+                "콘텐츠"
               }
-              onPress={() =>
-                void commentsQuery.refetch()
+              content={
+                contentText
               }
+              tags={normalizeStringList(
+                post.tags,
+              )}
             />
-          </View>
+          </PostArticle>
 
-          <AppCard
-            style={
-              styles.section
-            }
+          <PostCommentSection
+            tone="fan"
+            count={commentCount}
           >
-            <Text
-              style={
-                styles.sectionTitle
-              }
-            >
-              댓글
-            </Text>
-
-            <AppTextInput
-              label="댓글 작성"
-              value={
-                commentText
-              }
-              placeholder="댓글을 입력하세요"
-              multiline
-              maxLength={500}
-              textAlignVertical="top"
-              style={
-                styles.commentInput
+            <PostCommentComposer
+              tone="fan"
+              value={commentText}
+              isPending={
+                createCommentMutation.isPending
               }
               onChangeText={
                 setCommentText
               }
+              onSubmit={() =>
+                void submitComment()
+              }
             />
 
-            <View style={styles.commentSubmitRow}>
-              <Text style={styles.counterText}>
-                {commentText.length}/500
-              </Text>
-
-              <AppButton
-                label="댓글 등록"
-                disabled={
-                  !commentText.trim()
-                }
-                loading={
-                  createCommentMutation.isPending
-                }
-                style={styles.commentSubmitButton}
-                onPress={() =>
-                  void submitComment()
+            {commentErrorMessage ? (
+              <PostCommentError
+                message={
+                  commentErrorMessage
                 }
               />
-            </View>
-
-            {commentErrorMessage ? (
-              <Text style={styles.commentError}>
-                {commentErrorMessage}
-              </Text>
             ) : null}
 
             {commentsQuery.isLoading ? (
-              <Text
-                style={styles.meta}
-              >
-                댓글을 불러오는
-                중이에요
-              </Text>
+              <PostCommentMessage
+                tone="fan"
+                message="댓글을 불러오고 있어요"
+              />
             ) : commentsQuery.isError ? (
-              <View style={styles.commentErrorRow}>
-                <Text style={styles.meta}>
-                  댓글을 불러오지 못했어요
-                </Text>
-
-                <AppButton
-                  label="다시 시도"
-                  variant="ghost"
-                  style={styles.smallButton}
-                  onPress={() =>
-                    void commentsQuery.refetch()
-                  }
-                />
-              </View>
+              <PostCommentMessage
+                tone="fan"
+                message="댓글을 불러오지 못했어요"
+                actionLabel="다시 시도"
+                onAction={() =>
+                  void commentsQuery.refetch()
+                }
+              />
             ) : comments.length ===
                 0 &&
-              myComments.length ===
+              separateMyComments.length ===
                 0 ? (
-              <Text
-                style={styles.meta}
-              >
-                아직 댓글이
-                없어요.
-              </Text>
+              <PostCommentMessage
+                tone="fan"
+                message="아직 댓글이 없어요"
+              />
             ) : (
-              <View
-                style={
-                  styles.commentList
-                }
-              >
-                {comments.map(
-                  (comment) => {
-                    const isEditing =
-                      comment.commentId ===
-                      editingCommentId;
+              <>
+                {separateMyComments.length >
+                0 ? (
+                  <PostCommentGroup title="내 댓글">
+                    {separateMyComments.map(
+                      (comment) =>
+                        renderComment(
+                          comment,
+                          comment.commentId !=
+                            null,
+                        ),
+                    )}
+                  </PostCommentGroup>
+                ) : null}
 
-                    return (
-                      <View
-                        key={`${comment.commentId}-${comment.createdAt}`}
-                        style={
-                          styles.commentRow
-                        }
-                      >
-                        <Avatar
-                          imageUrl={
-                            comment.profileImageUrl
-                          }
-                          label={
-                            comment.authorName
-                          }
-                          size={36}
-                        />
-
-                        <View
-                          style={
-                            styles.commentText
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.commentAuthor
-                            }
-                          >
-                            {
-                              comment.authorName
-                            }
-                          </Text>
-
-                          {isEditing ? (
-                            <>
-                              <AppTextInput
-                                label="댓글 수정"
-                                value={
-                                  editingCommentText
-                                }
-                                multiline
-                                maxLength={500}
-                                style={
-                                  styles.editInput
-                                }
-                                onChangeText={
-                                  setEditingCommentText
-                                }
-                              />
-
-                              <View
-                                style={
-                                  styles.commentActions
-                                }
-                              >
-                                <AppButton
-                                  label="취소"
-                                  variant="ghost"
-                                  style={
-                                    styles.smallButton
-                                  }
-                                  onPress={
-                                    cancelEdit
-                                  }
-                                />
-
-                                <AppButton
-                                  label="저장"
-                                  loading={
-                                    updateCommentMutation.isPending
-                                  }
-                                  style={
-                                    styles.smallButton
-                                  }
-                                  onPress={() =>
-                                    void saveEdit()
-                                  }
-                                />
-                              </View>
-                            </>
-                          ) : (
-                            <>
-                              <Text
-                                style={
-                                  styles.commentBody
-                                }
-                              >
-                                {
-                                  comment.content
-                                }
-                              </Text>
-
-                              {comment.createdAt ? (
-                                <Text
-                                  style={
-                                    styles.meta
-                                  }
-                                >
-                                  {formatDate(
-                                    comment.createdAt,
-                                  )}
-                                </Text>
-                              ) : null}
-
-                              {comment.isMine ||
-                              (comment.commentId != null &&
-                                myCommentIds.has(
-                                  comment.commentId,
-                                )) ||
-                              (currentUserId != null &&
-                                comment.authorId ===
-                                  currentUserId) ? (
-                                <View
-                                  style={
-                                    styles.commentActions
-                                  }
-                                >
-                                  <AppButton
-                                    label="수정"
-                                    variant="ghost"
-                                    style={
-                                      styles.smallButton
-                                    }
-                                    onPress={() =>
-                                      beginEditComment(
-                                        comment.commentId,
-                                        comment.content,
-                                      )
-                                    }
-                                  />
-
-                                  <AppButton
-                                    label="삭제"
-                                    variant="ghost"
-                                    style={
-                                      styles.smallButton
-                                    }
-                                    onPress={() =>
-                                      deleteComment(
-                                        comment.commentId,
-                                      )
-                                    }
-                                  />
-                                </View>
-                              ) : null}
-                            </>
-                          )}
-                        </View>
-                      </View>
-                    );
-                  },
-                )}
-
-                {commentsQuery.hasNextPage ? (
-                  <AppButton
-                    label={
-                      commentsQuery.isFetchingNextPage
-                        ? "댓글 불러오는 중..."
-                        : "댓글 더 보기"
+                {comments.length >
+                0 ? (
+                  <PostCommentGroup
+                    title={
+                      separateMyComments.length >
+                      0
+                        ? "전체 댓글"
+                        : undefined
                     }
-                    variant="secondary"
-                    loading={
-                      commentsQuery.isFetchingNextPage
-                    }
+                  >
+                    {comments.map(
+                      (comment) =>
+                        renderComment(
+                          comment,
+                          comment.isMine ||
+                            (comment.commentId !=
+                              null &&
+                              myCommentIds.has(
+                                comment.commentId,
+                              )) ||
+                            (currentUserId !=
+                              null &&
+                              comment.authorId ===
+                                currentUserId),
+                        ),
+                    )}
+                  </PostCommentGroup>
+                ) : null}
+
+                {commentsQuery.isFetchingNextPage ? (
+                  <PostCommentMessage
+                    tone="fan"
+                    message="댓글을 더 불러오고 있어요"
+                  />
+                ) : commentsQuery.hasNextPage ? (
+                  <Pressable
+                    accessibilityRole="button"
                     onPress={
                       loadMoreComments
                     }
-                  />
+                  >
+                    <Text
+                      style={
+                        styles.loadMore
+                      }
+                    >
+                      댓글 더 보기
+                    </Text>
+                  </Pressable>
                 ) : null}
-              </View>
+              </>
             )}
-          </AppCard>
+          </PostCommentSection>
         </>
       )}
     </Screen>
@@ -1001,174 +806,20 @@ export function FanContentDetailScreen() {
 const styles =
   StyleSheet.create({
     container: {
-      gap: spacing.lg,
+      paddingHorizontal: 0,
+      paddingTop: 0,
+      backgroundColor:
+        getPostBackground("fan"),
     },
 
-    heroCard: {
-      gap: spacing.md,
+    header: {
+      paddingHorizontal: 15,
     },
 
-    authorRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.md,
-    },
-
-    authorText: {
-      flex: 1,
-      gap: spacing.xs,
-    },
-
-    bandName: {
+    loadMore: {
+      ...textStyles.caption3,
       color:
-        colors.neutral900,
-      fontSize: 15,
-      fontWeight: "900",
-    },
-
-    title: {
-      color:
-        colors.neutral900,
-      fontSize: 24,
-      fontWeight: "900",
-      lineHeight: 31,
-    },
-
-    body: {
-      color:
-        colors.neutral800,
-      fontSize: 14,
-      lineHeight: 22,
-    },
-
-    meta: {
-      color:
-        colors.neutral600,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-
-    section: {
-      gap: spacing.md,
-    },
-
-    sectionTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 17,
-      fontWeight: "900",
-    },
-
-    mediaUrl: {
-      color:
-        colors.neutral600,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-
-    actionRow: {
-      flexDirection: "row",
-      gap: spacing.sm,
-    },
-
-    actionButton: {
-      flex: 1,
-      minHeight: 44,
-      paddingHorizontal:
-        spacing.md,
-    },
-
-    compactButton: {
-      minHeight: 38,
-      paddingHorizontal:
-        spacing.md,
-    },
-
-    commentInput: {
-      minHeight: 92,
-      paddingTop:
-        spacing.md,
-    },
-
-    commentSubmitRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: spacing.md,
-    },
-
-    counterText: {
-      color:
-        colors.neutral500,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-
-    commentSubmitButton: {
-      minHeight: 38,
-      paddingHorizontal:
-        spacing.lg,
-    },
-
-    commentError: {
-      color:
-        colors.error,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-
-    commentErrorRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: spacing.md,
-    },
-
-    commentList: {
-      gap: spacing.lg,
-    },
-
-    commentRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: spacing.md,
-    },
-
-    commentText: {
-      flex: 1,
-      gap: spacing.xs,
-    },
-
-    commentAuthor: {
-      color:
-        colors.neutral900,
-      fontSize: 13,
-      fontWeight: "900",
-    },
-
-    commentBody: {
-      color:
-        colors.neutral800,
-      fontSize: 13,
-      lineHeight: 19,
-    },
-
-    commentActions: {
-      flexDirection: "row",
-      gap: spacing.sm,
-      marginTop:
-        spacing.xs,
-    },
-
-    smallButton: {
-      minHeight: 36,
-      paddingHorizontal:
-        spacing.md,
-    },
-
-    editInput: {
-      minHeight: 72,
-      paddingTop:
-        spacing.md,
+        colors.primary400,
+      textAlign: "center",
     },
   });

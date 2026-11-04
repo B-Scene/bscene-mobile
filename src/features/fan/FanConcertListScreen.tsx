@@ -1,184 +1,277 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 
+import { FanConcertCard } from "@/features/fan/FanConcertCard";
+import { mapPerformanceToConcert } from "@/features/fan/concertMappers";
 import {
-  invalidatePerformanceInterestQueries,
-  useAddPerformanceInterest,
-  useDeletePerformanceInterest,
+  useFanHomeQuery,
+  useRecommendedPerformancesInfiniteQuery,
   useUpcomingPerformancesInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
-import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
 import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { Badge } from "@/shared/components/Badge";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 import { Screen } from "@/shared/components/Screen";
-import { colors, spacing } from "@/shared/constants/theme";
-import {
-  type ConcertListItem,
-  mapPerformanceToConcert,
-} from "@/features/fan/concertMappers";
+import { colors, textStyles } from "@/shared/constants/theme";
+
+import type {
+  RecommendedPerformanceSort,
+  UpcomingPerformanceSort,
+} from "@/types/fan/home";
+
+const UPCOMING_SORT_OPTIONS = ["공연임박순", "최신순", "인기순"] as const;
+const RECOMMENDED_SORT_OPTIONS = ["인기순", "공연임박순"] as const;
+
+type SortOption = (typeof UPCOMING_SORT_OPTIONS)[number];
+
+const UPCOMING_SORT_TO_API: Record<SortOption, UpcomingPerformanceSort> = {
+  공연임박순: "IMMINENT",
+  최신순: "LATEST",
+  인기순: "POPULAR",
+};
+
+const RECOMMENDED_SORT_TO_API: Record<string, RecommendedPerformanceSort> = {
+  인기순: "POPULAR",
+  공연임박순: "IMMINENT",
+};
 
 export function FanConcertListScreen() {
-  const query = useUpcomingPerformancesInfiniteQuery("IMMINENT", 10);
+  const [selectedSort, setSelectedSort] = useState<SortOption | null>(null);
+  const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
+  const fanHomeQuery = useFanHomeQuery();
+  const useRecommended =
+    fanHomeQuery.data?.performanceType === "RECOMMENDED" ||
+    fanHomeQuery.data?.hasFollowingBands === false;
+  const canResolveSource = fanHomeQuery.isSuccess || fanHomeQuery.isError;
+  const sortOptions: readonly SortOption[] = useRecommended
+    ? RECOMMENDED_SORT_OPTIONS
+    : UPCOMING_SORT_OPTIONS;
+  const defaultSort: SortOption = useRecommended ? "인기순" : "공연임박순";
+  const effectiveSort =
+    selectedSort && sortOptions.includes(selectedSort)
+      ? selectedSort
+      : defaultSort;
+  const upcomingQuery = useUpcomingPerformancesInfiniteQuery(
+    UPCOMING_SORT_TO_API[effectiveSort],
+    10,
+    canResolveSource && !useRecommended,
+  );
+  const recommendedQuery = useRecommendedPerformancesInfiniteQuery(
+    RECOMMENDED_SORT_TO_API[effectiveSort] ?? "POPULAR",
+    10,
+    canResolveSource && useRecommended,
+  );
+  const query = useRecommended ? recommendedQuery : upcomingQuery;
   const concerts =
     query.data?.pages
       .flatMap((page) => page.items)
       .map(mapPerformanceToConcert) ?? [];
-
-  const retry = () => {
-    void query.refetch();
-  };
+  const isLoading = !canResolveSource || query.isLoading;
 
   return (
-    <Screen scroll={false} contentStyle={styles.container}>
-      <AppHeader title="공연 일정" />
+    <Screen
+      edges={["top", "left", "right"]}
+      scroll={false}
+      contentStyle={styles.container}
+    >
+      <AppHeader
+        title={useRecommended ? "추천 공연" : "공연 일정"}
+        style={styles.header}
+      />
 
-      {query.isLoading ? (
-        <AppState loading title="공연을 불러오는 중이에요" />
-      ) : query.isError ? (
-        <AppState
-          title="공연을 불러오지 못했어요"
-          description="잠시 후 다시 시도해 주세요."
-          actionLabel="다시 시도"
-          onAction={retry}
-        />
-      ) : concerts.length === 0 ? (
-        <AppState
-          title="표시할 공연이 없어요"
-          description="새로운 공연 일정이 등록되면 이곳에서 볼 수 있어요."
-        />
-      ) : (
-        <FlatList
-          data={concerts}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
-              void query.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.35}
-          renderItem={({ item }) => <ConcertRow item={item} />}
-          ListFooterComponent={
-            query.isFetchingNextPage ? (
-              <Text style={styles.footerText}>더 불러오는 중이에요</Text>
-            ) : undefined
+      <View style={styles.sortRow}>
+        <Pressable
+          accessibilityRole="button"
+          style={[styles.sortChip, selectedSort && styles.sortChipSelected]}
+          onPress={() => setIsSortSheetOpen(true)}
+        >
+          <Text
+            style={[
+              styles.sortChipText,
+              selectedSort && styles.sortChipTextSelected,
+            ]}
+          >
+            {effectiveSort}
+          </Text>
+          <Svg width={12} height={7} viewBox="0 0 12 7" fill="none">
+            <Path
+              d="M1 1L6 6L11 1"
+              stroke={selectedSort ? colors.primary400 : colors.neutral600}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
+        </Pressable>
+      </View>
+
+      <FlatList
+        data={concerts}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          isLoading ? (
+            <Text style={styles.message}>공연을 불러오는 중이에요</Text>
+          ) : query.isError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>공연을 불러오지 못했어요</Text>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.retryButton}
+                onPress={() => {
+                  void query.refetch();
+                  void fanHomeQuery.refetch();
+                }}
+              >
+                <Text style={styles.retryText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          ) : undefined
+        }
+        ListFooterComponent={
+          query.isFetchingNextPage ? (
+            <Text style={styles.footerText}>더 불러오는 중이에요</Text>
+          ) : undefined
+        }
+        renderItem={({ item }) => <FanConcertCard item={item} />}
+        onEndReached={() => {
+          if (query.hasNextPage && !query.isFetchingNextPage) {
+            void query.fetchNextPage();
           }
-        />
-      )}
+        }}
+        onEndReachedThreshold={0.35}
+      />
+
+      <BottomSheetModal
+        open={isSortSheetOpen}
+        closeLabel="정렬 옵션 닫기"
+        onClose={() => setIsSortSheetOpen(false)}
+      >
+        <View style={styles.sheet}>
+          {sortOptions.map((option) => {
+            const isSelected = option === effectiveSort;
+
+            return (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                style={styles.sheetOption}
+                onPress={() => {
+                  setSelectedSort(option);
+                  setIsSortSheetOpen(false);
+                }}
+              >
+                <Text
+                  style={[styles.sheetText, isSelected && styles.sheetTextSelected]}
+                >
+                  {option}
+                </Text>
+                {isSelected ? <AppIcon name="checkActive" size={20} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheetModal>
     </Screen>
-  );
-}
-
-function ConcertRow({ item }: { item: ConcertListItem }) {
-  const queryClient = useQueryClient();
-  const addInterestMutation = useAddPerformanceInterest();
-  const deleteInterestMutation = useDeletePerformanceInterest();
-  const isInterestPending =
-    addInterestMutation.isPending || deleteInterestMutation.isPending;
-
-  const toggleInterest = async () => {
-    if (item.performanceId == null) return;
-
-    if (item.isInterested) {
-      try {
-        await deleteInterestMutation.mutateAsync(item.performanceId);
-      } catch {
-        Alert.alert("관심 공연", "관심 공연 해제에 실패했어요.");
-      }
-      return;
-    }
-
-    try {
-      await addInterestMutation.mutateAsync(item.performanceId);
-    } catch (error) {
-      if (isAlreadyInterestedPerformanceError(error)) {
-        await invalidatePerformanceInterestQueries(queryClient, item.performanceId);
-        return;
-      }
-      Alert.alert("관심 공연", "관심 공연 등록에 실패했어요.");
-    }
-  };
-
-  return (
-    <AppCard style={styles.card}>
-      <View style={styles.cardText}>
-        <Text numberOfLines={1} style={styles.title}>
-          {item.title}
-        </Text>
-        <Text numberOfLines={1} style={styles.meta}>
-          {item.location}
-        </Text>
-        <Text style={styles.meta}>{item.dateTime}</Text>
-      </View>
-      <View style={styles.cardAction}>
-        <Badge label={item.status} tone="pink" />
-        <AppButton
-          label={item.isInterested ? "관심 해제" : "관심"}
-          variant={item.isInterested ? "secondary" : "ghost"}
-          loading={isInterestPending}
-          disabled={item.performanceId == null}
-          style={styles.compactButton}
-          onPress={() => void toggleInterest()}
-        />
-        <AppButton
-          label="상세"
-          variant="ghost"
-          onPress={() =>
-            router.push(
-              `/fan/home/concerts/${item.id}` as Parameters<typeof router.push>[0],
-            )
-          }
-        />
-      </View>
-    </AppCard>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    gap: spacing.lg,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
-  listContent: {
-    paddingBottom: spacing.xxl,
+  header: {
+    paddingHorizontal: 15,
   },
-  card: {
-    marginBottom: spacing.md,
+  sortRow: {
+    height: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 11,
+    paddingLeft: 17,
+    paddingRight: 18,
+  },
+  sortChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.neutral400,
+    backgroundColor: colors.white,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  sortChipSelected: {
+    borderColor: colors.primary400,
+    backgroundColor: colors.primary0,
+  },
+  sortChipText: {
+    ...textStyles.caption3,
+    color: colors.neutral600,
+  },
+  sortChipTextSelected: {
+    color: colors.primary400,
+  },
+  list: {
+    gap: 12,
+    paddingHorizontal: 15,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  message: {
+    ...textStyles.body3,
+    color: colors.neutral600,
+    paddingVertical: 24,
+    textAlign: "center",
+  },
+  errorBox: {
+    alignItems: "flex-start",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  errorText: {
+    ...textStyles.body3,
+    color: colors.neutral700,
+  },
+  retryButton: {
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: colors.primary400,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryText: {
+    ...textStyles.caption3,
+    color: colors.white,
+  },
+  footerText: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
+    textAlign: "center",
+  },
+  sheet: {
+    gap: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.white,
+    paddingHorizontal: 30,
+    paddingTop: 32,
+    paddingBottom: 48,
+  },
+  sheetOption: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.md,
   },
-  cardText: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  title: {
+  sheetText: {
+    ...textStyles.label2,
     color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "900",
   },
-  meta: {
-    color: colors.neutral600,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  cardAction: {
-    alignItems: "flex-end",
-    gap: spacing.sm,
-  },
-  compactButton: {
-    minHeight: 38,
-    paddingHorizontal: spacing.md,
-  },
-  footerText: {
-    color: colors.neutral600,
-    fontSize: 13,
-    textAlign: "center",
-    paddingVertical: spacing.lg,
+  sheetTextSelected: {
+    color: colors.primary400,
   },
 });

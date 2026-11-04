@@ -1,7 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/shared/components/AppButton";
-import { colors, spacing } from "@/shared/constants/theme";
+import { colors, spacing, textStyles } from "@/shared/constants/theme";
 
 type AppStateProps = {
   title: string;
@@ -40,15 +40,13 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   title: {
+    ...textStyles.label1,
     color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "800",
     textAlign: "center",
   },
   description: {
+    ...textStyles.caption1,
     color: colors.neutral600,
-    fontSize: 14,
-    lineHeight: 20,
     textAlign: "center",
   },
 });

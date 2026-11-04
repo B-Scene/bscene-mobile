@@ -3,16 +3,18 @@ import {
   router,
   useLocalSearchParams,
 } from "expo-router";
-import { Share2 } from "lucide-react-native";
+import { useCallback, useRef, useState, type ComponentRef } from "react";
 import {
-  Alert,
   Linking,
   Pressable,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 
 import {
   invalidatePerformanceInterestQueries,
@@ -26,14 +28,25 @@ import {
   isAlreadyInterestedPerformanceError,
   isAlreadySetPerformanceAlarmError,
 } from "@/api/fan/home";
-import { AppButton } from "@/shared/components/AppButton";
-import { AppCard } from "@/shared/components/AppCard";
-import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
-import { Badge } from "@/shared/components/Badge";
+import {
+  ConcertAlarmHint,
+  ConcertCard,
+  ConcertDivider,
+  ConcertHeader,
+  ConcertHeaderButton,
+  ConcertHeadline,
+  ConcertInfoRows,
+  ConcertIntro,
+  ConcertPoster,
+  formatConcertDateTime,
+} from "@/features/concert/ConcertDetailParts";
+import { ProfileTabs } from "@/features/fan/FanBandProfileParts";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
-import { colors, spacing } from "@/shared/constants/theme";
+import { Toast } from "@/shared/components/Toast";
+import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import {
   formatDateTime,
   formatDday,
@@ -53,6 +66,21 @@ const AGE_RATING_LABELS: Record<string, string> = {
   AGE_19: "만 19세 이상",
 };
 
+const TABS = ["공연정보", "공연소개", "캐스팅"] as const;
+type ConcertDetailTab = (typeof TABS)[number];
+
+const SECTION_SCROLL_MARGIN: Record<ConcertDetailTab, number> = {
+  공연정보: 43,
+  공연소개: 43,
+  캐스팅: 82,
+};
+
+const formatPrice = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === "") return "가격 미정";
+  if (typeof value === "number") return `${value.toLocaleString()}원`;
+  return value;
+};
+
 export function FanConcertDetailScreen() {
   const params = useLocalSearchParams<{ concertId?: string }>();
   const performanceId = Number(params.concertId);
@@ -64,21 +92,27 @@ export function FanConcertDetailScreen() {
   const deleteInterestMutation = useDeletePerformanceInterest();
   const setAlarmMutation = useSetPerformanceAlarm();
   const deleteAlarmMutation = useDeletePerformanceAlarm();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const sectionOffsets = useRef<Partial<Record<ConcertDetailTab, number>>>({});
+  const [selectedTab, setSelectedTab] = useState<ConcertDetailTab>("공연정보");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false);
+  const [isAlarmHintDismissed, setIsAlarmHintDismissed] = useState(false);
+  const closeToast = useCallback(() => setToastMessage(null), []);
   const detail = query.data;
   const date = getConcertDate(detail ?? {});
   const title = getConcertTitle(detail);
   const location = getConcertLocation(detail);
-  const meta = [detail?.genre, detail?.region].filter(Boolean).join(" · ");
+  const meta =
+    [detail?.genre, detail?.region].filter(Boolean).join(" · ") || "장르 · 지역";
   const posterImageUrl = getDetailPosterImageUrl(detail);
   const description =
     detail?.introduction ??
     detail?.description ??
     detail?.content ??
     "공연 소개가 준비 중이에요.";
-  const price =
-    detail?.ticketPrice == null && detail?.price == null
-      ? "가격 미정"
-      : String(detail.ticketPrice ?? detail.price);
+  const price = formatPrice(detail?.ticketPrice ?? detail?.price);
   const ageRating =
     AGE_RATING_LABELS[String(detail?.ageRating ?? "")] ??
     detail?.ageRating ??
@@ -95,6 +129,32 @@ export function FanConcertDetailScreen() {
     addInterestMutation.isPending || deleteInterestMutation.isPending;
   const isAlarmPending =
     setAlarmMutation.isPending || deleteAlarmMutation.isPending;
+  const infoRows = [
+    { label: "공연 일시", value: formatConcertDateTime(date) },
+    { label: "공연 장소", value: location },
+    { label: "티켓 가격", value: price },
+    { label: "관람 연령", value: ageRating },
+  ];
+  const tags = detail?.tags?.length ? detail.tags : [title];
+  const casting = detail?.casting ?? [];
+  const showAlarmHint = Boolean(detail) && !isAlarmSet && !isAlarmHintDismissed;
+
+  const selectTab = (tab: ConcertDetailTab) => {
+    setSelectedTab(tab);
+
+    const offset = sectionOffsets.current[tab];
+
+    if (offset !== undefined) {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, offset - SECTION_SCROLL_MARGIN[tab]),
+        animated: true,
+      });
+    }
+  };
+
+  const recordSectionOffset = (tab: ConcertDetailTab, y: number) => {
+    sectionOffsets.current[tab] = y;
+  };
 
   const openTicket = async () => {
     if (!detail?.ticketLink) return;
@@ -102,13 +162,13 @@ export function FanConcertDetailScreen() {
     try {
       await Linking.openURL(detail.ticketLink);
     } catch {
-      Alert.alert("예매하기", "예매 링크를 열지 못했어요.");
+      setToastMessage("예매 링크 열기에 실패했어요");
     }
   };
 
   const shareConcert = async () => {
     if (!Number.isFinite(performanceId) || performanceId <= 0) {
-      Alert.alert("공유하기", "공연 정보를 확인할 수 없어요.");
+      setToastMessage("공연 정보를 확인할 수 없어요");
       return;
     }
 
@@ -121,7 +181,7 @@ export function FanConcertDetailScreen() {
         url: concertLink,
       });
     } catch {
-      Alert.alert("공유하기", "공연 링크를 공유하지 못했어요.");
+      setToastMessage("공연 링크 공유에 실패했어요");
     }
   };
 
@@ -131,8 +191,9 @@ export function FanConcertDetailScreen() {
     if (isInterested) {
       try {
         await deleteInterestMutation.mutateAsync(performanceId);
+        setToastMessage("관심 공연을 해제했어요");
       } catch {
-        Alert.alert("관심 공연", "관심 공연 해제에 실패했어요.");
+        setToastMessage("관심 공연 해제에 실패했어요");
       }
       return;
     }
@@ -144,7 +205,7 @@ export function FanConcertDetailScreen() {
         await invalidatePerformanceInterestQueries(queryClient, performanceId);
         return;
       }
-      Alert.alert("관심 공연", "관심 공연 등록에 실패했어요.");
+      setToastMessage("관심 공연 등록에 실패했어요");
     }
   };
 
@@ -154,269 +215,353 @@ export function FanConcertDetailScreen() {
     if (isAlarmSet) {
       try {
         await deleteAlarmMutation.mutateAsync(performanceId);
-        Alert.alert("공연 알림", "공연 알림을 해제했어요.");
+        setToastMessage("공연 알림을 해제했어요");
       } catch {
-        Alert.alert("공연 알림", "공연 알림 해제에 실패했어요.");
+        setToastMessage("공연 알림 해제에 실패했어요");
       }
       return;
     }
 
     try {
       await setAlarmMutation.mutateAsync(performanceId);
-      Alert.alert(
-        "공연 알림이 설정됐어요",
-        "공연 시작 전에 알림을 보내드릴게요.",
-      );
+      setIsAlarmModalOpen(true);
     } catch (error) {
       if (isAlreadySetPerformanceAlarmError(error)) {
         await invalidatePerformanceInterestQueries(queryClient, performanceId);
-        Alert.alert("공연 알림", "이미 공연 알림이 설정되어 있어요.");
+        setToastMessage("이미 공연 알림이 설정되어 있어요");
         return;
       }
-      Alert.alert("공연 알림", "공연 알림 설정에 실패했어요.");
+      setToastMessage("공연 알림 설정에 실패했어요");
     }
   };
 
   return (
-    <Screen contentStyle={styles.container}>
-      <AppHeader
-        title="공연 상세"
-        rightContent={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="공연 공유하기"
-            hitSlop={12}
-            style={styles.headerIconButton}
-            onPress={() => void shareConcert()}
-          >
-            <Share2 size={22} color={colors.neutral900} />
-          </Pressable>
-        }
+    <Screen
+      edges={["top", "left", "right"]}
+      scroll={false}
+      contentStyle={styles.container}
+    >
+      <ScrollView
+        ref={scrollRef}
+        stickyHeaderIndices={[2]}
+        contentContainerStyle={{ paddingBottom: insets.bottom }}
+      >
+        <View>
+          <ConcertHeader>
+            <ConcertHeaderButton
+              label={isAlarmSet ? "공연 알림 설정됨" : "공연 알림 설정"}
+              disabled={isAlarmPending}
+              onPress={() => void toggleAlarm()}
+            >
+              <AppIcon
+                name={isAlarmSet ? "notificationOnDark" : "notificationOffDark"}
+                size={24}
+              />
+            </ConcertHeaderButton>
+            <ConcertHeaderButton
+              label="공유하기"
+              onPress={() => void shareConcert()}
+            >
+              <AppIcon name="shareDark" size={24} />
+            </ConcertHeaderButton>
+          </ConcertHeader>
+
+          <ConcertPoster imageUrl={posterImageUrl} />
+
+          {showAlarmHint ? (
+            <ConcertAlarmHint onClose={() => setIsAlarmHintDismissed(true)} />
+          ) : null}
+        </View>
+
+        <View style={styles.summary}>
+          {query.isLoading ? (
+            <Text style={styles.loadingText}>공연 정보를 불러오는 중이에요</Text>
+          ) : null}
+
+          {query.isError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>공연 정보를 불러오지 못했어요</Text>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.retryButton}
+                onPress={() => void query.refetch()}
+              >
+                <Text style={styles.retryText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          <ConcertHeadline
+            tone="fan"
+            dday={formatDday(detail ?? {}, date)}
+            title={title}
+            meta={meta}
+            isLiked={isInterested}
+            count={interestCount}
+            likeDisabled={isInterestPending}
+            onLikePress={() => void toggleInterest()}
+          />
+
+          <ConcertCard>
+            <ConcertInfoRows rows={infoRows.slice(0, 3)} strong />
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={!detail?.ticketLink}
+              style={[
+                styles.ticketButton,
+                !detail?.ticketLink && styles.ticketButtonDisabled,
+              ]}
+              onPress={() => void openTicket()}
+            >
+              <Text
+                style={[
+                  styles.ticketText,
+                  !detail?.ticketLink && styles.ticketTextDisabled,
+                ]}
+              >
+                {detail?.ticketLink ? "예매하기" : "지금은 예매할 수 없어요"}
+              </Text>
+            </Pressable>
+          </ConcertCard>
+        </View>
+
+        <View style={styles.tabs}>
+          <ProfileTabs
+            fullWidth
+            tabs={TABS}
+            activeTab={selectedTab}
+            onChange={selectTab}
+          />
+        </View>
+
+        <View
+          style={styles.infoSection}
+          onLayout={(event) =>
+            recordSectionOffset("공연정보", event.nativeEvent.layout.y)
+          }
+        >
+          <Text style={styles.infoTitle}>공연정보</Text>
+          <View style={styles.infoRows}>
+            <ConcertInfoRows rows={infoRows} />
+          </View>
+        </View>
+
+        <ConcertDivider tone="fan" />
+
+        <View
+          style={styles.introSection}
+          onLayout={(event) =>
+            recordSectionOffset("공연소개", event.nativeEvent.layout.y)
+          }
+        >
+          <ConcertIntro
+            tone="fan"
+            title="공연소개"
+            description={description}
+            tags={tags}
+          />
+        </View>
+
+        <ConcertDivider tone="fan" />
+
+        <View
+          style={styles.castingSection}
+          onLayout={(event) =>
+            recordSectionOffset("캐스팅", event.nativeEvent.layout.y)
+          }
+        >
+          <Text style={styles.sectionTitle}>캐스팅</Text>
+
+          <View style={styles.castingList}>
+            {casting.length > 0 ? (
+              casting.map((band, index) => {
+                const bandInfo = getCastingBandInfo(band);
+                const bandId = getCastingBandId(band);
+                const bandName =
+                  bandInfo.bandName ?? bandInfo.name ?? band.bandName ?? "밴드명";
+                const bandMeta =
+                  [
+                    bandInfo.genre ?? bandInfo.bandGenre,
+                    bandInfo.region ?? bandInfo.bandRegion,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "장르 · 지역";
+
+                return (
+                  <Pressable
+                    key={`${bandId ?? bandName}-${index}`}
+                    accessibilityRole="button"
+                    disabled={bandId == null}
+                    style={styles.castingCard}
+                    onPress={() => {
+                      if (bandId == null) return;
+                      router.push(
+                        `/fan/bands/${bandId}` as Parameters<
+                          typeof router.push
+                        >[0],
+                      );
+                    }}
+                  >
+                    <ProfileImage
+                      imageUrl={getCastingBandImageUrl(band)}
+                      size={35}
+                      variant="band"
+                    />
+                    <View style={styles.castingText}>
+                      <Text numberOfLines={1} style={styles.castingName}>
+                        {bandName}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.castingMeta}>
+                        {bandMeta}
+                      </Text>
+                    </View>
+                    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M9 6L15 12L9 18"
+                        stroke={colors.neutral400}
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </Svg>
+                  </Pressable>
+                );
+              })
+            ) : (
+              <Text style={styles.castingMeta}>캐스팅 정보가 준비 중이에요</Text>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+
+      <ConfirmModal
+        open={isAlarmModalOpen}
+        showCancel={false}
+        title="공연 알림이 설정됐어요"
+        description="공연 시작 1시간 전에 알림을 보내드릴게요"
+        onCancel={() => setIsAlarmModalOpen(false)}
+        onConfirm={() => setIsAlarmModalOpen(false)}
       />
 
-      {query.isLoading ? (
-        <AppState loading title="공연 정보를 불러오는 중이에요" />
-      ) : query.isError ? (
-        <AppState
-          title="공연 정보를 불러오지 못했어요"
-          description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
-          actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
-        />
-      ) : detail ? (
-        <>
-          <AppCard style={styles.heroCard}>
-            <View style={styles.poster}>
-              <Avatar imageUrl={posterImageUrl} label={title} size={84} />
-            </View>
-            <Badge label={formatDday(detail, date)} tone="pink" />
-            <Text style={styles.title}>{title}</Text>
-            {meta ? <Text style={styles.meta}>{meta}</Text> : null}
-            <View style={styles.actionRow}>
-              <AppButton
-                label={
-                  isInterested
-                    ? `관심 해제 · ${interestCount.toLocaleString()}`
-                    : `관심 · ${interestCount.toLocaleString()}`
-                }
-                variant={isInterested ? "secondary" : "ghost"}
-                loading={isInterestPending}
-                style={styles.actionButton}
-                onPress={() => void toggleInterest()}
-              />
-              <AppButton
-                label={isAlarmSet ? "알림 해제" : "알림 받기"}
-                variant={isAlarmSet ? "secondary" : "ghost"}
-                loading={isAlarmPending}
-                style={styles.actionButton}
-                onPress={() => void toggleAlarm()}
-              />
-            </View>
-          </AppCard>
-
-          <AppCard style={styles.infoCard}>
-            <InfoRow label="공연 일시" value={formatDateTime(date)} />
-            <InfoRow label="공연 장소" value={location} />
-            <InfoRow label="티켓 가격" value={price} />
-            <InfoRow label="관람 연령" value={ageRating} />
-            <AppButton
-              label={detail.ticketLink ? "예매하기" : "예매 링크 없음"}
-              disabled={!detail.ticketLink}
-              onPress={() => void openTicket()}
-            />
-          </AppCard>
-
-          <Section title="공연소개">
-            <Text style={styles.description}>{description}</Text>
-          </Section>
-
-          <Section title="캐스팅">
-            {detail.casting?.length ? (
-              <View style={styles.castingList}>
-                {detail.casting.map((band, index) => {
-                  const bandInfo = getCastingBandInfo(band);
-                  const bandId = getCastingBandId(band);
-                  const bandName =
-                    bandInfo.bandName ?? bandInfo.name ?? band.bandName ?? "밴드명";
-                  const bandMeta =
-                    [bandInfo.genre ?? bandInfo.bandGenre, bandInfo.region ?? bandInfo.bandRegion]
-                      .filter(Boolean)
-                      .join(" · ") || "장르 · 지역";
-
-                  return (
-                    <Pressable
-                      key={`${bandId ?? bandName}-${index}`}
-                      accessibilityRole="button"
-                      disabled={bandId == null}
-                      style={[
-                        styles.castingRow,
-                        bandId == null && styles.castingRowDisabled,
-                      ]}
-                      onPress={() => {
-                        if (bandId == null) return;
-                        router.push(
-                          `/fan/bands/${bandId}` as Parameters<
-                            typeof router.push
-                          >[0],
-                        );
-                      }}
-                    >
-                      <Avatar
-                        imageUrl={
-                          getCastingBandImageUrl(band)
-                        }
-                        label={bandName}
-                        size={42}
-                      />
-                      <View style={styles.castingText}>
-                        <Text style={styles.castingName}>{bandName}</Text>
-                        <Text style={styles.meta}>{bandMeta}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : (
-              <Text style={styles.meta}>캐스팅 정보가 준비 중이에요</Text>
-            )}
-          </Section>
-        </>
-      ) : null}
+      <Toast
+        open={toastMessage !== null}
+        message={toastMessage}
+        tone={toastMessage?.includes("실패") ? "error" : "success"}
+        onClose={closeToast}
+      />
     </Screen>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <AppCard style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
-    </AppCard>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.lg,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
-  heroCard: {
-    gap: spacing.md,
+  summary: {
+    paddingHorizontal: 24,
+    paddingVertical: 24,
   },
-  headerIconButton: {
-    width: 40,
-    height: 40,
+  loadingText: {
+    ...textStyles.body3,
+    marginBottom: 16,
+    color: colors.neutral600,
+  },
+  errorBox: {
+    alignItems: "flex-start",
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  errorText: {
+    ...textStyles.body3,
+    color: colors.neutral700,
+  },
+  retryButton: {
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: colors.primary400,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryText: {
+    ...textStyles.caption3,
+    color: colors.white,
+  },
+  ticketButton: {
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 16,
+    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: colors.primary400,
   },
-  poster: {
-    alignItems: "center",
-    paddingVertical: spacing.md,
+  ticketButtonDisabled: {
+    borderColor: colors.neutral400,
   },
-  title: {
+  ticketText: {
+    ...textStyles.label2,
+    color: colors.primary400,
+  },
+  ticketTextDisabled: {
+    color: colors.neutral500,
+  },
+  tabs: {
+    backgroundColor: colors.white,
+  },
+  infoSection: {
+    paddingHorizontal: 29,
+    paddingVertical: 16,
+  },
+  infoTitle: {
+    ...textStyles.body1,
     color: colors.neutral900,
-    fontSize: 24,
-    fontWeight: "900",
-    lineHeight: 31,
-  },
-  meta: {
-    color: colors.neutral600,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  actionButton: {
-    flex: 1,
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-  },
-  infoCard: {
-    gap: spacing.md,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.lg,
-  },
-  infoLabel: {
-    color: colors.neutral600,
-    fontSize: 13,
     fontWeight: "700",
+    lineHeight: 38,
   },
-  infoValue: {
-    flex: 1,
-    color: colors.neutral900,
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "right",
+  infoRows: {
+    marginTop: 17,
   },
-  section: {
-    gap: spacing.md,
+  introSection: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+  castingSection: {
+    paddingHorizontal: 29,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
   sectionTitle: {
+    ...textStyles.body1,
     color: colors.neutral900,
-    fontSize: 17,
-    fontWeight: "900",
-  },
-  description: {
-    color: colors.neutral800,
-    fontSize: 14,
-    lineHeight: 22,
   },
   castingList: {
-    gap: spacing.md,
+    gap: 12,
+    marginTop: 16,
   },
-  castingRow: {
+  castingCard: {
+    ...shadows.card,
+    height: 60,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-  },
-  castingRowDisabled: {
-    opacity: 0.75,
+    gap: 18,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
   },
   castingText: {
     flex: 1,
+    minWidth: 0,
   },
   castingName: {
+    ...textStyles.caption3,
     color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "900",
+  },
+  castingMeta: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
   },
 });

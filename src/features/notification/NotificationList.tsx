@@ -119,6 +119,7 @@ export function NotificationList({
 
   return (
     <Screen
+      edges={["top", "left", "right"]}
       scroll={false}
       contentStyle={{ ...styles.container, backgroundColor: background }}
     >

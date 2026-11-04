@@ -1,324 +1,309 @@
-import {
-  router,
-  useLocalSearchParams,
-} from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useState, type ReactNode } from "react";
 import {
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
+import { ApplicationSelectModal } from "@/features/session/ApplicationSelectModal";
+import { ApplicationSubmittedScreen } from "@/features/session/RecruitmentCompleteScreens";
+import { useApplySessionRecruitmentMutation } from "@/hooks/api/session/useSessionApplication";
+import { useCreateChatRoomMutation } from "@/hooks/api/session/useSessionChat";
 import {
-  useApplySessionRecruitmentMutation,
-  useMySessionApplicationSummaryQuery,
-} from "@/hooks/api/session/useSessionApplication";
-import {
-  useCreateChatRoomMutation,
-} from "@/hooks/api/session/useSessionChat";
-import {
-  useAddSessionRecruitmentInterest,
   useDeleteSessionRecruitment,
-  useRemoveSessionRecruitmentInterest,
   useSessionRecruitmentDetailQuery,
 } from "@/hooks/api/session/useSessionRecruitment";
-import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
-import {
-  colors,
-} from "@/shared/constants/theme";
-import type {
-  SessionRecruitmentDetailResponse,
-} from "@/types/session/sessionRecruitment";
+import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
+import type { SessionRecruitmentDetailResponse } from "@/types/session/sessionRecruitment";
 
-const parseRouteId = (
-  value?: string | string[],
-) => {
-  const rawValue =
-    Array.isArray(value)
-      ? value[0]
-      : value;
+type RouterTarget = Parameters<typeof router.push>[0];
 
-  const parsed =
-    Number(rawValue);
+const parseRouteId = (value?: string | string[]) => {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(rawValue);
 
-  return Number.isFinite(parsed) &&
-    parsed > 0
-    ? parsed
-    : 0;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 };
 
-const formatDday = (
-  dDay: number,
-) => {
-  if (dDay < 0) {
-    return "마감";
-  }
-
-  if (dDay === 0) {
-    return "오늘 마감";
-  }
+const formatDday = (dDay: number) => {
+  if (dDay < 0) return "마감";
+  if (dDay === 0) return "오늘 마감";
 
   return `D-${dDay}`;
 };
 
-const formatDeadline = (
-  value: string,
-) => {
+const formatDeadline = (value: string) => {
   const normalized = value.includes("T") ? value : value.replace(" ", "T");
   const [dateValue, timeValue = ""] = normalized.split("T");
   const time = timeValue.slice(0, 5);
 
-  if (!dateValue || !time) {
-    return value;
-  }
+  if (!dateValue || !time) return value;
 
   const [year, month, day] = dateValue.split("-");
 
   return `${year}.${month}.${day}. ${time} 마감`;
 };
 
+function DetailHeader() {
+  return (
+    <View style={styles.header}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="뒤로가기"
+        hitSlop={12}
+        style={styles.headerBack}
+        onPress={() => router.back()}
+      >
+        <AppIcon name="arrowLeft" size={24} />
+      </Pressable>
+      <Text style={styles.headerTitle}>모집 공고</Text>
+    </View>
+  );
+}
+
 export function BandSessionRecruitmentDetailScreen() {
-  const params =
-    useLocalSearchParams<{
-      recruitmentId?: string;
-    }>();
-
-  const recruitmentId =
-    parseRouteId(
-      params.recruitmentId,
-    );
-
-  const query =
-    useSessionRecruitmentDetailQuery(
-      recruitmentId,
-    );
-
-  const addInterestMutation =
-    useAddSessionRecruitmentInterest();
-
-  const removeInterestMutation =
-    useRemoveSessionRecruitmentInterest();
-
-  const deleteMutation =
-    useDeleteSessionRecruitment();
-
-  const createChatMutation =
-    useCreateChatRoomMutation();
-
+  const params = useLocalSearchParams<{ recruitmentId?: string }>();
+  const recruitmentId = parseRouteId(params.recruitmentId);
+  const query = useSessionRecruitmentDetailQuery(recruitmentId);
+  const deleteMutation = useDeleteSessionRecruitment();
+  const createChatMutation = useCreateChatRoomMutation();
+  const applyMutation = useApplySessionRecruitmentMutation();
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelErrorMessage, setCancelErrorMessage] = useState("");
+  const [isApplicationModalOpen, setIsApplicationModalOpen] = useState(false);
+  const [completedApplication, setCompletedApplication] = useState<{
+    sessionApplicationId: number;
+    applicationTitle: string;
+  } | null>(null);
   const detail = query.data;
-  const isInterested =
-    detail?.isInterested ??
-    false;
-  const isInterestPending =
-    addInterestMutation.isPending ||
-    removeInterestMutation.isPending;
 
-  const toggleInterest =
-    async () => {
-      if (!detail) {
-        return;
-      }
+  const openChat = async () => {
+    if (!detail || detail.isMine || createChatMutation.isPending) return;
 
-      try {
-        if (isInterested) {
-          await removeInterestMutation.mutateAsync(
-            detail.sessionRecruitmentId,
-          );
+    try {
+      const room = await createChatMutation.mutateAsync({
+        contextType: "RECRUITMENT",
+        sessionRecruitmentId: detail.sessionRecruitmentId,
+      });
 
-          return;
-        }
-
-        await addInterestMutation.mutateAsync(
-          detail.sessionRecruitmentId,
-        );
-      } catch {
-        Alert.alert(
-          "관심 공고",
-          "관심 상태를 변경하지 못했어요.",
-        );
-      }
-    };
-
-  const openChat =
-    async () => {
-      if (
-        !detail ||
-        detail.isMine ||
-        createChatMutation.isPending
-      ) {
-        return;
-      }
-
-      try {
-        const room =
-          await createChatMutation.mutateAsync(
-            {
-              contextType:
-                "RECRUITMENT",
-
-              sessionRecruitmentId:
-                detail.sessionRecruitmentId,
-            },
-          );
-
-        router.push(
-          `/band/session/messages/${room.chatRoomId}` as Parameters<
-            typeof router.push
-          >[0],
-        );
-      } catch {
-        Alert.alert(
-          "쪽지",
-          "쪽지방을 만들지 못했어요. 잠시 후 다시 시도해 주세요.",
-        );
-      }
-    };
-
-  const editRecruitment =
-    () => {
-      if (!detail) {
-        return;
-      }
-
-      router.push(
-        `/band/session/recruitments/form?recruitmentId=${detail.sessionRecruitmentId}` as Parameters<
-          typeof router.push
-        >[0],
-      );
-    };
-
-  const deleteRecruitment =
-    () => {
-      if (!detail) {
-        return;
-      }
-
+      router.push(`/band/session/messages/${room.chatRoomId}` as RouterTarget);
+    } catch (error) {
       Alert.alert(
-        "세션 모집 공고 취소",
-        "취소한 모집 공고는 다시 복구할 수 없어요.",
-        [
-          {
-            text: "닫기",
-            style: "cancel",
-          },
-
-          {
-            text: "취소하기",
-            style: "destructive",
-
-            onPress: () => {
-              void (async () => {
-                try {
-                  await deleteMutation.mutateAsync(
-                    detail.sessionRecruitmentId,
-                  );
-
-                  router.replace(
-                    "/band/session" as Parameters<
-                      typeof router.replace
-                    >[0],
-                  );
-                } catch {
-                  Alert.alert(
-                    "모집 공고 취소",
-                    "모집 공고를 취소하지 못했어요.",
-                  );
-                }
-              })();
-            },
-          },
-        ],
+        "쪽지",
+        getApiErrorMessage(
+          error,
+          "쪽지방 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
       );
-    };
+    }
+  };
+
+  const editRecruitment = () => {
+    if (!detail) return;
+
+    router.push(
+      `/band/session/recruitments/form?recruitmentId=${detail.sessionRecruitmentId}` as RouterTarget,
+    );
+  };
+
+  const openCancelModal = () => {
+    setCancelErrorMessage("");
+    setIsCancelModalOpen(true);
+  };
+
+  const closeCancelModal = () => {
+    if (!deleteMutation.isPending) setIsCancelModalOpen(false);
+  };
+
+  const confirmCancel = async () => {
+    if (!detail || deleteMutation.isPending) return;
+
+    setCancelErrorMessage("");
+
+    try {
+      await deleteMutation.mutateAsync(detail.sessionRecruitmentId);
+      setIsCancelModalOpen(false);
+      router.replace("/band/session" as Parameters<typeof router.replace>[0]);
+    } catch (error) {
+      setCancelErrorMessage(
+        getApiErrorMessage(
+          error,
+          "세션 모집 공고 취소에 실패했어요. 잠시 후 다시 시도해주세요.",
+        ),
+      );
+    }
+  };
+
+  const previewApplication = (sessionApplicationId: number) => {
+    setIsApplicationModalOpen(false);
+    router.push(`/band/session/find/${sessionApplicationId}?own=1` as RouterTarget);
+  };
+
+  const editApplication = (sessionApplicationId: number) => {
+    setIsApplicationModalOpen(false);
+    router.push(
+      `/band/session/applications/form?applicationId=${sessionApplicationId}` as RouterTarget,
+    );
+  };
+
+  const createApplication = () => {
+    setIsApplicationModalOpen(false);
+    router.push("/band/session/applications/form" as RouterTarget);
+  };
+
+  const applyApplication = async (sessionApplicationId: number) => {
+    if (!detail) return;
+
+    try {
+      const result = await applyMutation.mutateAsync({
+        sessionRecruitmentId: detail.sessionRecruitmentId,
+        body: { sessionApplicationId },
+      });
+
+      setIsApplicationModalOpen(false);
+      setCompletedApplication({
+        sessionApplicationId,
+        applicationTitle: result.applicationTitle,
+      });
+    } catch (error) {
+      Alert.alert(
+        "세션 지원",
+        getApiErrorMessage(error, "지원에 실패했어요. 잠시 후 다시 시도해주세요."),
+      );
+    }
+  };
+
+  if (detail && completedApplication) {
+    return (
+      <ApplicationSubmittedScreen
+        recruitmentTitle={detail.recruitmentTitle}
+        bandName={detail.bandName}
+        applicationTitle={completedApplication.applicationTitle}
+        messaging={createChatMutation.isPending}
+        onSendMessage={() => void openChat()}
+        onViewApplication={() =>
+          previewApplication(completedApplication.sessionApplicationId)
+        }
+        onGoToSessionHome={() => router.back()}
+      />
+    );
+  }
 
   return (
-    <Screen
-      contentStyle={
-        styles.container
-      }
-    >
-      <AppHeader title="모집 공고" />
+    <Screen scroll={false} contentStyle={styles.container}>
+      <DetailHeader />
 
       {query.isLoading ? (
-        <View style={styles.stateWrap}>
-          <AppState
-            loading
-            title="모집 공고 상세 정보를 불러오고 있어요"
-          />
+        <View style={styles.state}>
+          <Text style={styles.stateText}>
+            모집 공고 상세 정보를 불러오고 있어요
+          </Text>
         </View>
-      ) : query.isError ||
-        !detail ? (
-        <View style={styles.stateWrap}>
-          <AppState
-            title="모집 공고 상세 정보를 불러오지 못했어요"
-            description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
-            actionLabel="다시 시도"
-            onAction={() =>
-              void query.refetch()
-            }
-          />
+      ) : query.isError || !detail ? (
+        <View style={styles.state}>
+          <Text style={styles.stateText}>
+            모집 공고 상세 정보를 불러오지 못했어요
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.retryButton}
+            onPress={() => void query.refetch()}
+          >
+            <Text style={styles.retryText}>다시 시도</Text>
+          </Pressable>
         </View>
       ) : (
         <>
-          <RecruitmentDetailContent
-            detail={detail}
-          />
+          <ScrollView style={styles.scroll}>
+            <RecruitmentDetailContent detail={detail} />
+          </ScrollView>
 
-          {detail.isMine ? (
-            <OwnerActions
-              isDeleting={deleteMutation.isPending}
-              onEdit={editRecruitment}
-              onDelete={deleteRecruitment}
-            />
-          ) : (
-            <VisitorActions
-              bandName={detail.bandName}
-              isMessaging={createChatMutation.isPending}
-              onMessage={() => void openChat()}
-            />
-          )}
-
-          {!detail.isMine ? (
-            <ApplyRecruitmentCard
-              detail={detail}
-            />
-          ) : null}
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={isInterestPending}
-            style={[
-              styles.interestButton,
-              isInterested
-                ? styles.interestButtonActive
-                : styles.interestButtonIdle,
-            ]}
-            onPress={() =>
-              void toggleInterest()
-            }
-          >
-            <Text
-              style={[
-                styles.interestButtonText,
-                isInterested
-                  ? styles.interestButtonTextActive
-                  : styles.interestButtonTextIdle,
-              ]}
-            >
-              {isInterestPending
-                ? "변경 중..."
-                : isInterested
-                  ? "관심 공고 해제"
-                  : "관심 공고 등록"}
-            </Text>
-          </Pressable>
+          <View style={styles.footer}>
+            {detail.isMine ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.outlineAction}
+                  onPress={editRecruitment}
+                >
+                  <Text style={styles.outlineActionText}>수정하기</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={deleteMutation.isPending}
+                  style={[
+                    styles.filledAction,
+                    deleteMutation.isPending && styles.disabled,
+                  ]}
+                  onPress={openCancelModal}
+                >
+                  <Text style={styles.filledActionText}>
+                    {deleteMutation.isPending ? "취소 중" : "취소하기"}
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={createChatMutation.isPending}
+                  style={styles.outlineAction}
+                  onPress={() => void openChat()}
+                >
+                  <Text style={styles.outlineActionText}>쪽지 보내기</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.filledAction}
+                  onPress={() => setIsApplicationModalOpen(true)}
+                >
+                  <Text style={styles.filledActionText}>지원하기</Text>
+                </Pressable>
+              </>
+            )}
+          </View>
         </>
       )}
+
+      <ConfirmModal
+        open={isCancelModalOpen}
+        tone="orange"
+        title="세션 모집 공고를 취소할까요?"
+        description={
+          <>
+            {"취소한 모집 공고는\n다시 복구할 수 없어요."}
+            {cancelErrorMessage ? (
+              <Text style={styles.modalError}>{`\n${cancelErrorMessage}`}</Text>
+            ) : null}
+          </>
+        }
+        cancelLabel="닫기"
+        confirmLabel={deleteMutation.isPending ? "취소 중" : "취소하기"}
+        confirmDisabled={deleteMutation.isPending}
+        onCancel={closeCancelModal}
+        onConfirm={() => void confirmCancel()}
+      />
+
+      {detail && !detail.isMine ? (
+        <ApplicationSelectModal
+          open={isApplicationModalOpen}
+          applying={applyMutation.isPending}
+          onClose={() => setIsApplicationModalOpen(false)}
+          onCreateApplication={createApplication}
+          onPreviewApplication={previewApplication}
+          onEditApplication={editApplication}
+          onApplyApplication={(id) => void applyApplication(id)}
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -329,75 +314,52 @@ function RecruitmentDetailContent({
   detail: SessionRecruitmentDetailResponse;
 }) {
   const infoRows = [
-    {
-      label: "파트",
-      value: detail.part,
-    },
-    {
-      label: "실력대",
-      value: detail.skillLevel,
-    },
-    {
-      label: "장르",
-      value: detail.genre,
-    },
-    {
-      label: "활동 지역",
-      value: detail.region,
-    },
-    {
-      label: "연습 일정",
-      value: detail.practiceSchedule,
-    },
-    {
-      label: "연습 장소",
-      value: detail.practicePlace,
-    },
-    {
-      label: "지원 자격",
-      value: detail.qualification,
-    },
+    { label: "파트", value: detail.part },
+    { label: "실력대", value: detail.skillLevel },
+    { label: "장르", value: detail.genre },
+    { label: "활동 지역", value: detail.region },
+    { label: "연습 일정", value: detail.practiceSchedule },
+    { label: "연습 장소", value: detail.practicePlace },
+    { label: "지원 자격", value: detail.qualification },
   ];
+  const shortLocation =
+    detail.bandRegion.split(" ")[0] || detail.bandRegion;
 
   return (
     <>
-      <View style={styles.summarySection}>
-        <View style={styles.badgeLine}>
-          {detail.isNew ? (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>NEW</Text>
-            </View>
-          ) : null}
-          {detail.isMine ? (
-            <View style={styles.mineBadge}>
-              <Text style={styles.mineBadgeText}>내 공고</Text>
-            </View>
-          ) : null}
-        </View>
+      <View style={styles.summary}>
+        {detail.isNew ? (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>NEW</Text>
+          </View>
+        ) : null}
 
-        <Text style={styles.title}>{detail.recruitmentTitle}</Text>
-
-        <View style={styles.deadlineRow}>
-          <Text style={styles.deadlineText}>
-            {formatDeadline(detail.deadlineAt)}
-          </Text>
-          <View style={styles.deadlineDivider} />
-          <Text style={styles.ddayText}>{formatDday(detail.dDay)}</Text>
+        <View style={styles.titleGroup}>
+          <Text style={styles.title}>{detail.recruitmentTitle}</Text>
+          <View style={styles.deadlineRow}>
+            <Text style={styles.deadlineText}>
+              {detail.deadlineAt
+                ? formatDeadline(detail.deadlineAt)
+                : "마감일 정보 없음"}
+            </Text>
+            <View style={styles.deadlineDivider} />
+            <Text style={styles.ddayText}>{formatDday(detail.dDay)}</Text>
+          </View>
         </View>
       </View>
 
       <View style={styles.thickDivider} />
 
       <View style={styles.contentWrap}>
-        <DetailSection title="상세 요강">
+        <DetailSection title="상세 요강" bodyGap={16}>
           <Text style={styles.bodyText}>
             {detail.content || "상세 요강이 없습니다."}
           </Text>
         </DetailSection>
 
-        <SectionDivider />
+        <View style={styles.sectionDivider} />
 
-        <DetailSection title="모집 조건">
+        <DetailSection title="모집 조건" bodyGap={16}>
           <View style={styles.infoRows}>
             {infoRows.map((row) => (
               <View key={row.label} style={styles.infoRow}>
@@ -408,21 +370,21 @@ function RecruitmentDetailContent({
           </View>
         </DetailSection>
 
-        <SectionDivider />
+        <View style={styles.sectionDivider} />
 
-        <DetailSection title="밴드 정보">
+        <DetailSection title="밴드 정보" bodyGap={12} last>
           <View style={styles.bandCard}>
-            <Avatar
+            <ProfileImage
               imageUrl={detail.bandProfileImageUrl}
-              label={detail.bandName}
               size={35}
+              variant="band"
             />
             <View style={styles.bandText}>
               <Text numberOfLines={1} style={styles.bandName}>
                 {detail.bandName}
               </Text>
               <Text numberOfLines={1} style={styles.bandMeta}>
-                {detail.bandGenre} · {detail.bandRegion}
+                {detail.bandGenre} · {shortLocation}
               </Text>
             </View>
           </View>
@@ -434,592 +396,227 @@ function RecruitmentDetailContent({
 
 function DetailSection({
   title,
+  bodyGap,
+  last = false,
   children,
 }: {
   title: string;
-  children: React.ReactNode;
+  bodyGap: number;
+  last?: boolean;
+  children: ReactNode;
 }) {
   return (
-    <View style={styles.detailSection}>
+    <View style={[styles.section, last && styles.sectionLast]}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+      <View style={{ marginTop: bodyGap }}>{children}</View>
     </View>
   );
 }
 
-function SectionDivider() {
-  return <View style={styles.sectionDivider} />;
-}
-
-function OwnerActions({
-  isDeleting,
-  onEdit,
-  onDelete,
-}: {
-  isDeleting: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <View style={styles.actionFooter}>
-      <Pressable
-        accessibilityRole="button"
-        style={styles.outlineAction}
-        onPress={onEdit}
-      >
-        <Text style={styles.outlineActionText}>수정하기</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        disabled={isDeleting}
-        style={styles.filledAction}
-        onPress={onDelete}
-      >
-        <Text style={styles.filledActionText}>
-          {isDeleting ? "취소 중" : "취소하기"}
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
-
-function VisitorActions({
-  bandName,
-  isMessaging,
-  onMessage,
-}: {
-  bandName: string;
-  isMessaging: boolean;
-  onMessage: () => void;
-}) {
-  return (
-    <View style={styles.actionFooter}>
-      <Pressable
-        accessibilityRole="button"
-        disabled={isMessaging}
-        style={styles.outlineAction}
-        onPress={onMessage}
-      >
-        <Text style={styles.outlineActionText}>
-          {isMessaging ? "생성 중" : "쪽지 보내기"}
-        </Text>
-      </Pressable>
-      <View style={styles.filledAction}>
-        <Text style={styles.filledActionText}>{bandName} 지원하기</Text>
-      </View>
-    </View>
-  );
-}
-
-function ApplyRecruitmentCard({
-  detail,
-}: {
-  detail: SessionRecruitmentDetailResponse;
-}) {
-  const summaryQuery =
-    useMySessionApplicationSummaryQuery();
-
-  const applyMutation =
-    useApplySessionRecruitmentMutation();
-
-  const applications =
-    summaryQuery.data
-      ?.applications ?? [];
-
-  const [
-    manualSelectedApplicationId,
-    setManualSelectedApplicationId,
-  ] = useState(0);
-
-  const selectedApplicationId =
-    manualSelectedApplicationId ||
-    summaryQuery.data
-      ?.sessionApplicationId ||
-    applications[0]
-      ?.sessionApplicationId ||
-    0;
-
-  const apply =
-    async () => {
-      if (
-        selectedApplicationId <=
-        0
-      ) {
-        Alert.alert(
-          "세션 지원",
-          "지원할 지원서를 선택해 주세요.",
-        );
-
-        return;
-      }
-
-      try {
-        const result =
-          await applyMutation.mutateAsync(
-            {
-              sessionRecruitmentId:
-                detail.sessionRecruitmentId,
-
-              body: {
-                sessionApplicationId:
-                  selectedApplicationId,
-              },
-            },
-          );
-
-        Alert.alert(
-          "세션 지원 완료",
-          `${result.bandName}에 ${result.applicationTitle} 지원서로 지원했어요.`,
-        );
-      } catch {
-        Alert.alert(
-          "세션 지원",
-          "지원서를 제출하지 못했어요.",
-        );
-      }
-    };
-
-  if (
-    summaryQuery.isLoading
-  ) {
-    return (
-      <View style={styles.applyCard}>
-        <Text style={styles.sectionTitle}>세션 지원</Text>
-        <Text style={styles.bodyText}>내 지원서를 불러오는 중이에요.</Text>
-      </View>
-    );
-  }
-
-  if (
-    summaryQuery.isError
-  ) {
-    return (
-      <View style={styles.applyCard}>
-        <Text style={styles.sectionTitle}>세션 지원</Text>
-        <Text style={styles.bodyText}>내 지원서를 불러오지 못했어요.</Text>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.applyPrimaryButton}
-          onPress={() =>
-            void summaryQuery.refetch()
-          }
-        >
-          <Text style={styles.applyPrimaryText}>다시 시도</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (
-    applications.length === 0
-  ) {
-    return (
-      <View style={styles.applyCard}>
-        <Text style={styles.sectionTitle}>세션 지원</Text>
-        <Text style={styles.bodyText}>
-          아직 등록된 지원서가 없어요. 지원서를 먼저 작성해 주세요.
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.applyPrimaryButton}
-          onPress={() =>
-            router.push(
-              "/band/session/applications/form" as Parameters<
-                typeof router.push
-              >[0],
-            )
-          }
-        >
-          <Text style={styles.applyPrimaryText}>지원서 작성하기</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.applyCard}>
-      <Text style={styles.sectionTitle}>세션 지원</Text>
-      <Text style={styles.bodyText}>제출할 지원서를 선택해 주세요.</Text>
-
-      <View style={styles.applicationChips}>
-        {applications.map(
-          (application) => (
-            <Pressable
-              key={
-                application.sessionApplicationId
-              }
-              accessibilityRole="button"
-              style={[
-                styles.applicationChip,
-                selectedApplicationId === application.sessionApplicationId
-                  ? styles.applicationChipSelected
-                  : styles.applicationChipIdle,
-              ]}
-              onPress={() =>
-                setManualSelectedApplicationId(
-                  application.sessionApplicationId,
-                )
-              }
-            >
-              <Text
-                style={[
-                  styles.applicationChipText,
-                  selectedApplicationId === application.sessionApplicationId
-                    ? styles.applicationChipTextSelected
-                    : styles.applicationChipTextIdle,
-                ]}
-              >
-                {application.title}
-              </Text>
-            </Pressable>
-          ),
-        )}
-      </View>
-
-      <View style={styles.applyButtons}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={applyMutation.isPending}
-          style={styles.applyPrimaryButton}
-          onPress={() =>
-            void apply()
-          }
-        >
-          <Text style={styles.applyPrimaryText}>
-            {applyMutation.isPending ? "지원 중" : "지원하기"}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          style={styles.applySecondaryButton}
-          onPress={() =>
-            router.push(
-              "/band/session/applications/manage" as Parameters<
-                typeof router.push
-              >[0],
-            )
-          }
-        >
-          <Text style={styles.applySecondaryText}>지원서 관리</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-const styles =
-  StyleSheet.create({
-    container: {
-      paddingHorizontal: 0,
-      paddingTop: 0,
-      paddingBottom: 104,
-      backgroundColor: colors.white,
-    },
-    stateWrap: {
-      paddingHorizontal: 24,
-      paddingTop: 24,
-    },
-    summarySection: {
-      paddingHorizontal: 32,
-      paddingTop: 16,
-      paddingBottom: 20,
-    },
-    badgeLine: {
-      flexDirection: "row",
-      gap: 6,
-      minHeight: 13,
-      marginBottom: 8,
-    },
-    newBadge: {
-      height: 13,
-      borderRadius: 2,
-      backgroundColor: colors.secondary500,
-      justifyContent: "center",
-      paddingHorizontal: 3,
-    },
-    newBadgeText: {
-      color: colors.white,
-      fontSize: 8,
-      fontWeight: "700",
-      lineHeight: 10,
-    },
-    mineBadge: {
-      height: 13,
-      borderRadius: 2,
-      backgroundColor: colors.secondary100,
-      justifyContent: "center",
-      paddingHorizontal: 5,
-    },
-    mineBadgeText: {
-      color: colors.secondary600,
-      fontSize: 8,
-      fontWeight: "700",
-      lineHeight: 10,
-    },
-    title: {
-      color: colors.neutral900,
-      fontSize: 18,
-      fontWeight: "700",
-      lineHeight: 20,
-    },
-    deadlineRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      marginTop: 6,
-    },
-    deadlineText: {
-      color: colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-    deadlineDivider: {
-      width: 1,
-      height: 14,
-      backgroundColor: colors.neutral300,
-      marginHorizontal: 8,
-    },
-    ddayText: {
-      color: colors.secondary500,
-      fontSize: 12,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-    thickDivider: {
-      height: 2,
-      backgroundColor: colors.neutral400,
-    },
-    contentWrap: {
-      paddingHorizontal: 32,
-    },
-    detailSection: {
-      paddingVertical: 24,
-    },
-    sectionTitle: {
-      color: colors.neutral900,
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-    bodyText: {
-      color: colors.neutral800,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-      marginTop: 12,
-    },
-    sectionDivider: {
-      height: 2,
-      backgroundColor: colors.neutral300,
-      marginHorizontal: -8,
-    },
-    infoRows: {
-      gap: 12,
-      marginTop: 16,
-    },
-    infoRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 32,
-    },
-    infoLabel: {
-      width: 52,
-      color: colors.neutral700,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-    infoValue: {
-      flex: 1,
-      color: colors.neutral800,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-    bandCard: {
-      minHeight: 60,
-      borderRadius: 8,
-      backgroundColor: colors.white,
-      flexDirection: "row",
-      alignItems: "center",
-      marginTop: 12,
-      paddingLeft: 12,
-      paddingRight: 15,
-      paddingVertical: 12,
-      shadowColor: colors.neutral900,
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 0 },
-      elevation: 2,
-    },
-    bandText: {
-      flex: 1,
-      minWidth: 0,
-      marginLeft: 20,
-    },
-    bandName: {
-      color: colors.neutral900,
-      fontSize: 11,
-      fontWeight: "700",
-      lineHeight: 14,
-    },
-    bandMeta: {
-      color: colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-      marginTop: 1,
-    },
-    actionFooter: {
-      backgroundColor: colors.white,
-      flexDirection: "row",
-      gap: 10,
-      paddingHorizontal: 32,
-      paddingTop: 16,
-      paddingBottom: 20,
-      shadowColor: colors.neutral900,
-      shadowOpacity: 0.04,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: -4 },
-      elevation: 2,
-    },
-    outlineAction: {
-      flex: 1,
-      height: 48,
-      borderRadius: 10,
-      borderWidth: 1.5,
-      borderColor: colors.secondary500,
-      backgroundColor: colors.white,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    outlineActionText: {
-      color: colors.secondary500,
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-    filledAction: {
-      flex: 1,
-      height: 48,
-      borderRadius: 10,
-      backgroundColor: colors.secondary500,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 8,
-    },
-    filledActionText: {
-      color: colors.white,
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-      textAlign: "center",
-    },
-    interestButton: {
-      height: 44,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
-      marginHorizontal: 32,
-      marginTop: 12,
-    },
-    interestButtonActive: {
-      borderWidth: 1,
-      borderColor: colors.secondary500,
-      backgroundColor: colors.white,
-    },
-    interestButtonIdle: {
-      backgroundColor: colors.secondary100,
-    },
-    interestButtonText: {
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-    interestButtonTextActive: {
-      color: colors.secondary500,
-    },
-    interestButtonTextIdle: {
-      color: colors.secondary600,
-    },
-    applyCard: {
-      borderRadius: 16,
-      backgroundColor: colors.white,
-      gap: 12,
-      marginHorizontal: 32,
-      marginTop: 16,
-      padding: 18,
-      shadowColor: colors.neutral900,
-      shadowOpacity: 0.08,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 0 },
-      elevation: 2,
-    },
-    applicationChips: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    applicationChip: {
-      minHeight: 28,
-      borderRadius: 999,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-    },
-    applicationChipSelected: {
-      backgroundColor: colors.secondary500,
-    },
-    applicationChipIdle: {
-      backgroundColor: colors.neutral300,
-    },
-    applicationChipText: {
-      fontSize: 11,
-      fontWeight: "700",
-      lineHeight: 14,
-    },
-    applicationChipTextSelected: {
-      color: colors.white,
-    },
-    applicationChipTextIdle: {
-      color: colors.neutral600,
-    },
-    applyButtons: {
-      flexDirection: "row",
-      gap: 10,
-    },
-    applyPrimaryButton: {
-      flex: 1,
-      minHeight: 42,
-      borderRadius: 10,
-      backgroundColor: colors.secondary500,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-    },
-    applyPrimaryText: {
-      color: colors.white,
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-    applySecondaryButton: {
-      flex: 1,
-      minHeight: 42,
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: colors.secondary500,
-      backgroundColor: colors.white,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-    },
-    applySecondaryText: {
-      color: colors.secondary500,
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: colors.white,
+  },
+  header: {
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  headerBack: {
+    position: "absolute",
+    left: 15,
+    top: 12,
+    width: 24,
+    height: 24,
+  },
+  headerTitle: {
+    ...textStyles.body1,
+    color: colors.neutral900,
+  },
+  scroll: {
+    flex: 1,
+  },
+  state: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  stateText: {
+    ...textStyles.caption1,
+    color: colors.neutral500,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: colors.secondary500,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryText: {
+    ...textStyles.caption2,
+    color: colors.white,
+  },
+  summary: {
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 32,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  newBadge: {
+    height: 13,
+    justifyContent: "center",
+    borderRadius: 2,
+    backgroundColor: colors.secondary500,
+    paddingHorizontal: 3,
+  },
+  newBadgeText: {
+    ...textStyles.label4,
+    color: colors.white,
+  },
+  titleGroup: {
+    gap: 2,
+  },
+  title: {
+    ...textStyles.label1,
+    color: colors.neutral900,
+  },
+  deadlineRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  deadlineText: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
+  },
+  deadlineDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: colors.neutral300,
+    marginHorizontal: 8,
+  },
+  ddayText: {
+    ...textStyles.caption2,
+    color: colors.secondary500,
+  },
+  thickDivider: {
+    height: 2,
+    backgroundColor: colors.neutral400,
+  },
+  contentWrap: {
+    paddingHorizontal: 32,
+  },
+  section: {
+    paddingVertical: 24,
+  },
+  sectionLast: {
+    paddingBottom: 32,
+  },
+  sectionTitle: {
+    ...textStyles.body6,
+    color: colors.neutral900,
+  },
+  bodyText: {
+    ...textStyles.caption2,
+    color: colors.neutral800,
+  },
+  sectionDivider: {
+    height: 2,
+    backgroundColor: colors.neutral300,
+    marginHorizontal: -8,
+  },
+  infoRows: {
+    gap: 12,
+  },
+  infoRow: {
+    minHeight: 18,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 32,
+  },
+  infoLabel: {
+    ...textStyles.caption2,
+    width: 52,
+    color: colors.neutral700,
+  },
+  infoValue: {
+    ...textStyles.caption2,
+    flex: 1,
+    minWidth: 0,
+    color: colors.neutral800,
+  },
+  bandCard: {
+    ...shadows.card,
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    paddingLeft: 12,
+    paddingRight: 15,
+    paddingVertical: 12,
+  },
+  bandText: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 20,
+  },
+  bandName: {
+    ...textStyles.caption3,
+    color: colors.neutral900,
+  },
+  bandMeta: {
+    ...textStyles.caption2,
+    marginTop: 1,
+    color: colors.neutral600,
+  },
+  footer: {
+    flexDirection: "row",
+    gap: 10,
+    backgroundColor: colors.white,
+    paddingHorizontal: 32,
+    paddingTop: 16,
+    paddingBottom: 20,
+    boxShadow: "0px -4px 16px 0px rgba(0, 0, 0, 0.04)",
+  },
+  outlineAction: {
+    height: 48,
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: colors.secondary500,
+    borderRadius: 10,
+    backgroundColor: colors.white,
+  },
+  outlineActionText: {
+    ...textStyles.body6,
+    color: colors.secondary500,
+  },
+  filledAction: {
+    height: 48,
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    backgroundColor: colors.secondary500,
+  },
+  filledActionText: {
+    ...textStyles.body6,
+    color: colors.white,
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+  modalError: {
+    color: colors.error,
+  },
+});

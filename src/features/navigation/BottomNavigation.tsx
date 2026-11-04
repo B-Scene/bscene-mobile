@@ -105,6 +105,26 @@ const ACTIVE_COLOR = {
   band: colors.secondary500,
 } as const;
 
+// 웹에서 하단 탭을 표시하지 않는 경로
+const HIDDEN_NAV_PREFIXES = [
+  "/fan/home/notifications",
+  "/band/home/notifications",
+  "/fan/home/concerts/",
+  "/fan/explore/contents/",
+  "/band/live/now",
+  "/band/live/scheduled",
+  "/band/live/room",
+  "/fan/live/room",
+  "/fan/live/replays/",
+  "/band/my/recruit-alert",
+  "/band/my/live-alert",
+  "/band/my/applications",
+  "/band/my/postings",
+  "/band/my/members",
+  "/band/my/profile",
+  "/fan/my/profile",
+];
+
 type BottomNavigationProps = {
   mode: AppMode;
 };
@@ -125,6 +145,15 @@ export function BottomNavigation({
 
   const activeColor =
     ACTIVE_COLOR[mode];
+
+  if (
+    pathname !== "/fan/home/concerts/calendar" &&
+    HIDDEN_NAV_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    )
+  ) {
+    return null;
+  }
 
   return (
     <View

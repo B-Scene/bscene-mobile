@@ -7,8 +7,19 @@ import type {
   FanHomeConcert,
   FanHomeResponse,
   FanPerformanceDetailResponse,
+  FollowingPostsParams,
+  FollowingPostsResponse,
+  NormalizedPerformanceCalendarResponse,
+  NormalizedPerformancesByDateResponse,
   NormalizedUpcomingPerformancesResponse,
   PendingPerformanceParticipationResponse,
+  PerformanceCalendarDateItem,
+  PerformanceCalendarParams,
+  PerformanceCalendarResponse,
+  PerformancesByDateParams,
+  PerformancesByDateResponse,
+  RecommendedPerformancesParams,
+  RecommendedPerformancesResponse,
   UpcomingPerformancesParams,
   UpcomingPerformancesResponse,
 } from "@/types/fan/home";
@@ -118,6 +129,157 @@ export const getUpcomingPerformances = async ({
       totalPages: result.totalPages,
       totalCount,
     }),
+  };
+};
+
+export const getFollowingPosts = async ({
+  cursor,
+  size = 10,
+}: FollowingPostsParams = {}) => {
+  const { data } = await axiosInstance.get<
+    FanApiResponse<FollowingPostsResponse>
+  >("/posts/following", {
+    params: {
+      cursor,
+      size,
+    },
+  });
+
+  return data.result;
+};
+
+export const getRecommendedPerformances = async ({
+  sort = "POPULAR",
+  page = 0,
+  size = 10,
+}: RecommendedPerformancesParams = {}) => {
+  const response = await axiosInstance.get<
+    FanApiResponse<RecommendedPerformancesResponse | FanHomeConcert[] | null>
+  >("/performances/recommend", {
+    params: {
+      sort,
+      page,
+      size,
+    },
+  });
+  const { data } = response;
+
+  if (!data.isSuccess || data.result == null) {
+    throw new AxiosError(
+      data.message,
+      data.code,
+      response.config,
+      response.request,
+      response,
+    );
+  }
+
+  const result = data.result;
+
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      hasNext: false,
+      nextPage: null,
+      page,
+    };
+  }
+
+  const items =
+    result.items ??
+    result.content ??
+    result.performances ??
+    result.upcomingPerformances ??
+    result.data ??
+    result.list ??
+    [];
+  const currentPage = result.page ?? page;
+  const pageSize = result.size ?? result.pageSize ?? size;
+  const totalCount = result.totalCount ?? result.totalElements ?? result.total;
+
+  return {
+    ...result,
+    items,
+    page: currentPage,
+    hasNext: resolveHasNext({
+      explicitHasNext: result.hasNext,
+      page: currentPage,
+      pageSize,
+      totalPages: result.totalPages,
+      totalCount,
+    }),
+  };
+};
+
+export const getPerformanceCalendar = async ({
+  year,
+  month,
+}: PerformanceCalendarParams = {}): Promise<NormalizedPerformanceCalendarResponse> => {
+  const hasYearAndMonth = typeof year === "number" && typeof month === "number";
+  const { data } = await axiosInstance.get<
+    FanApiResponse<PerformanceCalendarResponse | PerformanceCalendarDateItem[]>
+  >("/performances/calendar", {
+    params: hasYearAndMonth
+      ? {
+          year,
+          month,
+        }
+      : undefined,
+  });
+  const result = data.result;
+
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+    };
+  }
+
+  return {
+    items:
+      result.items ??
+      result.dates ??
+      result.performanceDates ??
+      result.calendarDates ??
+      result.days ??
+      [],
+  };
+};
+
+export const getPerformancesByDate = async ({
+  date,
+  page = 0,
+  size = 10,
+}: PerformancesByDateParams = {}): Promise<NormalizedPerformancesByDateResponse> => {
+  const { data } = await axiosInstance.get<
+    FanApiResponse<PerformancesByDateResponse | FanHomeConcert[]>
+  >("/performances/by-date", {
+    params: {
+      date,
+      page,
+      size,
+    },
+  });
+  const result = data.result;
+
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      hasNext: false,
+      nextPage: null,
+      page,
+    };
+  }
+
+  return {
+    ...result,
+    items:
+      result.items ??
+      result.content ??
+      result.performances ??
+      result.data ??
+      result.list ??
+      [],
+    hasNext: result.hasNext ?? false,
   };
 };
 

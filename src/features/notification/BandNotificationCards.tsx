@@ -38,7 +38,7 @@ const getStringField = (
   value: NotificationBandInvite | null | undefined,
   field: string,
 ) => {
-  const fieldValue: unknown = value ? Reflect.get(value, field) : undefined;
+  const fieldValue = value?.[field];
 
   return typeof fieldValue === "string" && fieldValue.length > 0
     ? fieldValue
@@ -49,7 +49,7 @@ const getNumberField = (
   value: NotificationBandInvite | null | undefined,
   field: string,
 ) => {
-  const fieldValue: unknown = value ? Reflect.get(value, field) : undefined;
+  const fieldValue = value?.[field];
 
   return typeof fieldValue === "number" && Number.isFinite(fieldValue)
     ? fieldValue

@@ -1,3 +1,7 @@
+import { activateBandMemberProfile } from "@/api/band/bandManagement";
+import { bandManagementKeys } from "@/hooks/api/band/useBandManagement";
+import { notificationKeys } from "@/hooks/api/notification/useNotification";
+import { myProfilesKeys } from "@/hooks/api/user/useMyProfiles";
 import {
   useInfiniteQuery,
   useMutation,
@@ -495,7 +499,21 @@ export const useFinalizeApplicationSubmissionMutation =
           body,
         ),
 
-      onSuccess: () => {
+      onSuccess: async (
+        result,
+        { body },
+      ) => {
+        if (
+          body.isAccepted &&
+          result?.bandMemberProfileId
+        ) {
+          await activateBandMemberProfile(
+            result.bandMemberProfileId,
+          ).catch(
+            () => undefined,
+          );
+        }
+
         queryClient.invalidateQueries({
           queryKey:
             sessionApplicationKeys.submissions(),
@@ -504,6 +522,21 @@ export const useFinalizeApplicationSubmissionMutation =
         queryClient.invalidateQueries({
           queryKey:
             sessionApplicationKeys.summary(),
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            notificationKeys.all,
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            myProfilesKeys.all,
+        });
+
+        queryClient.invalidateQueries({
+          queryKey:
+            bandManagementKeys.all,
         });
       },
     });

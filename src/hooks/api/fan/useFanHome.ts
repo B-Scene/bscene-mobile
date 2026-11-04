@@ -14,15 +14,36 @@ import {
   deletePerformanceParticipation,
   getFanHome,
   getFanPerformanceDetail,
+  getFollowingPosts,
+  getPerformanceCalendar,
+  getPerformancesByDate,
+  getRecommendedPerformances,
   getPendingPerformanceParticipation,
   getUpcomingPerformances,
   setPerformanceAlarm,
 } from "@/api/fan/home";
-import type { UpcomingPerformanceSort } from "@/types/fan/home";
+import type {
+  PerformanceCalendarParams,
+  PerformancesByDateParams,
+  RecommendedPerformanceSort,
+  UpcomingPerformanceSort,
+} from "@/types/fan/home";
 
 export const fanHomeKeys = {
   all: ["fanHome"] as const,
   main: () => [...fanHomeKeys.all, "main"] as const,
+  followingPosts: (size: number) =>
+    [...fanHomeKeys.all, "followingPosts", size] as const,
+  recommendedPerformances: (sort: RecommendedPerformanceSort, size: number) =>
+    [...fanHomeKeys.all, "recommendedPerformances", sort, size] as const,
+  recommendedPerformancesLists: () =>
+    [...fanHomeKeys.all, "recommendedPerformances"] as const,
+  performanceCalendar: ({ year, month }: PerformanceCalendarParams) =>
+    [...fanHomeKeys.all, "performanceCalendar", year ?? null, month ?? null] as const,
+  performancesByDate: (date: string | undefined, size: number) =>
+    [...fanHomeKeys.all, "performancesByDate", date ?? null, size] as const,
+  performancesByDateLists: () =>
+    [...fanHomeKeys.all, "performancesByDate"] as const,
   upcomingPerformances: (sort: UpcomingPerformanceSort, size: number) =>
     [...fanHomeKeys.all, "upcomingPerformances", sort, size] as const,
   upcomingPerformancesLists: () =>
@@ -45,6 +66,12 @@ export const invalidatePerformanceInterestQueries = (
     queryClient.invalidateQueries({
       queryKey: fanHomeKeys.upcomingPerformancesLists(),
     }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.recommendedPerformancesLists(),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: fanHomeKeys.performancesByDateLists(),
+    }),
   ]);
 };
 
@@ -52,6 +79,21 @@ export const useFanHomeQuery = () => {
   return useQuery({
     queryKey: fanHomeKeys.main(),
     queryFn: getFanHome,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const useFollowingPostsInfiniteQuery = (size = 10) => {
+  return useInfiniteQuery({
+    queryKey: fanHomeKeys.followingPosts(size),
+    queryFn: ({ pageParam }) =>
+      getFollowingPosts({
+        cursor: pageParam,
+        size,
+      }),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
     staleTime: 1000 * 30,
   });
 };
@@ -135,6 +177,61 @@ export const useDeletePerformanceInterest = () => {
     mutationFn: deletePerformanceInterest,
     onSuccess: (_result, performanceId) =>
       invalidatePerformanceInterestQueries(queryClient, performanceId),
+  });
+};
+
+export const useRecommendedPerformancesInfiniteQuery = (
+  sort: RecommendedPerformanceSort = "POPULAR",
+  size = 10,
+  enabled = true,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanHomeKeys.recommendedPerformances(sort, size),
+    queryFn: ({ pageParam }) =>
+      getRecommendedPerformances({
+        sort,
+        page: pageParam,
+        size,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => {
+      if (!lastPage.hasNext) return undefined;
+      return lastPage.nextPage ?? pages.length;
+    },
+    enabled,
+    staleTime: 1000 * 30,
+  });
+};
+
+export const usePerformanceCalendarQuery = (
+  params: PerformanceCalendarParams = {},
+) => {
+  return useQuery({
+    queryKey: fanHomeKeys.performanceCalendar(params),
+    queryFn: () => getPerformanceCalendar(params),
+    staleTime: 1000 * 30,
+  });
+};
+
+export const usePerformancesByDateInfiniteQuery = (
+  params: Omit<PerformancesByDateParams, "page" | "size"> = {},
+  size = 10,
+) => {
+  return useInfiniteQuery({
+    queryKey: fanHomeKeys.performancesByDate(params.date, size),
+    queryFn: ({ pageParam }) =>
+      getPerformancesByDate({
+        ...params,
+        page: pageParam,
+        size,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => {
+      if (!lastPage.hasNext) return undefined;
+      return lastPage.nextPage ?? pages.length;
+    },
+    enabled: Boolean(params.date),
+    staleTime: 1000 * 30,
   });
 };
 

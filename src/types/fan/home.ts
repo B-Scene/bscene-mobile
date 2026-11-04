@@ -228,10 +228,62 @@ export interface FanHomeResponse {
   popularConcerts?: FanHomeConcert[];
 }
 
+export type FollowingPostMediaType = "IMAGE" | "VIDEO" | string;
+
+export interface FollowingPostItem {
+  postId?: number;
+  id?: number | string;
+  bandId?: number;
+  bandName?: string;
+  bandProfileImageUrl?: string | null;
+  bandImageUrl?: string | null;
+  bandProfileUrl?: string | null;
+  bandLogoUrl?: string | null;
+  profileImageUrl?: string | null;
+  avatarUrl?: string | null;
+  logoUrl?: string | null;
+  genre?: string | null;
+  region?: string | null;
+  title?: string | null;
+  content?: string | null;
+  mediaType?: FollowingPostMediaType | null;
+  imageUrl?: string | null;
+  contentImageUrl?: string | null;
+  mainImageUrl?: string | null;
+  mediaUrl?: string[] | string;
+  mediaUrls?: string[] | string;
+  imageUrls?: string[] | string;
+  images?: string[] | string;
+  thumbnailUrl?: string | null;
+  thumbnailImageUrl?: string | null;
+  videoThumbnailUrl?: string | null;
+  tags?: string[];
+  createdAt?: string | null;
+  postedAgo?: number | null;
+}
+
+export interface FollowingPostsParams {
+  cursor?: number;
+  size?: number;
+}
+
+export interface FollowingPostsResponse {
+  items: FollowingPostItem[];
+  hasNext: boolean;
+  nextCursor: number | null;
+}
+
 export type UpcomingPerformanceSort = "IMMINENT" | "LATEST" | "POPULAR";
+export type RecommendedPerformanceSort = "POPULAR" | "IMMINENT";
 
 export interface UpcomingPerformancesParams {
   sort?: UpcomingPerformanceSort;
+  page?: number;
+  size?: number;
+}
+
+export interface RecommendedPerformancesParams {
+  sort?: RecommendedPerformanceSort;
   page?: number;
   size?: number;
 }
@@ -259,4 +311,68 @@ export interface NormalizedUpcomingPerformancesResponse
   items: FanHomeConcert[];
   hasNext: boolean;
   page: number;
+}
+
+export type RecommendedPerformancesResponse = UpcomingPerformancesResponse;
+
+export type PerformanceCalendarParams =
+  | {
+      year?: never;
+      month?: never;
+    }
+  | {
+      year: number;
+      month: number;
+    };
+
+export type PerformanceCalendarDateItem =
+  | string
+  | {
+      date?: string | null;
+      dateKey?: string | null;
+      performanceDate?: string | null;
+      startDate?: string | null;
+      startAt?: string | null;
+      startDateTime?: string | null;
+      year?: number | null;
+      month?: number | null;
+      day?: number | null;
+    };
+
+export interface PerformanceCalendarResponse {
+  items?: PerformanceCalendarDateItem[];
+  dates?: PerformanceCalendarDateItem[];
+  performanceDates?: PerformanceCalendarDateItem[];
+  calendarDates?: PerformanceCalendarDateItem[];
+  days?: PerformanceCalendarDateItem[];
+}
+
+export interface NormalizedPerformanceCalendarResponse {
+  items: PerformanceCalendarDateItem[];
+}
+
+export interface PerformancesByDateParams {
+  date?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface PerformancesByDateResponse {
+  items?: FanHomeConcert[];
+  content?: FanHomeConcert[];
+  performances?: FanHomeConcert[];
+  data?: FanHomeConcert[];
+  list?: FanHomeConcert[];
+  hasNext?: boolean;
+  nextPage?: number | null;
+  page?: number;
+  totalCount?: number;
+  totalElements?: number;
+  total?: number;
+}
+
+export interface NormalizedPerformancesByDateResponse
+  extends PerformancesByDateResponse {
+  items: FanHomeConcert[];
+  hasNext: boolean;
 }

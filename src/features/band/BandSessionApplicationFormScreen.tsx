@@ -1,24 +1,21 @@
-import {
-  router,
-  useLocalSearchParams,
-} from "expo-router";
-import {
-  Plus,
-  Trash2,
-} from "lucide-react-native";
-import {
-  useMemo,
-  useState,
-} from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
+import {
+  SessionChips,
+  SessionCountedTextArea,
+  SessionFormTopBar,
+  SessionSelect,
+  SessionTextInput,
+} from "@/features/session/RecruitmentApplicationFormParts";
 import {
   useCreateSessionApplicationMutation,
   useMySessionApplicationDetailQuery,
@@ -26,9 +23,11 @@ import {
   useUpdateSessionApplicationMutation,
 } from "@/hooks/api/session/useSessionApplication";
 import { AppHeader } from "@/shared/components/AppHeader";
+import { AppIcon } from "@/shared/components/AppIcon";
 import { AppState } from "@/shared/components/AppState";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
-import { colors } from "@/shared/constants/theme";
+import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import type {
   CreateSessionApplicationRequest,
   MySessionApplicationDetailResponse,
@@ -451,6 +450,16 @@ function BandSessionApplicationForm({
     initialValues.portfolioLinks,
   );
 
+  const [
+    isCancelModalOpen,
+    setIsCancelModalOpen,
+  ] = useState(false);
+
+  const [
+    isSaveModalOpen,
+    setIsSaveModalOpen,
+  ] = useState(false);
+
   const isDefaultPurpose =
     purpose.trim() === "기본";
 
@@ -766,799 +775,384 @@ function BandSessionApplicationForm({
     createMutation.isPending ||
     updateMutation.isPending;
 
+  const headerTitle = isEdit ? "지원서 수정" : "지원서 작성";
+  const canSubmit = isValid && !isSubmitting;
+
   return (
-    <Screen
-      contentStyle={
-        styles.container
-      }
-    >
-      <AppHeader
-        title={
-          isEdit
-            ? "지원서 수정"
-            : "지원서 작성"
-        }
+    <Screen scroll={false} contentStyle={styles.container}>
+      <SessionFormTopBar
+        title={headerTitle}
+        onBack={() => setIsCancelModalOpen(true)}
+        onClose={() => setIsCancelModalOpen(true)}
       />
 
-      <FormField
-        label="지원서 유형"
-        required
-        value={purpose}
-        placeholder="지원서 유형을 입력해 주세요"
-        maxLength={20}
-        editable={
-          !isDefaultPurpose
-        }
-        onChangeText={
-          setPurpose
-        }
-      />
-
-      {isDefaultPurpose ? (
-        <Text
-          style={styles.helper}
-        >
-          기본 지원서의 유형은 변경할 수
-          없어요.
-        </Text>
-      ) : null}
-
-      <FormField
-        label="지원서 제목"
-        required
-        value={title}
-        placeholder="지원서 제목을 입력해 주세요"
-        maxLength={50}
-        onChangeText={
-          setTitle
-        }
-      />
-
-      <FormField
-        label="지원서 한줄 소개"
-        required
-        value={oneLineIntro}
-        placeholder="지원서 목록에 표시될 짧은 소개를 입력해 주세요 (최대 50자)"
-        maxLength={50}
-        onChangeText={
-          setOneLineIntro
-        }
-      />
-
-      <View style={styles.fieldBlock}>
-        <FieldLabel label="소개글" required />
-
-        <TextInput
-          value={intro}
-          onChangeText={
-            setIntro
-          }
-          multiline
-          maxLength={500}
-          textAlignVertical="top"
-          placeholder="활동 경력과 스타일을 소개해 주세요"
-          placeholderTextColor={
-            colors.neutral500
-          }
-          style={
-            styles.textArea
-          }
-        />
-
-        <Text
-          style={
-            styles.countText
-          }
-        >
-          {intro.length}/500
-        </Text>
-      </View>
-
-      <ChoiceSection
-        title="파트"
-        options={
-          PART_OPTIONS
-        }
-        value={part}
-        onSelect={
-          setPart
-        }
-      />
-
-      <ChoiceSection
-        title="실력대"
-        options={
-          SKILL_OPTIONS
-        }
-        value={skillLevel}
-        onSelect={
-          setSkillLevel
-        }
-      />
-
-      <ChoiceSection
-        title="선호 장르"
-        options={
-          GENRE_OPTIONS
-        }
-        value={genre}
-        onSelect={
-          setGenre
-        }
-      />
-
-      <ChoiceSection
-        title="활동 지역"
-        options={
-          REGION_OPTIONS
-        }
-        value={region}
-        onSelect={
-          setRegion
-        }
-      />
-
-      <View style={styles.fieldBlock}>
-        <FieldLabel
-          label="가능한 활동 (복수 선택 가능)"
-          required
-        />
-
-        <View
-          style={styles.chips}
-        >
-          {ACTIVITY_OPTIONS.map(
-            (activity) => (
-              <OptionPill
-                key={activity}
-                label={activity}
-                selected={
-                  activities.includes(
-                    activity,
-                  )
-                }
-                onPress={() =>
-                  toggleActivity(
-                    activity,
-                  )
-                }
-              />
-            ),
-          )}
-        </View>
-      </View>
-
-      <View style={styles.fieldBlock}>
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            경력
-          </Text>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={
-              addCareer
-            }
-            style={
-              styles.addButton
-            }
-          >
-            <Plus
-              size={18}
-              color={
-                colors.primary600
-              }
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.form}
+      >
+        <View style={styles.fields}>
+          <Field label="지원서 유형" required>
+            <SessionTextInput
+              value={purpose}
+              editable={!isDefaultPurpose}
+              maxLength={20}
+              placeholder="지원서 유형을 입력해 주세요"
+              style={isDefaultPurpose && styles.inputLocked}
+              onChangeText={setPurpose}
             />
+          </Field>
 
-            <Text
-              style={
-                styles.addButtonText
+          <Field label="지원서 제목" required>
+            <SessionTextInput
+              value={title}
+              maxLength={50}
+              placeholder="지원서 제목을 입력해 주세요"
+              onChangeText={setTitle}
+            />
+          </Field>
+
+          <Field label="지원서 한줄 소개" required>
+            <SessionTextInput
+              value={oneLineIntro}
+              maxLength={50}
+              placeholder="지원서 목록에 표시될 짧은 소개를 입력해 주세요 (최대 50자)"
+              onChangeText={setOneLineIntro}
+            />
+          </Field>
+
+          <Field label="소개글" required>
+            <SessionCountedTextArea
+              value={intro}
+              height={72}
+              maxLength={500}
+              placeholder="활동 경력과 스타일을 소개해 주세요"
+              onChangeText={setIntro}
+            />
+          </Field>
+
+          <Field label="파트" required>
+            <SessionChips
+              options={PART_OPTIONS}
+              isSelected={(option) =>
+                part === option || (option === "etc." && part === "etc")
               }
-            >
-              추가
-            </Text>
-          </Pressable>
-        </View>
+              onPress={setPart}
+            />
+          </Field>
 
-        {careers.length ===
-        0 ? (
-          <Text
-            style={styles.helper}
-          >
-            경력이 있다면 추가해 주세요.
-          </Text>
-        ) : (
-          careers.map(
-            (
-              career,
-              index,
-            ) => (
-              <View
-                key={career.id}
-                style={
-                  styles.repeatCard
-                }
-              >
-                <View
-                  style={
-                    styles.repeatHeader
-                  }
-                >
-                  <Text
-                    style={
-                      styles.repeatTitle
-                    }
-                  >
-                    경력 {index + 1}
-                  </Text>
+          <Field label="실력대" required>
+            <SessionChips
+              options={SKILL_OPTIONS}
+              isSelected={(option) => skillLevel === option}
+              onPress={setSkillLevel}
+            />
+          </Field>
 
+          <Field label="선호 장르" required zIndex={3}>
+            <SessionSelect
+              value={genre === "etc" ? "etc." : genre}
+              options={GENRE_OPTIONS}
+              placeholder="장르 선택"
+              onChange={setGenre}
+            />
+          </Field>
+
+          <Field label="활동 지역" required zIndex={2}>
+            <SessionSelect
+              value={region}
+              options={REGION_OPTIONS}
+              placeholder="지역 선택"
+              onChange={setRegion}
+            />
+          </Field>
+
+          <Field label="가능한 활동 (복수 선택 가능)" required>
+            <SessionChips
+              options={ACTIVITY_OPTIONS}
+              isSelected={(option) => activities.includes(option)}
+              onPress={toggleActivity}
+            />
+          </Field>
+
+          <Field label="경력">
+            <View style={styles.repeatList}>
+              {careers.map((career) => (
+                <View key={career.id} style={styles.careerCard}>
                   <Pressable
-                    hitSlop={10}
-                    onPress={() =>
-                      removeCareer(
-                        career.id,
-                      )
-                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="경력 삭제"
+                    hitSlop={6}
+                    style={styles.careerDelete}
+                    onPress={() => removeCareer(career.id)}
                   >
-                    <Trash2
-                      size={18}
-                      color={
-                        colors.error
+                    <AppIcon name="sessionDelete" size={20} />
+                  </Pressable>
+
+                  <Field label="경력명" required>
+                    <SessionTextInput
+                      value={career.name}
+                      placeholder="밴드 드러머 활동"
+                      style={styles.inputWithAction}
+                      onChangeText={(value) =>
+                        updateCareer(career.id, "name", value)
                       }
                     />
-                  </Pressable>
+                  </Field>
+
+                  <Field label="기간" required>
+                    <SessionTextInput
+                      value={career.period}
+                      placeholder="2026.01 - 현재"
+                      onChangeText={(value) =>
+                        updateCareer(career.id, "period", value)
+                      }
+                    />
+                  </Field>
+
+                  <Field label="상세 내용">
+                    <SessionTextInput
+                      multiline
+                      value={career.description}
+                      placeholder="활동 내용을 입력해 주세요"
+                      style={styles.careerTextArea}
+                      onChangeText={(value) =>
+                        updateCareer(career.id, "description", value)
+                      }
+                    />
+                  </Field>
                 </View>
+              ))}
 
-                <FormField
-                  label="활동명"
-                  value={
-                    career.name
-                  }
-                  placeholder="밴드 또는 활동명"
-                  onChangeText={(
-                    value,
-                  ) =>
-                    updateCareer(
-                      career.id,
-                      "name",
-                      value,
-                    )
-                  }
-                />
+              <AddButton label="+ 경력 추가" onPress={addCareer} />
+            </View>
+          </Field>
 
-                <FormField
-                  label="활동 기간"
-                  value={
-                    career.period
-                  }
-                  placeholder="예: 2024.03 ~ 2025.02"
-                  onChangeText={(
-                    value,
-                  ) =>
-                    updateCareer(
-                      career.id,
-                      "period",
-                      value,
-                    )
-                  }
-                />
+          <Field label="포트폴리오">
+            <View style={styles.portfolioList}>
+              {portfolioLinks.map((link, index) => (
+                <View key={`portfolio-${index}`}>
+                  <SessionTextInput
+                    value={link}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    placeholder="YouTube 또는 영상 링크를 첨부해 주세요"
+                    style={styles.inputWithAction}
+                    onChangeText={(value) => updatePortfolioLink(index, value)}
+                  />
 
-                <FormField
-                  label="설명"
-                  value={
-                    career.description
-                  }
-                  placeholder="담당 역할이나 활동 내용을 입력해 주세요"
-                  onChangeText={(
-                    value,
-                  ) =>
-                    updateCareer(
-                      career.id,
-                      "description",
-                      value,
-                    )
-                  }
-                />
-              </View>
-            ),
-          )
-        )}
-      </View>
+                  {portfolioLinks.length > 1 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${index + 1}번째 포트폴리오 삭제`}
+                      hitSlop={6}
+                      style={styles.portfolioDelete}
+                      onPress={() => removePortfolioLink(index)}
+                    >
+                      <AppIcon name="sessionDelete" size={16} />
+                    </Pressable>
+                  ) : null}
+                </View>
+              ))}
 
-      <View style={styles.fieldBlock}>
-        <View
-          style={
-            styles.sectionHeader
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            포트폴리오
-          </Text>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={
-              addPortfolioLink
-            }
-            style={
-              styles.addButton
-            }
-          >
-            <Plus
-              size={18}
-              color={
-                colors.primary600
-              }
-            />
-
-            <Text
-              style={
-                styles.addButtonText
-              }
-            >
-              추가
-            </Text>
-          </Pressable>
+              <AddButton label="+ 포트폴리오 추가" onPress={addPortfolioLink} />
+            </View>
+          </Field>
         </View>
 
-        {portfolioLinks.map(
-          (
-            link,
-            index,
-          ) => (
-            <View
-              key={`portfolio-${index}`}
-              style={
-                styles.portfolioRow
-              }
-            >
-              <View
-                style={
-                  styles.portfolioInput
-                }
-              >
-                <FormField
-                  label={`링크 ${index + 1}`}
-                  value={link}
-                  placeholder="https://"
-                  autoCapitalize="none"
-                  keyboardType="url"
-                  onChangeText={(
-                    value,
-                  ) =>
-                    updatePortfolioLink(
-                      index,
-                      value,
-                    )
-                  }
-                />
-              </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={!canSubmit}
+          style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
+          onPress={() => {
+            if (isEdit) {
+              setIsSaveModalOpen(true);
+              return;
+            }
 
-              <Pressable
-                hitSlop={10}
-                style={
-                  styles.portfolioDelete
-                }
-                onPress={() =>
-                  removePortfolioLink(
-                    index,
-                  )
-                }
-              >
-                <Trash2
-                  size={19}
-                  color={
-                    colors.error
-                  }
-                />
-              </Pressable>
-            </View>
-          ),
-        )}
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={
-          !isValid ||
-          isSubmitting
-        }
-        style={[
-          styles.submitButton,
-          (!isValid || isSubmitting) &&
-            styles.submitButtonDisabled,
-        ]}
-        onPress={() =>
-          void submit()
-        }
-      >
-        <Text
-          style={[
-            styles.submitButtonText,
-            (!isValid || isSubmitting) &&
-              styles.submitButtonTextDisabled,
-          ]}
+            void submit();
+          }}
         >
-          {isSubmitting
-            ? "저장 중..."
-            : isEdit
-              ? "지원서 저장"
-              : "지원서 등록"}
-        </Text>
-      </Pressable>
+          <Text
+            style={[styles.submitText, !canSubmit && styles.submitTextDisabled]}
+          >
+            {isSubmitting
+              ? "저장 중..."
+              : isEdit
+                ? "지원서 저장"
+                : "지원서 등록"}
+          </Text>
+        </Pressable>
+      </ScrollView>
+
+      <ConfirmModal
+        open={isCancelModalOpen}
+        tone="orange"
+        title={
+          isEdit ? "지원서 수정을 취소할까요?" : "지원서 작성을 취소할까요?"
+        }
+        description={"입력한 내용은 저장되지 않고\n사라집니다."}
+        onCancel={() => setIsCancelModalOpen(false)}
+        onConfirm={() => {
+          setIsCancelModalOpen(false);
+          router.back();
+        }}
+      />
+
+      <ConfirmModal
+        open={isSaveModalOpen}
+        tone="orange"
+        title="지원서를 저장할까요?"
+        description={"수정한 내용으로\n지원서를 저장해요."}
+        onCancel={() => setIsSaveModalOpen(false)}
+        onConfirm={() => {
+          setIsSaveModalOpen(false);
+          void submit();
+        }}
+      />
     </Screen>
   );
 }
 
-function FormField({
+function Field({
   label,
   required = false,
-  value,
-  placeholder,
-  maxLength,
-  editable = true,
-  autoCapitalize,
-  keyboardType,
-  onChangeText,
+  zIndex,
+  children,
 }: {
   label: string;
   required?: boolean;
-  value: string;
-  placeholder: string;
-  maxLength?: number;
-  editable?: boolean;
-  autoCapitalize?: "none" | "sentences" | "words" | "characters";
-  keyboardType?: "default" | "email-address" | "numeric" | "phone-pad" | "url";
-  onChangeText: (value: string) => void;
+  zIndex?: number;
+  children: ReactNode;
 }) {
   return (
-    <View style={styles.fieldBlock}>
-      <FieldLabel label={label} required={required} />
-      <TextInput
-        value={value}
-        editable={editable}
-        placeholder={placeholder}
-        placeholderTextColor={colors.neutral500}
-        maxLength={maxLength}
-        autoCapitalize={autoCapitalize}
-        keyboardType={keyboardType}
-        style={[
-          styles.input,
-          !editable && styles.inputLocked,
-        ]}
-        onChangeText={onChangeText}
-      />
-    </View>
-  );
-}
-
-function FieldLabel({
-  label,
-  required = false,
-}: {
-  label: string;
-  required?: boolean;
-}) {
-  return (
-    <View style={styles.labelRow}>
-      <Text style={styles.label}>{label}</Text>
-      {required ? (
-        <Text style={styles.requiredMark}>*</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function ChoiceSection({
-  title,
-  options,
-  value,
-  onSelect,
-}: {
-  title: string;
-  options: string[];
-  value: string;
-  onSelect: (
-    value: string,
-  ) => void;
-}) {
-  return (
-    <View style={styles.fieldBlock}>
-      <FieldLabel label={title} required />
-
-      <View
-        style={styles.chips}
-      >
-        {options.map(
-          (option) => (
-            <OptionPill
-              key={option}
-              label={option}
-              selected={
-                value === option ||
-                (
-                  option ===
-                    "etc." &&
-                  value === "etc"
-                )
-              }
-              onPress={() =>
-                onSelect(
-                  option,
-                )
-              }
-            />
-          ),
-        )}
+    <View style={zIndex ? { zIndex } : undefined}>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>{label}</Text>
+        {required ? <Text style={styles.requiredMark}>*</Text> : null}
       </View>
+      {children}
     </View>
   );
 }
 
-function OptionPill({
+function AddButton({
   label,
-  selected,
   onPress,
 }: {
   label: string;
-  selected: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
-      style={[
-        styles.optionPill,
-        selected
-          ? styles.optionPillSelected
-          : styles.optionPillIdle,
-      ]}
+      style={styles.addButton}
       onPress={onPress}
     >
-      <Text
-        style={[
-          styles.optionPillText,
-          selected
-            ? styles.optionPillTextSelected
-            : styles.optionPillTextIdle,
-        ]}
-      >
-        {label}
-      </Text>
+      <Text style={styles.addButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    container: {
-      gap: 12,
-      paddingHorizontal: 32,
-      paddingTop: 12,
-      paddingBottom: 32,
-      backgroundColor: colors.white,
-    },
-
-    fieldBlock: {
-      gap: 6,
-    },
-
-    labelRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-
-    label: {
-      color:
-        colors.neutral900,
-      fontSize: 15,
-      fontWeight: "700",
-      lineHeight: 20,
-    },
-
-    requiredMark: {
-      color: colors.error,
-      fontSize: 15,
-      fontWeight: "700",
-      lineHeight: 20,
-      marginLeft: 4,
-    },
-
-    input: {
-      height: 52,
-      borderWidth: 1,
-      borderColor: colors.neutral400,
-      borderRadius: 5,
-      backgroundColor: colors.white,
-      color: colors.neutral900,
-      fontSize: 13,
-      fontWeight: "500",
-      lineHeight: 18,
-      paddingHorizontal: 16,
-    },
-
-    inputLocked: {
-      backgroundColor: colors.neutral200,
-      color: colors.neutral600,
-    },
-
-    textArea: {
-      height: 72,
-      borderWidth: 1,
-      borderColor:
-        colors.neutral400,
-      borderRadius: 5,
-      backgroundColor:
-        colors.white,
-      color:
-        colors.neutral900,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-      paddingHorizontal: 16,
-      paddingTop: 6,
-      paddingBottom: 20,
-    },
-
-    countText: {
-      color:
-        colors.neutral500,
-      fontSize: 11,
-      textAlign: "right",
-      marginTop: -24,
-      marginRight: 12,
-    },
-
-    helper: {
-      color:
-        colors.neutral500,
-      fontSize: 12,
-      lineHeight: 18,
-    },
-
-    sectionTitle: {
-      color:
-        colors.neutral900,
-      fontSize: 15,
-      fontWeight: "700",
-      lineHeight: 20,
-    },
-
-    sectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent:
-        "space-between",
-      minHeight: 26,
-    },
-
-    chips: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-
-    optionPill: {
-      minHeight: 26,
-      borderRadius: 8,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 15,
-    },
-
-    optionPillSelected: {
-      backgroundColor: colors.secondary500,
-    },
-
-    optionPillIdle: {
-      backgroundColor: colors.neutral300,
-    },
-
-    optionPillText: {
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-
-    optionPillTextSelected: {
-      color: colors.white,
-    },
-
-    optionPillTextIdle: {
-      color: colors.neutral600,
-    },
-
-    addButton: {
-      minHeight: 36,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      paddingHorizontal:
-        8,
-    },
-
-    addButtonText: {
-      color:
-        colors.secondary500,
-      fontSize: 13,
-      fontWeight: "800",
-    },
-
-    repeatCard: {
-      gap: 12,
-      borderTopWidth: 1,
-      borderTopColor:
-        colors.neutral300,
-      paddingTop:
-        12,
-    },
-
-    repeatHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent:
-        "space-between",
-    },
-
-    repeatTitle: {
-      color:
-        colors.neutral800,
-      fontSize: 13,
-      fontWeight: "800",
-    },
-
-    portfolioRow: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: 8,
-    },
-
-    portfolioInput: {
-      flex: 1,
-    },
-
-    portfolioDelete: {
-      width: 44,
-      height: 52,
-      alignItems: "center",
-      justifyContent:
-        "center",
-    },
-
-    submitButton: {
-      height: 52,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: colors.secondary500,
-      marginTop: 8,
-    },
-
-    submitButtonDisabled: {
-      backgroundColor: colors.neutral300,
-    },
-
-    submitButtonText: {
-      color: colors.white,
-      fontSize: 15,
-      fontWeight: "700",
-      lineHeight: 20,
-    },
-
-    submitButtonTextDisabled: {
-      color: colors.neutral600,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: colors.white,
+  },
+  form: {
+    paddingHorizontal: 32,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  fields: {
+    gap: 12,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  label: {
+    ...textStyles.body1,
+    color: colors.neutral900,
+  },
+  requiredMark: {
+    ...textStyles.body1,
+    marginLeft: 4,
+    color: colors.error,
+  },
+  inputLocked: {
+    backgroundColor: colors.neutral200,
+    color: colors.neutral600,
+  },
+  inputWithAction: {
+    paddingRight: 40,
+  },
+  repeatList: {
+    gap: 12,
+  },
+  careerCard: {
+    ...shadows.card,
+    gap: 12,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    padding: 16,
+  },
+  careerDelete: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 1,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  careerTextArea: {
+    height: 80,
+    paddingVertical: 6,
+  },
+  portfolioList: {
+    gap: 8,
+  },
+  portfolioDelete: {
+    position: "absolute",
+    top: 5,
+    right: 12,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addButton: {
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.secondary500,
+    borderRadius: 5,
+    backgroundColor: colors.white,
+  },
+  addButtonText: {
+    ...textStyles.caption2,
+    color: colors.secondary500,
+  },
+  submitButton: {
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: colors.secondary500,
+    marginTop: 20,
+  },
+  submitButtonDisabled: {
+    backgroundColor: colors.neutral300,
+  },
+  submitText: {
+    ...textStyles.body1,
+    color: colors.white,
+  },
+  submitTextDisabled: {
+    color: colors.neutral600,
+  },
+});

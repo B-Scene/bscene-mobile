@@ -69,6 +69,8 @@ export interface LiveReplayItem {
   viewCount: number;
 
   durationSeconds?: number;
+
+  durationSec?: number;
 }
 
 export interface LiveHomeResponse {
@@ -188,6 +190,14 @@ export interface LiveCoPublisher {
   whepUrl: string;
 }
 
+export interface LiveCoHostRequester {
+  userId: number;
+
+  nickname:
+    | string
+    | null;
+}
+
 export interface EnterLiveResponse {
   liveId: number;
 
@@ -237,6 +247,10 @@ export interface EnterLiveResponse {
 
   coPublishers?:
     LiveCoPublisher[];
+
+  coPublisher?:
+    | LiveCoPublisher[]
+    | null;
 }
 
 export interface CreateLiveRequest {
@@ -334,6 +348,9 @@ export interface LiveReservationResponse {
 
   cohostCandidates?:
     LiveReservationCoHostCandidate[];
+
+  coHostCandidates?:
+    LiveReservationCoHostCandidate[];
 }
 
 export interface UpdateLiveReservationRequest {
@@ -349,9 +366,7 @@ export interface UpdateLiveReservationRequest {
 
   scheduledAt: string;
 
-  coHost?: number[];
-
-  cohosts?:
+  coHost?:
     | number[]
     | null;
 }
@@ -372,6 +387,19 @@ export interface LiveChatTicketResponse {
   subprotocol: string;
 
   expiresInSeconds: number;
+}
+
+export interface LiveMemberItem {
+  bandProfileImageUrl: string | null;
+  nickname: string;
+  bandName: string;
+  part: string[];
+  isLeader: boolean;
+  profileImageUrl?: string | null;
+}
+
+export interface LiveMembersResponse {
+  members: LiveMemberItem[];
 }
 
 export interface LiveChatMessage {
