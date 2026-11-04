@@ -135,6 +135,12 @@ const parseId = (
     : 0;
 };
 
+const isCoHostInviteParam = (
+  value?: string,
+) =>
+  value === "1" ||
+  value === "accept";
+
 export function LiveRoomScreen({
   mode,
 }: {
@@ -227,9 +233,17 @@ export function LiveRoomScreen({
     isInvitePending,
     setIsInvitePending,
   ] = useState(
-    params.coHostInvite ===
-      "1",
+    isCoHostInviteParam(
+      params.coHostInvite,
+    ),
   );
+
+  const shouldAutoAcceptInvite =
+    params.coHostInvite ===
+    "accept";
+
+  const autoAcceptStartedRef =
+    useRef(false);
 
   const isEnteringAsCoHostRef =
     useRef(false);
@@ -1117,6 +1131,16 @@ export function LiveRoomScreen({
           Alert.alert(
             "공동 진행 초대",
             "초대를 처리하지 못했어요.",
+            shouldAutoAcceptInvite
+              ? [
+                  {
+                    text: "확인",
+
+                    onPress: () =>
+                      router.back(),
+                  },
+                ]
+              : undefined,
           );
 
           return;
@@ -1159,6 +1183,22 @@ export function LiveRoomScreen({
       }
     };
 
+  useEffect(() => {
+    if (
+      !shouldAutoAcceptInvite ||
+      autoAcceptStartedRef.current
+    ) {
+      return;
+    }
+
+    autoAcceptStartedRef.current =
+      true;
+
+    void respondInvite(
+      true,
+    );
+  });
+
   const sortedMessages =
     useMemo(
       () =>
@@ -1173,6 +1213,24 @@ export function LiveRoomScreen({
         ),
       [messages],
     );
+
+  if (
+    isInvitePending &&
+    shouldAutoAcceptInvite
+  ) {
+    return (
+      <Screen
+        contentStyle={
+          styles.stateContainer
+        }
+      >
+        <AppHeader
+          title="라이브"
+          style={styles.stateHeader}
+        />
+      </Screen>
+    );
+  }
 
   if (isInvitePending) {
     return (

@@ -14,6 +14,22 @@ export interface RegisterPushTokenRequest {
   platform: PushTokenPlatform;
 }
 
+export interface NotificationBandInvite {
+  bandInviteId?: number | null;
+  bandMemberId?: number | null;
+  bandId?: number | null;
+  bandName?: string | null;
+  position?: string | null;
+  part?: string | null;
+  role?: string | null;
+  genre?: string | null;
+  region?: string | null;
+  memberCount?: number | null;
+  profileImageUrl?: string | null;
+  bandProfileImageUrl?: string | null;
+  [key: string]: unknown;
+}
+
 export interface NotificationItem {
   notificationId: number;
   type: string;
@@ -24,6 +40,8 @@ export interface NotificationItem {
   mode?: NotificationSettingsMode | null;
   referenceId?: number | string | null;
   deepLink?: string | null;
+  actionable?: boolean;
+  bandInvite?: NotificationBandInvite | null;
 }
 
 export interface GetNotificationsParams {

@@ -1,3 +1,4 @@
+import type { ReactElement, ReactNode } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppHeader } from "@/shared/components/AppHeader";
@@ -30,7 +31,7 @@ export const isBandNotification = (notification: NotificationItem) => {
   );
 };
 
-const formatNotificationTime = (createdAt: string) => {
+export const formatNotificationTime = (createdAt: string) => {
   const createdDate = new Date(createdAt);
 
   if (Number.isNaN(createdDate.getTime())) {
@@ -103,6 +104,8 @@ export function NotificationList({
   query,
   notifications,
   onPressItem,
+  renderCard,
+  children,
 }: {
   tone: NotificationTone;
   query: {
@@ -115,6 +118,8 @@ export function NotificationList({
   };
   notifications: NotificationItem[];
   onPressItem: (notification: NotificationItem) => void;
+  renderCard?: (notification: NotificationItem) => ReactElement | null;
+  children?: ReactNode;
 }) {
   const { accent, background } = TONES[tone];
 
@@ -160,13 +165,15 @@ export function NotificationList({
               <Text style={styles.footerText}>더 불러오는 중이에요</Text>
             ) : undefined
           }
-          renderItem={({ item }) => (
-            <NotificationCard
-              tone={tone}
-              notification={item}
-              onPress={() => onPressItem(item)}
-            />
-          )}
+          renderItem={({ item }) =>
+            renderCard?.(item) ?? (
+              <NotificationCard
+                tone={tone}
+                notification={item}
+                onPress={() => onPressItem(item)}
+              />
+            )
+          }
           onEndReached={() => {
             if (query.hasNextPage && !query.isFetchingNextPage) {
               void query.fetchNextPage();
@@ -175,6 +182,8 @@ export function NotificationList({
           onEndReachedThreshold={0.35}
         />
       )}
+
+      {children}
     </Screen>
   );
 }

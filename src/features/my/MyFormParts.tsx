@@ -103,22 +103,30 @@ export function SelectField<T extends string>({
   value,
   options,
   placeholder,
+  overlay = false,
+  error = false,
   onChange,
 }: {
   value: T | "";
   options: readonly { value: T; label: string }[];
   placeholder: string;
+  overlay?: boolean;
+  error?: boolean;
   onChange: (value: T) => void;
 }) {
   const [open, setOpen] = useState(false);
   const label = options.find((option) => option.value === value)?.label;
 
   return (
-    <View style={styles.select}>
+    <View style={[styles.select, overlay && styles.selectOverlay]}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        style={[styles.selectButton, open && styles.selectButtonOpen]}
+        style={[
+          styles.selectButton,
+          error && styles.selectButtonError,
+          open && styles.selectButtonOpen,
+        ]}
         onPress={() => setOpen((prev) => !prev)}
       >
         <Text style={[styles.selectText, !label && styles.selectPlaceholder]}>
@@ -132,7 +140,7 @@ export function SelectField<T extends string>({
       </Pressable>
 
       {open ? (
-        <View style={styles.selectMenu}>
+        <View style={[styles.selectMenu, overlay && styles.selectMenuOverlay]}>
           {options.map((option) => (
             <Pressable
               key={option.value}
@@ -334,6 +342,17 @@ const styles = StyleSheet.create({
   select: {
     gap: 4,
   },
+  selectOverlay: {
+    zIndex: 10,
+  },
+  selectMenuOverlay: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    zIndex: 10,
+  },
   selectButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -343,6 +362,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 5,
+  },
+  selectButtonError: {
+    borderColor: colors.error,
   },
   selectButtonOpen: {
     borderColor: colors.secondary500,

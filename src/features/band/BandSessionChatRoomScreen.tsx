@@ -4,9 +4,6 @@ import {
   useLocalSearchParams,
 } from "expo-router";
 import {
-  Send,
-} from "lucide-react-native";
-import {
   useCallback,
   useEffect,
   useRef,
@@ -21,6 +18,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SvgXml } from "react-native-svg";
 
 import {
   sessionChatKeys,
@@ -29,13 +27,13 @@ import {
   useSessionDirectMessageSocket,
 } from "@/hooks/api/session/useSessionChat";
 import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { ConfirmModal } from "@/shared/components/ConfirmModal";
+import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import {
   colors,
-  radius,
-  spacing,
+  textStyles,
 } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type {
@@ -44,6 +42,8 @@ import type {
   DirectMessageErrorFrame,
   DirectMessageReadData,
 } from "@/types/session/sessionChat";
+
+const LEAVE_ICON_XML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 12C4 12.2652 4.10536 12.5196 4.29289 12.7071C4.48043 12.8946 4.73478 13 5 13H12.59L10.29 15.29C10.1963 15.383 10.1219 15.4936 10.0711 15.6154C10.0203 15.7373 9.9942 15.868 9.9942 16C9.9942 16.132 10.0203 16.2627 10.0711 16.3846C10.1219 16.5064 10.1963 16.617 10.29 16.71C10.383 16.8037 10.4936 16.8781 10.6154 16.9289C10.7373 16.9797 10.868 17.0058 11 17.0058C11.132 17.0058 11.2627 16.9797 11.3846 16.9289C11.5064 16.8781 11.617 16.8037 11.71 16.71L15.71 12.71C15.801 12.6149 15.8724 12.5028 15.92 12.38C16.02 12.1365 16.02 11.8635 15.92 11.62C15.8724 11.4972 15.801 11.3851 15.71 11.29L11.71 7.29C11.6168 7.19676 11.5061 7.1228 11.3842 7.07234C11.2624 7.02188 11.1319 6.99591 11 6.99591C10.8681 6.99591 10.7376 7.02188 10.6158 7.07234C10.4939 7.1228 10.3832 7.19676 10.29 7.29C10.1968 7.38324 10.1228 7.49393 10.0723 7.61575C10.0219 7.73757 9.99591 7.86814 9.99591 8C9.99591 8.13186 10.0219 8.26243 10.0723 8.38425C10.1228 8.50607 10.1968 8.61676 10.29 8.71L12.59 11H5C4.73478 11 4.48043 11.1054 4.29289 11.2929C4.10536 11.4804 4 11.7348 4 12ZM17 2H7C6.20435 2 5.44129 2.31607 4.87868 2.87868C4.31607 3.44129 4 4.20435 4 5V8C4 8.26522 4.10536 8.51957 4.29289 8.70711C4.48043 8.89464 4.73478 9 5 9C5.26522 9 5.51957 8.89464 5.70711 8.70711C5.89464 8.51957 6 8.26522 6 8V5C6 4.73478 6.10536 4.48043 6.29289 4.29289C6.48043 4.10536 6.73478 4 7 4H17C17.2652 4 17.5196 4.10536 17.7071 4.29289C17.8946 4.48043 18 4.73478 18 5V19C18 19.2652 17.8946 19.5196 17.7071 19.7071C17.5196 19.8946 17.2652 20 17 20H7C6.73478 20 6.48043 19.8946 6.29289 19.7071C6.10536 19.5196 6 19.2652 6 19V16C6 15.7348 5.89464 15.4804 5.70711 15.2929C5.51957 15.1054 5.26522 15 5 15C4.73478 15 4.48043 15.1054 4.29289 15.2929C4.10536 15.4804 4 15.7348 4 16V19C4 19.7956 4.31607 20.5587 4.87868 21.1213C5.44129 21.6839 6.20435 22 7 22H17C17.7956 22 18.5587 21.6839 19.1213 21.1213C19.6839 20.5587 20 19.7956 20 19V5C20 4.20435 19.6839 3.44129 19.1213 2.87868C18.5587 2.31607 17.7956 2 17 2Z" fill="#141414"/></svg>`;
 
 interface LocalChatMessage
   extends ChatMessageItem {
@@ -184,6 +184,16 @@ export function BandSessionChatRoomScreen() {
     messageInput,
     setMessageInput,
   ] = useState("");
+
+  const [
+    isLeaveModalOpen,
+    setIsLeaveModalOpen,
+  ] = useState(false);
+
+  const [
+    isInputFocused,
+    setIsInputFocused,
+  ] = useState(false);
 
   const listRef =
     useRef<
@@ -686,223 +696,114 @@ export function BandSessionChatRoomScreen() {
     setMessageInput("");
   };
 
-  const leaveRoom = () => {
+  const leaveRoom = async () => {
     if (!room) {
       return;
     }
 
-    Alert.alert(
-      "쪽지창 나가기",
-      "나가기를 하면 대화 내용이 쪽지함에서도 삭제될 수 있어요. 나갈까요?",
-      [
-        {
-          text: "취소",
-          style: "cancel",
-        },
+    try {
+      socket.close();
 
-        {
-          text: "나가기",
-          style: "destructive",
+      await leaveMutation.mutateAsync(
+        room.chatRoomId,
+      );
 
-          onPress: () => {
-            void (async () => {
-              try {
-                socket.close();
+      setIsLeaveModalOpen(false);
 
-                await leaveMutation.mutateAsync(
-                  room.chatRoomId,
-                );
-
-                router.replace(
-                  "/band/session/messages" as Parameters<
-                    typeof router.replace
-                  >[0],
-                );
-              } catch {
-                Alert.alert(
-                  "쪽지창 나가기",
-                  "쪽지창을 나가지 못했어요. 다시 시도해 주세요.",
-                );
-              }
-            })();
-          },
-        },
-      ],
-    );
+      router.replace(
+        "/band/session/messages" as Parameters<
+          typeof router.replace
+        >[0],
+      );
+    } catch {
+      Alert.alert(
+        "쪽지창 나가기",
+        "쪽지창을 나가지 못했어요. 다시 시도해 주세요.",
+      );
+    }
   };
 
   if (chatRoomId <= 0) {
     return (
       <Screen
+        edges={["top", "left", "right"]}
         scroll={false}
-        contentStyle={
-          styles.container
-        }
+        contentStyle={styles.container}
       >
-        <AppHeader title="쪽지" />
+        <AppHeader title="쪽지" style={styles.header} />
 
-        <AppState
-          title="쪽지방 정보를 찾을 수 없어요"
-          description="쪽지함으로 돌아가 다시 선택해 주세요."
-        />
+        <View style={styles.stateWrap}>
+          <Text style={styles.stateText}>
+            쪽지방 정보를 찾을 수 없어요.
+          </Text>
+        </View>
       </Screen>
     );
   }
 
+  const canSubmit =
+    Boolean(room?.canSend) &&
+    socket.isConnected &&
+    messageInput.trim().length > 0;
+
   return (
     <Screen
+      edges={["top", "left", "right"]}
       scroll={false}
       contentStyle={styles.container}
     >
       <AppHeader
-        title={
-          room?.opponentName ?? "쪽지"
-        }
+        title={room?.opponentName ?? "쪽지"}
+        style={styles.header}
         rightContent={
           room ? (
             <Pressable
-              hitSlop={12}
-              onPress={leaveRoom}
+              accessibilityRole="button"
+              accessibilityLabel="쪽지창 나가기"
+              hitSlop={8}
+              onPress={() => setIsLeaveModalOpen(true)}
             >
-              <Text
-                style={
-                  styles.leaveText
-                }
-              >
-                나가기
-              </Text>
+              <SvgXml xml={LEAVE_ICON_XML} width={24} height={24} />
             </Pressable>
           ) : null
         }
       />
 
       {query.isLoading ? (
-        <AppState
-          loading
-          title="대화를 불러오는 중이에요"
-        />
+        <View style={styles.stateWrap}>
+          <Text style={styles.stateText}>쪽지를 불러오고 있어요</Text>
+        </View>
       ) : query.isError || !room ? (
-        <AppState
-          title="대화를 불러오지 못했어요"
-          description="삭제된 대화이거나 네트워크 연결이 불안정할 수 있어요."
-          actionLabel="다시 시도"
-          onAction={() =>
-            void query.refetch()
-          }
-        />
+        <View style={styles.stateWrap}>
+          <Text style={styles.stateText}>쪽지 내용을 불러오지 못했어요</Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.retryButton}
+            onPress={() => void query.refetch()}
+          >
+            <Text style={styles.retryText}>다시 시도</Text>
+          </Pressable>
+        </View>
       ) : (
         <>
-          <View style={styles.opponentCard}>
-            <Avatar
-              imageUrl={
-                room.opponentProfileImageUrl
-              }
-              label={
-                room.opponentName
-              }
-              size={42}
-            />
-
-            <View
-              style={
-                styles.opponentInfo
-              }
-            >
-              <Text
-                style={
-                  styles.opponentName
-                }
-              >
-                {room.opponentName}
+          {!socket.isConnected ? (
+            <View style={styles.connectionRow}>
+              <Text style={styles.connectionText}>
+                {socket.lastErrorMessage || "실시간 연결 중..."}
               </Text>
-
-              <Text
-                style={
-                  styles.opponentMeta
-                }
-              >
-                {[
-                  room.part,
-                  room.genre,
-                  room.region,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </Text>
-            </View>
-
-            {!room.canSend ? (
-              <Text style={styles.closedBadge}>대화 종료</Text>
-            ) : null}
-          </View>
-
-          <View
-            style={
-              styles.connectionRow
-            }
-          >
-            <View
-              style={[
-                styles.connectionDot,
-                socket.isConnected
-                  ? styles.connectionDotOn
-                  : styles.connectionDotOff,
-              ]}
-            />
-
-            <Text
-              style={[
-                styles.connectionText,
-
-                socket.isConnected &&
-                  styles.connectedText,
-              ]}
-            >
-              {socket.isConnected
-                ? "실시간 연결됨"
-                : socket.lastErrorMessage ||
-                  "실시간 연결 중..."}
-            </Text>
-
-            {!socket.isConnected ? (
               <Pressable
-                onPress={() =>
-                  void socket.reconnect()
-                }
+                accessibilityRole="button"
+                onPress={() => void socket.reconnect()}
               >
-                <Text
-                  style={
-                    styles.reconnectText
-                  }
-                >
-                  재연결
-                </Text>
+                <Text style={styles.reconnectText}>재연결</Text>
               </Pressable>
-            ) : null}
-          </View>
+            </View>
+          ) : null}
 
           {messages.length === 0 ? (
-            <View
-              style={
-                styles.emptyMessages
-              }
-            >
-              <Text
-                style={
-                  styles.emptyTitle
-                }
-              >
-                아직 주고받은
-                쪽지가 없어요
-              </Text>
-
-              <Text
-                style={
-                  styles.emptyDescription
-                }
-              >
-                첫 메시지를
-                보내보세요.
+            <View style={styles.stateWrap}>
+              <Text style={styles.stateText}>
+                아직 주고받은 쪽지가 없어요
               </Text>
             </View>
           ) : (
@@ -910,62 +811,57 @@ export function BandSessionChatRoomScreen() {
               ref={listRef}
               data={messages}
               style={styles.messageList}
-              contentContainerStyle={
-                styles.messages
+              contentContainerStyle={styles.messages}
+              keyExtractor={(item) =>
+                item.clientMsgId ?? String(item.chatMessageId)
               }
-              keyExtractor={(
-                item,
-              ) =>
-                item.clientMsgId ??
-                String(
-                  item.chatMessageId,
-                )
-              }
-              renderItem={({
-                item,
-                index,
-              }) => {
-                const previous =
-                  messages[index - 1];
-
+              renderItem={({ item, index }) => {
+                const previous = messages[index - 1];
+                const next = messages[index + 1];
+                const dateKey = getDateKey(item.createdAt);
                 const showDate =
-                  index === 0 ||
-                  getDateKey(
-                    previous.createdAt,
-                  ) !==
-                    getDateKey(
-                      item.createdAt,
-                    );
+                  Boolean(dateKey) &&
+                  (index === 0 ||
+                    getDateKey(previous.createdAt) !== dateKey);
+                const showTime =
+                  !next ||
+                  next.isMine !== item.isMine ||
+                  formatMessageTime(next.createdAt) !==
+                    formatMessageTime(item.createdAt) ||
+                  getDateKey(next.createdAt) !== dateKey;
 
                 return (
-                  <>
+                  <View style={index > 0 && styles.messageGap}>
                     {showDate ? (
-                      <DateDivider
-                        value={
-                          item.createdAt
+                      <View
+                        style={
+                          index === 0
+                            ? styles.firstDate
+                            : styles.dateSpacing
                         }
-                      />
+                      >
+                        <DateDivider value={item.createdAt} />
+                      </View>
                     ) : null}
 
-                    <MessageBubble
-                      message={item}
-                    />
-                  </>
+                    <View style={showDate && styles.afterDate}>
+                      <MessageBubble
+                        message={item}
+                        senderName={room.opponentName}
+                        profileImageUrl={room.opponentProfileImageUrl}
+                        showTime={showTime}
+                      />
+                    </View>
+                  </View>
                 );
               }}
             />
           )}
 
-          <View
-            style={
-              styles.composer
-            }
-          >
+          <View style={styles.composer}>
             <TextInput
               value={messageInput}
-              onChangeText={
-                setMessageInput
-              }
+              onChangeText={setMessageInput}
               placeholder={
                 room.canSend
                   ? socket.isConnected
@@ -973,54 +869,54 @@ export function BandSessionChatRoomScreen() {
                     : "서버 연결 중..."
                   : "현재 메시지를 보낼 수 없어요"
               }
-              placeholderTextColor={
-                colors.neutral500
-              }
-              editable={
-                room.canSend
-              }
+              placeholderTextColor={colors.neutral400}
+              editable={room.canSend}
               maxLength={2000}
               returnKeyType="send"
               blurOnSubmit={false}
-              onSubmitEditing={
-                sendMessage
-              }
-              style={
-                styles.input
-              }
+              onSubmitEditing={sendMessage}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+              style={[
+                styles.input,
+                isInputFocused && styles.inputFocused,
+                !room.canSend && styles.inputDisabled,
+              ]}
             />
 
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="쪽지 보내기"
-              disabled={
-                !room.canSend ||
-                !socket.isConnected ||
-                !messageInput.trim()
-              }
+              disabled={!canSubmit}
               onPress={sendMessage}
-              style={({
-                pressed,
-              }) => [
+              style={[
                 styles.sendButton,
-
-                (!room.canSend ||
-                  !socket.isConnected ||
-                  !messageInput.trim()) &&
-                  styles.sendButtonDisabled,
-
-                pressed &&
-                  styles.sendButtonPressed,
+                !canSubmit && styles.sendButtonDisabled,
               ]}
             >
-              <Send
-                size={19}
-                color={colors.white}
-              />
+              <View style={styles.sendBackground}>
+                <AppIcon name="sendButton" size={36} />
+              </View>
+              <AppIcon name="airplane" size={32} />
             </Pressable>
           </View>
         </>
       )}
+
+      <ConfirmModal
+        open={isLeaveModalOpen}
+        tone="orange"
+        title="쪽지창을 나갈까요?"
+        description={
+          "나가기를 하면 대화 내용이 모두\n쪽지함 목록에서도 삭제돼요."
+        }
+        confirmLabel={
+          leaveMutation.isPending ? "나가는 중..." : "나가기"
+        }
+        confirmDisabled={leaveMutation.isPending}
+        onCancel={() => setIsLeaveModalOpen(false)}
+        onConfirm={() => void leaveRoom()}
+      />
     </Screen>
   );
 }
@@ -1030,50 +926,54 @@ function DateDivider({
 }: {
   value: string;
 }) {
-  const label =
-    formatMessageDate(value);
+  const label = formatMessageDate(value);
 
   if (!label) {
     return null;
   }
 
   return (
-    <View
-      style={
-        styles.dateDivider
-      }
-    >
-      <Text
-        style={
-          styles.dateText
-        }
-      >
-        {label}
-      </Text>
+    <View style={styles.dateDivider}>
+      <Text style={styles.dateText}>{label}</Text>
     </View>
   );
 }
 
 function MessageBubble({
   message,
+  senderName,
+  profileImageUrl,
+  showTime,
 }: {
   message: LocalChatMessage;
+  senderName: string;
+  profileImageUrl?: string | null;
+  showTime: boolean;
 }) {
   if (message.isMine) {
     return (
-      <View style={[styles.messageRow, styles.mineRow]}>
+      <View style={styles.mineRow}>
         <View style={styles.mineMessageWrap}>
-          <View style={styles.mineSideMeta}>
-            {!message.isRead ? (
-              <Text style={styles.unreadMarker}>1</Text>
-            ) : null}
-            <Text style={styles.messageTime}>
-              {formatMessageTime(message.createdAt)}
-            </Text>
-            {message.pending ? (
-              <Text style={styles.pendingText}>전송 중</Text>
-            ) : null}
-          </View>
+          {!message.isRead || showTime || message.pending ? (
+            <View style={styles.mineSideMeta}>
+              {!message.isRead ? (
+                <Text
+                  accessibilityLabel="상대방이 읽지 않음"
+                  style={styles.unreadMarker}
+                >
+                  1
+                </Text>
+              ) : null}
+              {showTime ? (
+                <Text style={styles.messageTime}>
+                  {formatMessageTime(message.createdAt)}
+                </Text>
+              ) : null}
+              {message.pending ? (
+                <Text style={styles.messageTime}>전송 중</Text>
+              ) : null}
+            </View>
+          ) : null}
 
           <View style={[styles.messageBubble, styles.mineBubble]}>
             <Text style={styles.messageText}>{message.content}</Text>
@@ -1084,310 +984,212 @@ function MessageBubble({
   }
 
   return (
-    <View
-      style={[
-        styles.messageRow,
-        styles.receivedRow,
-      ]}
-    >
-      <Avatar
-        imageUrl={null}
-        label={message.senderName}
-        size={35}
-      />
+    <View style={styles.receivedRow}>
+      <ProfileImage imageUrl={profileImageUrl} size={35} variant="band" />
 
       <View style={styles.receivedContent}>
-        <Text style={styles.senderName}>{message.senderName}</Text>
+        <Text style={styles.senderName}>{senderName}</Text>
         <View style={styles.receivedBubbleRow}>
           <View style={[styles.messageBubble, styles.receivedBubble]}>
             <Text style={styles.messageText}>{message.content}</Text>
           </View>
-          <Text style={styles.messageTime}>
-            {formatMessageTime(message.createdAt)}
-          </Text>
+          {showTime ? (
+            <Text style={[styles.messageTime, styles.receivedTime]}>
+              {formatMessageTime(message.createdAt)}
+            </Text>
+          ) : null}
         </View>
       </View>
     </View>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      gap: 0,
-      paddingBottom: 0,
-      paddingHorizontal: 0,
-      backgroundColor: colors.white,
-    },
-
-    leaveText: {
-      color: colors.error,
-      fontSize: 12,
-      fontWeight: "800",
-    },
-
-    opponentCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      paddingHorizontal: 17,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor:
-        colors.neutral300,
-    },
-
-    opponentInfo: {
-      flex: 1,
-      gap: 2,
-    },
-
-    opponentName: {
-      color: colors.neutral900,
-      fontSize: 13,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-
-    opponentMeta: {
-      color: colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-
-    closedBadge: {
-      height: 22,
-      borderRadius: 999,
-      backgroundColor: colors.neutral300,
-      color: colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 22,
-      paddingHorizontal: 12,
-    },
-
-    connectionRow: {
-      minHeight: 30,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: spacing.xs,
-    },
-
-    connectionText: {
-      color: colors.neutral500,
-      fontSize: 11,
-      fontWeight: "500",
-    },
-
-    connectionDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-    },
-
-    connectionDotOn: {
-      backgroundColor: colors.secondary500,
-    },
-
-    connectionDotOff: {
-      backgroundColor: colors.neutral400,
-    },
-
-    connectedText: {
-      color: colors.secondary600,
-    },
-
-    reconnectText: {
-      color: colors.secondary600,
-      fontSize: 11,
-      fontWeight: "800",
-      marginLeft: spacing.xs,
-    },
-
-    messageList: {
-      flex: 1,
-    },
-
-    messages: {
-      flexGrow: 1,
-      paddingVertical:
-        12,
-      paddingHorizontal: 17,
-    },
-
-    emptyMessages: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: spacing.sm,
-    },
-
-    emptyTitle: {
-      color: colors.neutral900,
-      fontSize: 16,
-      fontWeight: "800",
-      textAlign: "center",
-    },
-
-    emptyDescription: {
-      color: colors.neutral600,
-      fontSize: 13,
-    },
-
-    dateDivider: {
-      alignItems: "center",
-      marginVertical: 4,
-    },
-
-    dateText: {
-      color: colors.neutral600,
-      fontSize: 12,
-      fontWeight: "500",
-      lineHeight: 18,
-    },
-
-    messageRow: {
-      width: "100%",
-      marginBottom:
-        12,
-    },
-
-    mineRow: {
-      alignItems: "flex-end",
-    },
-
-    receivedRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 10,
-    },
-
-    mineMessageWrap: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: 5,
-    },
-
-    mineSideMeta: {
-      alignItems: "flex-end",
-      marginBottom: 1,
-    },
-
-    receivedContent: {
-      minWidth: 0,
-      flex: 1,
-    },
-
-    receivedBubbleRow: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: 5,
-      marginTop: 4,
-    },
-
-    messageBubble: {
-      maxWidth: 208,
-      borderRadius: 12,
-      paddingTop: 12,
-      paddingBottom: 12,
-      paddingLeft: 12,
-      paddingRight: 16,
-    },
-
-    mineBubble: {
-      borderWidth: 1,
-      borderColor: colors.secondary500,
-      backgroundColor: colors.secondary100,
-    },
-
-    receivedBubble: {
-      borderWidth: 1,
-      borderColor: colors.neutral500,
-      backgroundColor: colors.white,
-    },
-
-    senderName: {
-      color: colors.neutral900,
-      fontSize: 12,
-      fontWeight: "700",
-      lineHeight: 18,
-    },
-
-    messageText: {
-      color: colors.neutral900,
-      fontSize: 12,
-      fontWeight: "400",
-      lineHeight: 18,
-    },
-
-    messageTime: {
-      color: colors.neutral500,
-      fontSize: 8,
-      fontWeight: "500",
-      lineHeight: 10,
-    },
-
-    unreadMarker: {
-      color: colors.secondary500,
-      fontSize: 9,
-      fontWeight: "500",
-      lineHeight: 10,
-    },
-
-    pendingText: {
-      color: colors.neutral500,
-      fontSize: 8,
-      fontWeight: "500",
-      lineHeight: 10,
-    },
-
-    composer: {
-      minHeight: 65,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      backgroundColor:
-        colors.white,
-      paddingHorizontal: 17,
-      paddingTop: 12,
-      paddingBottom: 17,
-    },
-
-    input: {
-      flex: 1,
-      height: 36,
-      borderWidth: 1,
-      borderColor: colors.neutral400,
-      borderRadius:
-        radius.pill,
-      backgroundColor:
-        colors.white,
-      color: colors.neutral900,
-      fontSize: 12,
-      lineHeight: 18,
-      paddingHorizontal: 18,
-      paddingVertical: 0,
-    },
-
-    sendButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor:
-        colors.secondary500,
-    },
-
-    sendButtonDisabled: {
-      backgroundColor:
-        colors.neutral400,
-    },
-
-    sendButtonPressed: {
-      opacity: 0.8,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    gap: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: colors.white,
+  },
+  header: {
+    paddingHorizontal: 15,
+  },
+  stateWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  stateText: {
+    ...textStyles.caption1,
+    color: colors.neutral500,
+    textAlign: "center",
+  },
+  retryButton: {
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: colors.secondary500,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryText: {
+    ...textStyles.caption2,
+    color: colors.white,
+  },
+  connectionRow: {
+    minHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 15,
+  },
+  connectionText: {
+    ...textStyles.caption2,
+    flexShrink: 1,
+    color: colors.neutral500,
+  },
+  reconnectText: {
+    ...textStyles.caption3,
+    color: colors.secondary500,
+  },
+  messageList: {
+    flex: 1,
+  },
+  messages: {
+    flexGrow: 1,
+    paddingHorizontal: 15,
+    paddingBottom: 24,
+  },
+  messageGap: {
+    marginTop: 22,
+  },
+  firstDate: {
+    paddingTop: 4,
+  },
+  dateSpacing: {
+    marginBottom: 22,
+  },
+  afterDate: {
+    marginTop: 20,
+  },
+  dateDivider: {
+    alignItems: "center",
+    paddingTop: 4,
+  },
+  dateText: {
+    ...textStyles.caption3,
+    color: colors.neutral600,
+  },
+  mineRow: {
+    alignItems: "flex-end",
+  },
+  receivedRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  mineMessageWrap: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 5,
+  },
+  mineSideMeta: {
+    alignItems: "flex-end",
+    marginBottom: 1,
+  },
+  receivedContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  receivedBubbleRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 5,
+    marginTop: 4,
+  },
+  messageBubble: {
+    maxWidth: 208,
+    borderRadius: 12,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingLeft: 12,
+    paddingRight: 16,
+  },
+  mineBubble: {
+    borderWidth: 1,
+    borderColor: colors.secondary500,
+    backgroundColor: colors.secondary100,
+  },
+  receivedBubble: {
+    borderWidth: 1,
+    borderColor: colors.neutral500,
+    backgroundColor: colors.white,
+  },
+  senderName: {
+    ...textStyles.caption3,
+    color: colors.neutral900,
+  },
+  messageText: {
+    ...textStyles.body3,
+    color: colors.neutral900,
+  },
+  messageTime: {
+    ...textStyles.caption4,
+    color: colors.neutral500,
+  },
+  receivedTime: {
+    marginBottom: 1,
+  },
+  unreadMarker: {
+    color: colors.secondary500,
+    fontSize: 9,
+    fontWeight: "500",
+    lineHeight: 10,
+  },
+  composer: {
+    height: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    backgroundColor: colors.white,
+    paddingHorizontal: 24,
+  },
+  input: {
+    height: 36,
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: colors.neutral300,
+    borderRadius: 999,
+    backgroundColor: colors.white,
+    color: colors.neutral900,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+    paddingHorizontal: 24,
+    paddingVertical: 0,
+  },
+  inputFocused: {
+    borderColor: colors.secondary500,
+  },
+  inputDisabled: {
+    backgroundColor: colors.neutral100,
+    color: colors.neutral400,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
+  sendButtonDisabled: {
+    opacity: 0.4,
+  },
+});
