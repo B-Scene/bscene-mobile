@@ -14,12 +14,21 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import {
   useBandPerformanceQuery,
   useBandPostQuery,
+  useBandQuery,
   useDeleteBandPerformance,
-  useDeleteBandPost,
 } from "@/hooks/api/band/useBand";
+import {
+  getPostBackground,
+  PostArticle,
+  PostAuthor,
+  PostBody,
+  PostDetailError,
+  PostDetailSkeleton,
+  PostMedia,
+  PostStats,
+} from "@/features/post/PostDetailParts";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
 import { Screen } from "@/shared/components/Screen";
 import { colors } from "@/shared/constants/theme";
 
@@ -28,12 +37,6 @@ const AGE_RATING_LABELS: Record<string, string> = {
   AGE_12: "만 12세 이상",
   AGE_15: "만 15세 이상",
   AGE_19: "만 19세 이상",
-};
-
-const POST_TYPE_LABELS: Record<string, string> = {
-  PHOTO: "사진",
-  TEXT: "글",
-  VIDEO: "영상",
 };
 
 const parseRouteId = (value?: string | string[]) => {
@@ -249,140 +252,51 @@ export function BandPostDetailScreen() {
   const params = useLocalSearchParams<{ postId?: string }>();
   const postId = parseRouteId(params.postId);
   const query = useBandPostQuery(postId);
-  const deleteMutation = useDeleteBandPost(query.data?.bandId);
   const post = query.data;
+  const bandQuery = useBandQuery(post?.bandId ?? null);
   const mediaUrls = post?.mediaUrls ?? [];
-  const mediaCount = mediaUrls.length;
-
-  const deletePost = () => {
-    if (!postId) return;
-
-    Alert.alert("콘텐츠 삭제", "등록한 콘텐츠를 삭제할까요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: () => {
-          deleteMutation.mutate(postId, {
-            onSuccess: () => router.back(),
-            onError: () => {
-              Alert.alert("콘텐츠 삭제", "콘텐츠를 삭제하지 못했어요.");
-            },
-          });
-        },
-      },
-    ]);
-  };
-
-  const openEdit = () => {
-    if (!postId) return;
-    router.push(
-      `/band/home/contents/form?postId=${postId}` as Parameters<
-        typeof router.push
-      >[0],
-    );
-  };
 
   return (
-    <Screen contentStyle={styles.postContainer}>
-      <AppHeader title="" />
+    <Screen
+      edges={["top", "left", "right"]}
+      contentStyle={styles.postContainer}
+    >
+      <AppHeader title="" style={styles.postHeader} />
 
       {query.isLoading ? (
-        <DetailSkeleton />
+        <PostDetailSkeleton />
       ) : query.isError || !postId ? (
-        <AppState
-          title="콘텐츠를 불러오지 못했어요"
+        <PostDetailError
+          tone="band"
           description="삭제되었거나 네트워크 연결이 불안정할 수 있어요."
-          actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
+          onRetry={() => void query.refetch()}
         />
       ) : post ? (
-        <>
-          <View style={styles.postArticle}>
-            <View style={styles.postAuthor}>
-              <Avatar
-                imageUrl={post.thumbnailUrl}
-                label={post.bandName}
-                size={42}
-              />
-              <View style={styles.authorText}>
-                <Text numberOfLines={1} style={styles.authorName}>
-                  {post.bandName}
-                </Text>
-                <Text style={styles.authorMeta}>{formatDate(post.createdAt)}</Text>
-              </View>
-            </View>
+        <PostArticle>
+          <PostAuthor
+            bandName={bandQuery.data?.name ?? post.bandName}
+            imageUrl={bandQuery.data?.profileImageUrl}
+            createdAt={post.createdAt}
+          />
 
-            {post.type !== "TEXT" && mediaUrls.length > 0 ? (
-              <Image
-                source={{ uri: post.thumbnailUrl ?? mediaUrls[0] }}
-                style={styles.postMedia}
-              />
-            ) : null}
-
-            <View style={styles.postStats}>
-              <View style={styles.statInline}>
-                <HeartIcon />
-                <Text style={styles.statInlineText}>0</Text>
-              </View>
-              <View style={styles.statInline}>
-                <CommentIcon />
-                <Text style={styles.statInlineText}>0</Text>
-              </View>
-            </View>
-
-            <View style={styles.postBody}>
-              <View style={styles.postTypePill}>
-                <Text style={styles.postTypeText}>
-                  {POST_TYPE_LABELS[post.type] ?? post.type}
-                </Text>
-              </View>
-              <Text style={styles.postTitle}>
-                {post.title || "제목 없는 콘텐츠"}
-              </Text>
-              {post.description ? (
-                <Text style={styles.postDescription}>{post.description}</Text>
-              ) : (
-                <Text style={styles.postDescription}>
-                  콘텐츠 설명이 준비 중이에요.
-                </Text>
-              )}
-              <TagSection tags={post.tags} />
-            </View>
-          </View>
-
-          <View style={styles.secondaryBand} />
-
-          <DetailSection title="콘텐츠 정보">
-            <InfoPanel
-              rows={[
-                { label: "미디어", value: `${formatCount(mediaCount)}개` },
-                { label: "작성일", value: formatDate(post.createdAt) },
-                { label: "수정일", value: formatDate(post.updatedAt) },
-              ]}
+          {post.type !== "TEXT" && mediaUrls.length > 0 ? (
+            <PostMedia
+              tone="band"
+              imageUrls={mediaUrls}
+              isVideo={post.type === "VIDEO"}
+              videoPosterUrl={post.thumbnailUrl}
             />
-          </DetailSection>
-
-          {mediaCount > 0 ? (
-            <DetailSection title="미디어 URL">
-              <View style={styles.mediaList}>
-                {mediaUrls.map((url) => (
-                  <Text key={url} numberOfLines={1} style={styles.mediaUrl}>
-                    {url}
-                  </Text>
-                ))}
-              </View>
-            </DetailSection>
           ) : null}
 
-          <ActionBar
-            primaryLabel="콘텐츠 수정"
-            destructiveLabel="콘텐츠 삭제"
-            destructiveLoading={deleteMutation.isPending}
-            onPrimaryPress={openEdit}
-            onDestructivePress={deletePost}
+          <PostStats likeCount={0} commentCount={0} />
+
+          <PostBody
+            tone="band"
+            title={post.title || "제목 없는 콘텐츠"}
+            content={post.description}
+            tags={post.tags}
           />
-        </>
+        </PostArticle>
       ) : null}
     </Screen>
   );
@@ -520,20 +434,6 @@ function HeartIcon() {
   );
 }
 
-function CommentIcon() {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M20 11.5C20 15.642 16.418 19 12 19C10.805 19 9.672 18.754 8.654 18.313L4 19.5L5.236 15.482C4.455 14.337 4 12.968 4 11.5C4 7.358 7.582 4 12 4C16.418 4 20 7.358 20 11.5Z"
-        stroke={colors.neutral700}
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 0,
@@ -544,8 +444,11 @@ const styles = StyleSheet.create({
   postContainer: {
     paddingHorizontal: 0,
     paddingTop: 0,
-    paddingBottom: 104,
-    backgroundColor: colors.secondary0,
+    paddingBottom: 12,
+    backgroundColor: getPostBackground("band"),
+  },
+  postHeader: {
+    paddingHorizontal: 15,
   },
   performanceHero: {
     height: 492,
@@ -735,97 +638,6 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: colors.error,
-  },
-  postArticle: {
-    backgroundColor: colors.white,
-    paddingHorizontal: 25,
-    paddingTop: 24,
-    paddingBottom: 24,
-  },
-  postAuthor: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  authorText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  authorName: {
-    color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-  authorMeta: {
-    color: colors.neutral600,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-    marginTop: 4,
-  },
-  postMedia: {
-    width: "100%",
-    height: 422,
-    backgroundColor: colors.neutral300,
-    marginTop: 24,
-  },
-  postStats: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 24,
-    marginTop: 24,
-  },
-  statInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statInlineText: {
-    color: colors.neutral900,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-  },
-  postBody: {
-    marginTop: 16,
-  },
-  postTypePill: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    backgroundColor: colors.secondary100,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginBottom: 10,
-  },
-  postTypeText: {
-    color: colors.secondary600,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-  },
-  postTitle: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
-  },
-  postDescription: {
-    color: colors.neutral900,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 8,
-  },
-  mediaList: {
-    gap: 8,
-    marginTop: 12,
-  },
-  mediaUrl: {
-    color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
   },
   skeletonWrap: {
     paddingTop: 24,

@@ -107,6 +107,7 @@ const ACTIVE_COLOR = {
 
 // 웹에서 하단 탭을 표시하지 않는 경로
 const HIDDEN_NAV_PREFIXES = [
+  "/fan/explore/contents/",
   "/band/live/now",
   "/band/live/scheduled",
   "/band/live/room",
