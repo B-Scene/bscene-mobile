@@ -1,5 +1,4 @@
-import { router } from "expo-router";
-import { Search, X } from "lucide-react-native";
+import { router, type Href } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
@@ -14,15 +13,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
+  FanLiveNowCard,
+  FanScheduledCard,
+  formatReplayDuration,
+} from "@/features/live/LiveCards";
+import {
   useLiveNowInfiniteQuery,
   useReplayListInfiniteQuery,
   useScheduledLiveInfiniteQuery,
   useToggleLiveAlarmMutation,
 } from "@/hooks/api/live/useLive";
-import { AppHeader } from "@/shared/components/AppHeader";
-import { AppState } from "@/shared/components/AppState";
-import { Avatar } from "@/shared/components/Avatar";
-import { colors, spacing } from "@/shared/constants/theme";
+import { AppIcon } from "@/shared/components/AppIcon";
+import { colors, textStyles } from "@/shared/constants/theme";
 import type {
   LiveNowItem,
   LiveReplayItem,
@@ -44,6 +46,12 @@ const TITLE_BY_KIND: Record<FanLiveListKind, string> = {
   now: "진행 중인 라이브",
   scheduled: "예정된 라이브",
   replays: "다시보기",
+};
+
+const STATUS_NOUN_BY_KIND: Record<FanLiveListKind, string> = {
+  now: "라이브 목록을",
+  scheduled: "예정된 라이브를",
+  replays: "다시보기를",
 };
 
 const filterToApi = (filter: FanLiveFilter) =>
@@ -99,38 +107,42 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <AppHeader
-        title={searchOpen ? "" : title}
-        rightContent={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={searchOpen ? "검색 닫기" : `${title} 검색`}
-            hitSlop={12}
-            style={styles.headerIconButton}
-            onPress={toggleSearch}
-          >
-            {searchOpen ? (
-              <X size={21} color={colors.neutral900} />
-            ) : (
-              <Search size={21} color={colors.neutral900} />
-            )}
-          </Pressable>
-        }
-      />
+    <SafeAreaView edges={["top"]} style={styles.safeArea}>
+      <View style={styles.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="뒤로가기"
+          hitSlop={12}
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <AppIcon name="arrowLeft" />
+        </Pressable>
 
-      {searchOpen ? (
-        <View style={styles.searchWrap}>
+        {searchOpen ? (
           <TextInput
             autoFocus
             value={searchQuery}
             placeholder={`${title} 검색`}
-            placeholderTextColor={colors.neutral500}
+            placeholderTextColor={colors.neutral400}
+            accessibilityLabel={`${title} 검색어`}
             style={styles.searchInput}
             onChangeText={setSearchQuery}
           />
-        </View>
-      ) : null}
+        ) : (
+          <Text style={styles.headerTitle}>{title}</Text>
+        )}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={searchOpen ? "검색 닫기" : `${title} 검색`}
+          hitSlop={12}
+          style={styles.searchButton}
+          onPress={toggleSearch}
+        >
+          <AppIcon name={searchOpen ? "closeDark" : "searchDark"} size={20} />
+        </Pressable>
+      </View>
 
       <FilterTabs value={filter} onChange={setFilter} />
 
@@ -139,13 +151,22 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
       ) : null}
 
       {query.isLoading ? (
-        <AppState loading title={`${title}를 불러오는 중이에요`} />
+        <Text style={styles.statusText}>
+          {STATUS_NOUN_BY_KIND[kind]} 불러오는 중이에요.
+        </Text>
       ) : query.isError ? (
-        <AppState
-          title={`${title}를 불러오지 못했어요`}
-          actionLabel="다시 시도"
-          onAction={() => void query.refetch()}
-        />
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>
+            {STATUS_NOUN_BY_KIND[kind]} 불러오지 못했어요.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.retryButton}
+            onPress={() => void query.refetch()}
+          >
+            <Text style={styles.retryText}>다시 불러오기</Text>
+          </Pressable>
+        </View>
       ) : (
         <LiveList
           kind={kind}
@@ -251,13 +272,23 @@ function LiveList({
   onEndReached: () => void;
   isFetchingNextPage: boolean;
 }) {
-  const emptyTitle = searchQuery.trim()
+  const hasSearch = Boolean(searchQuery.trim());
+  const emptyTitle = hasSearch
     ? "검색 결과가 없어요"
     : kind === "now"
       ? "지금 진행 중인 라이브가 없어요"
       : kind === "scheduled"
         ? "예정된 라이브가 없어요"
         : "저장된 다시보기가 없어요";
+  const emptyDescription = hasSearch
+    ? "다른 검색어를 입력해 보세요"
+    : kind === "replays"
+      ? "라이브가 종료되면 밴드가\n녹음본 저장 여부를 선택해요"
+      : kind === "scheduled"
+        ? "새로운 라이브 일정이 등록되면\n알림을 보내드릴게요"
+        : filter === "followed"
+          ? "팔로우한 밴드가 라이브를 시작하면\n알림을 보내드릴게요"
+          : "새로운 라이브가 시작되면 여기에서 확인할 수 있어요";
 
   return (
     <FlatList
@@ -265,11 +296,19 @@ function LiveList({
       keyExtractor={(item) => `${kind}-${item.liveId}`}
       contentContainerStyle={[
         styles.listContent,
+        kind !== "replays" && styles.listContentTopGap,
         items.length === 0 && styles.listEmptyContent,
       ]}
       renderItem={({ item }) => {
         if (kind === "now") {
-          return <LiveNowListCard live={item as LiveNowItem} />;
+          const live = item as LiveNowItem;
+
+          return (
+            <FanLiveNowCard
+              live={live}
+              listenerLabel={`${(live.viewCount ?? live.viewerCount ?? 0).toLocaleString()}명 청취 중`}
+            />
+          );
         }
 
         if (kind === "scheduled") {
@@ -286,64 +325,19 @@ function LiveList({
       ListEmptyComponent={
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-          <Text style={styles.emptyDescription}>
-            {searchQuery.trim()
-              ? "다른 검색어를 입력해 보세요"
-              : kind === "now" && filter === "followed"
-                ? "팔로우한 밴드가 라이브를 시작하면 알림을 보내드릴게요"
-                : kind === "replays"
-                  ? "라이브가 종료되면 밴드가 녹음본 저장 여부를 선택해요"
-                  : "새로운 라이브가 등록되면 여기에서 확인할 수 있어요"}
-          </Text>
+          <Text style={styles.emptyDescription}>{emptyDescription}</Text>
         </View>
       }
       ListFooterComponent={
         isFetchingNextPage ? (
-          <Text style={styles.footerText}>더 불러오는 중이에요</Text>
+          <Text style={styles.footerText}>
+            {kind === "replays" ? "다시보기를" : "라이브를"} 더 불러오는 중이에요.
+          </Text>
         ) : undefined
       }
       onEndReached={onEndReached}
       onEndReachedThreshold={0.4}
     />
-  );
-}
-
-function LiveNowListCard({ live }: { live: LiveNowItem }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      style={styles.liveCard}
-      onPress={() =>
-        router.push(
-          `/fan/live/room/${live.liveId}` as Parameters<typeof router.push>[0],
-        )
-      }
-    >
-      <View style={styles.liveProfileWrap}>
-        <Avatar
-          imageUrl={live.bandProfileImageUrl ?? live.thumbnailImageUrl}
-          label={live.bandName}
-          size={62}
-        />
-        <View style={styles.liveBadge}>
-          <Text style={styles.liveBadgeText}>LIVE</Text>
-        </View>
-      </View>
-      <View style={styles.liveCardInfo}>
-        <Text numberOfLines={1} style={styles.cardTitle}>
-          {live.title}
-        </Text>
-        <Text numberOfLines={1} style={styles.cardSubtitle}>
-          {live.bandName}
-        </Text>
-        <Text style={styles.liveMeta}>
-          {(live.viewerCount ?? live.viewCount ?? 0).toLocaleString()}명 시청 중
-        </Text>
-      </View>
-      <View style={styles.enterButton}>
-        <Text style={styles.enterButtonText}>입장</Text>
-      </View>
-    </Pressable>
   );
 }
 
@@ -381,37 +375,13 @@ function ScheduledLiveListCard({
   };
 
   return (
-    <View style={styles.liveCard}>
-      <Avatar
-        imageUrl={live.bandProfileImageUrl ?? live.thumbnailImageUrl}
-        label={live.bandName}
-        size={62}
-      />
-      <View style={styles.liveCardInfo}>
-        <Text numberOfLines={1} style={styles.cardTitle}>
-          {live.title}
-        </Text>
-        <Text numberOfLines={1} style={styles.cardSubtitle}>
-          {live.bandName}
-        </Text>
-        <Text style={styles.scheduledMeta}>
-          {formatScheduledAt(live.scheduledAt)}
-        </Text>
-      </View>
-
-      {showNotificationButton ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={mutation.isPending}
-          style={[styles.alarmButton, notified && styles.alarmButtonSoft]}
-          onPress={() => void toggleNotification()}
-        >
-          <Text style={styles.alarmButtonText}>
-            {notified ? "알림 받는 중" : "알림 받기"}
-          </Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <FanScheduledCard
+      live={live}
+      notified={notified}
+      disabled={mutation.isPending}
+      showNotification={showNotificationButton}
+      onToggleNotification={() => void toggleNotification()}
+    />
   );
 }
 
@@ -419,79 +389,44 @@ function ReplayListCard({ replay }: { replay: LiveReplayItem }) {
   return (
     <Pressable
       accessibilityRole="button"
-      style={styles.liveCard}
-      onPress={() =>
-        router.push(
-          `/fan/live/replays/${replay.liveId}` as Parameters<
-            typeof router.push
-          >[0],
-        )
-      }
+      accessibilityLabel={`${replay.title} 다시보기 열기`}
+      style={styles.replayCard}
+      onPress={() => router.push(`/fan/live/replays/${replay.liveId}` as Href)}
     >
       <View style={styles.replayThumb}>
         {replay.thumbnailImageUrl ? (
           <Image
-            source={{
-              uri: replay.thumbnailImageUrl,
-            }}
+            source={{ uri: replay.thumbnailImageUrl }}
             style={styles.replayImage}
           />
         ) : (
-          <View style={styles.replayFallback}>
-            <Text style={styles.replayFallbackText}>
-              {replay.bandName.slice(0, 1)}
-            </Text>
-          </View>
+          <AppIcon name="bandDefaultProfile" size={110} />
         )}
         <View style={styles.replayDuration}>
           <Text style={styles.replayDurationText}>
-            {formatReplayDuration(replay.durationSeconds)}
+            {formatReplayDuration(
+              replay.durationSeconds ?? replay.durationSec ?? 0,
+            )}
           </Text>
         </View>
       </View>
-      <View style={styles.liveCardInfo}>
-        <Text numberOfLines={1} style={styles.cardTitle}>
+
+      <View style={styles.replayInfo}>
+        <Text numberOfLines={1} style={styles.replayTitle}>
           {replay.title}
         </Text>
-        <Text numberOfLines={1} style={styles.cardSubtitle}>
+        <Text numberOfLines={1} style={styles.replayBand}>
           {replay.bandName}
         </Text>
-        <Text style={styles.replayMeta}>
-          {replay.viewCount.toLocaleString()}회 재생
-        </Text>
+        <View style={styles.replayMetaRow}>
+          <AppIcon name="playMuted" size={9} />
+          <Text style={styles.replayMeta}>
+            {replay.viewCount.toLocaleString()}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
-}
-
-function formatScheduledAt(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatReplayDuration(totalSeconds?: number) {
-  if (totalSeconds === undefined) {
-    return "00:00:00";
-  }
-
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(safeSeconds / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-  const seconds = safeSeconds % 60;
-
-  return [hours, minutes, seconds]
-    .map((value) => String(value).padStart(2, "0"))
-    .join(":");
 }
 
 const styles = StyleSheet.create({
@@ -499,30 +434,51 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
-  headerIconButton: {
-    width: 40,
-    height: 40,
+  header: {
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    backgroundColor: colors.white,
+  },
+  backButton: {
+    position: "absolute",
+    left: 15,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
-  searchWrap: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
+  headerTitle: {
+    ...textStyles.label2,
+    color: colors.neutral900,
+  },
+  searchButton: {
+    position: "absolute",
+    right: 24,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchInput: {
-    height: 40,
+    ...textStyles.body3,
+    flex: 1,
+    height: 36,
+    minWidth: 0,
     borderWidth: 1,
-    borderColor: colors.neutral300,
+    borderColor: colors.primary400,
     borderRadius: 999,
-    paddingHorizontal: 16,
+    backgroundColor: colors.white,
     color: colors.neutral900,
-    fontSize: 14,
-    fontWeight: "500",
+    marginHorizontal: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 0,
   },
   tabs: {
     height: 48,
     flexDirection: "row",
-    borderBottomWidth: 1,
+    borderBottomWidth: 2,
     borderBottomColor: colors.neutral400,
     paddingHorizontal: 20,
   },
@@ -532,9 +488,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tabText: {
+    ...textStyles.body1,
     color: colors.neutral400,
-    fontSize: 15,
-    fontWeight: "700",
   },
   tabTextSelected: {
     color: colors.primary400,
@@ -543,7 +498,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: -1,
+    bottom: -2,
     height: 2,
     backgroundColor: colors.primary400,
   },
@@ -555,13 +510,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   replayHint: {
+    ...textStyles.caption2,
     flex: 1,
     color: colors.neutral700,
-    fontSize: 12,
-    fontWeight: "500",
   },
   sortButtons: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   sortButton: {
@@ -574,210 +529,135 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary50,
   },
   sortButtonText: {
+    ...textStyles.caption3,
     color: colors.neutral600,
-    fontSize: 12,
-    fontWeight: "700",
   },
   sortButtonTextSelected: {
     color: colors.primary400,
   },
+  statusText: {
+    ...textStyles.caption2,
+    color: colors.neutral500,
+    paddingVertical: 40,
+    textAlign: "center",
+  },
+  errorBox: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  errorText: {
+    ...textStyles.caption2,
+    color: colors.neutral600,
+    textAlign: "center",
+  },
+  retryButton: {
+    borderRadius: 8,
+    backgroundColor: colors.primary400,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryText: {
+    ...textStyles.caption3,
+    color: colors.white,
+  },
   listContent: {
-    paddingHorizontal: 20,
-    paddingTop: spacing.lg,
-    paddingBottom: 120,
     gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  listContentTopGap: {
+    paddingTop: 24,
   },
   listEmptyContent: {
     flexGrow: 1,
     justifyContent: "center",
   },
-  liveCard: {
+  replayCard: {
     width: "100%",
-    minHeight: 86,
-    borderRadius: 16,
-    backgroundColor: colors.white,
+    height: 86,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    borderRadius: 16,
+    backgroundColor: colors.white,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    shadowColor: colors.neutral900,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 3,
-  },
-  liveProfileWrap: {
-    position: "relative",
-    shadowColor: colors.primary400,
-    shadowOpacity: 0.8,
-    shadowRadius: 18,
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    elevation: 5,
-  },
-  liveBadge: {
-    position: "absolute",
-    left: 17,
-    bottom: -2,
-    width: 27,
-    height: 12,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary400,
-  },
-  liveBadgeText: {
-    color: colors.white,
-    fontSize: 8,
-    fontWeight: "700",
-    lineHeight: 10,
-  },
-  liveCardInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitle: {
-    color: colors.neutral900,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-  cardSubtitle: {
-    color: colors.neutral700,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  liveMeta: {
-    color: colors.primary400,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  scheduledMeta: {
-    color: colors.primary300,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  replayMeta: {
-    color: colors.neutral500,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  enterButton: {
-    width: 51,
-    height: 22,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primary400,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.white,
-  },
-  enterButtonText: {
-    color: colors.primary400,
-    fontSize: 11,
-    fontWeight: "700",
-    lineHeight: 14,
-  },
-  alarmButton: {
-    width: 81,
-    height: 32,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.primary400,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.white,
-  },
-  alarmButtonSoft: {
-    borderColor: "transparent",
-    backgroundColor: colors.primary0,
-  },
-  alarmButtonText: {
-    color: colors.primary400,
-    fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 12,
-    textAlign: "center",
+    boxShadow: "0px 4px 8px 0px rgba(20, 20, 20, 0.1)",
   },
   replayThumb: {
     width: 110,
     height: 62,
-    borderRadius: 8,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
     overflow: "hidden",
+    borderRadius: 8,
     backgroundColor: colors.neutral200,
   },
   replayImage: {
     width: "100%",
     height: "100%",
   },
-  replayFallback: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary0,
-  },
-  replayFallbackText: {
-    color: colors.primary400,
-    fontSize: 22,
-    fontWeight: "700",
-  },
   replayDuration: {
     position: "absolute",
     right: 7,
     bottom: 5,
-    minWidth: 48,
-    height: 13,
-    borderRadius: 2,
+    height: 10,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 2,
     backgroundColor: colors.neutral900,
-    paddingHorizontal: 4,
+    paddingLeft: 3,
+    paddingRight: 2,
   },
   replayDurationText: {
+    ...textStyles.caption5,
     color: colors.white,
-    fontSize: 9,
-    fontWeight: "500",
-    lineHeight: 11,
+  },
+  replayInfo: {
+    flex: 1,
+    minWidth: 0,
+    marginLeft: 10,
+  },
+  replayTitle: {
+    ...textStyles.body1,
+    color: colors.neutral900,
+  },
+  replayBand: {
+    ...textStyles.caption2,
+    color: colors.neutral700,
+    marginTop: 2,
+  },
+  replayMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  replayMeta: {
+    ...textStyles.body5,
+    color: colors.neutral500,
   },
   emptyWrap: {
+    width: 219,
+    alignSelf: "center",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 48,
   },
   emptyTitle: {
+    ...textStyles.label1,
     color: colors.neutral900,
-    fontSize: 18,
-    fontWeight: "700",
-    lineHeight: 20,
     textAlign: "center",
   },
   emptyDescription: {
+    ...textStyles.caption1,
     color: colors.neutral600,
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 20,
     textAlign: "center",
   },
   footerText: {
+    ...textStyles.caption2,
     color: colors.neutral500,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 18,
-    paddingVertical: 16,
+    paddingVertical: 12,
     textAlign: "center",
   },
 });

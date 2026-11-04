@@ -61,6 +61,7 @@ export const textStyles = {
   label2: { fontSize: 18, fontWeight: "600", lineHeight: 20 },
   body1: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
   body2: { fontSize: 15, fontWeight: "500", lineHeight: 20 },
+  body3: { fontSize: 12, fontWeight: "400", lineHeight: 18 },
   body4: { fontSize: 10, fontWeight: "700", lineHeight: 12 },
   body5: { fontSize: 10, fontWeight: "500", lineHeight: 12 },
   body6: { fontSize: 15, fontWeight: "700", lineHeight: 20 },
@@ -68,6 +69,8 @@ export const textStyles = {
   caption2: { fontSize: 12, fontWeight: "500", lineHeight: 18 },
   caption3: { fontSize: 12, fontWeight: "600", lineHeight: 18 },
   caption4: { fontSize: 8, fontWeight: "500", lineHeight: 10 },
+  caption5: { fontSize: 6, fontWeight: "600", lineHeight: 10 },
+  label4: { fontSize: 7, fontWeight: "600", lineHeight: 10 },
 } as const satisfies Record<string, TextStyle>;
 
 export const shadows = {

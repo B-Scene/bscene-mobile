@@ -105,8 +105,13 @@ const ACTIVE_COLOR = {
   band: colors.secondary500,
 } as const;
 
-// 웹에서 showBottomNav={false} 그룹에 속한 마이페이지 하위 경로
+// 웹에서 하단 탭을 표시하지 않는 경로
 const HIDDEN_NAV_PREFIXES = [
+  "/band/live/now",
+  "/band/live/scheduled",
+  "/band/live/room",
+  "/fan/live/room",
+  "/fan/live/replays/",
   "/band/my/recruit-alert",
   "/band/my/live-alert",
   "/band/my/applications",

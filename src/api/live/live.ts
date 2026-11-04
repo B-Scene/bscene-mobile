@@ -31,7 +31,8 @@ import type {
     LiveHomeResponse,
     LiveNowListFilter,
     LiveNowListResponse,
-    LiveReservationResponse,
+    LiveMembersResponse,
+  LiveReservationResponse,
     ReplayListFilter,
     ReplayListResponse,
     ReplayPlaybackResponse,
@@ -226,6 +227,22 @@ export const createLive =
       >(
         "/lives",
         body,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
+export const getLiveMembers =
+  async (
+    liveId: number,
+  ) => {
+    const response =
+      await axiosInstance.get<
+        LiveApiResponse<LiveMembersResponse>
+      >(
+        `/lives/${liveId}/members`,
       );
 
     return assertSuccess(

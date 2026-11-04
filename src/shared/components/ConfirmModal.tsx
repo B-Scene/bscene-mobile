@@ -13,6 +13,7 @@ type ConfirmModalProps = {
   confirmDisabled?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  onBackdropPress?: () => void;
 };
 
 export function ConfirmModal({
@@ -25,6 +26,7 @@ export function ConfirmModal({
   confirmDisabled = false,
   onCancel,
   onConfirm,
+  onBackdropPress = onCancel,
 }: ConfirmModalProps) {
   const toneColor = tone === "pink" ? colors.primary400 : colors.secondary500;
 
@@ -34,9 +36,9 @@ export function ConfirmModal({
       statusBarTranslucent
       animationType="fade"
       visible={open}
-      onRequestClose={onCancel}
+      onRequestClose={onBackdropPress}
     >
-      <Pressable style={styles.overlay} onPress={onCancel}>
+      <Pressable style={styles.overlay} onPress={onBackdropPress}>
         <Pressable accessibilityViewIsModal style={styles.panel}>
           <View style={styles.texts}>
             <Text style={styles.title}>{title}</Text>
