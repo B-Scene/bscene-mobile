@@ -11,6 +11,7 @@ type ConfirmModalProps = {
   cancelLabel?: string;
   confirmLabel?: string;
   confirmDisabled?: boolean;
+  showCancel?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   onBackdropPress?: () => void;
@@ -24,6 +25,7 @@ export function ConfirmModal({
   cancelLabel = "취소",
   confirmLabel = "확인",
   confirmDisabled = false,
+  showCancel = true,
   onCancel,
   onConfirm,
   onBackdropPress = onCancel,
@@ -48,15 +50,17 @@ export function ConfirmModal({
           </View>
 
           <View style={styles.actions}>
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.button, { borderColor: toneColor }]}
-              onPress={onCancel}
-            >
-              <Text style={[styles.buttonText, { color: toneColor }]}>
-                {cancelLabel}
-              </Text>
-            </Pressable>
+            {showCancel ? (
+              <Pressable
+                accessibilityRole="button"
+                style={[styles.button, { borderColor: toneColor }]}
+                onPress={onCancel}
+              >
+                <Text style={[styles.buttonText, { color: toneColor }]}>
+                  {cancelLabel}
+                </Text>
+              </Pressable>
+            ) : null}
 
             <Pressable
               accessibilityRole="button"

@@ -12,6 +12,8 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -53,7 +55,13 @@ const getPageIndex = (
   return Math.min(pageCount - 1, Math.max(0, index));
 };
 
-export function PostDetailSkeleton() {
+export function PulseView({
+  style,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
   const [opacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
@@ -78,7 +86,13 @@ export function PostDetailSkeleton() {
   }, [opacity]);
 
   return (
-    <Animated.View style={[styles.skeleton, { opacity }]}>
+    <Animated.View style={[style, { opacity }]}>{children}</Animated.View>
+  );
+}
+
+export function PostDetailSkeleton() {
+  return (
+    <PulseView style={styles.skeleton}>
       <View style={styles.author}>
         <View style={styles.skeletonAvatar} />
         <View style={styles.authorText}>
@@ -93,7 +107,7 @@ export function PostDetailSkeleton() {
       </View>
       <View style={styles.skeletonTitle} />
       <View style={styles.skeletonBody} />
-    </Animated.View>
+    </PulseView>
   );
 }
 

@@ -90,14 +90,16 @@ const formatPostMeta = (createdAt: string, genre: string, region: string) => {
 export function ProfileTabs<T extends string>({
   tabs,
   activeTab,
+  fullWidth = false,
   onChange,
 }: {
   tabs: readonly T[];
   activeTab: T;
+  fullWidth?: boolean;
   onChange: (tab: T) => void;
 }) {
   return (
-    <View style={styles.tabs}>
+    <View style={[styles.tabs, fullWidth && styles.tabsFullWidth]}>
       <View style={styles.tabsLine} />
       {tabs.map((tab) => {
         const isActive = tab === activeTab;
@@ -113,7 +115,14 @@ export function ProfileTabs<T extends string>({
             <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
               {tab}
             </Text>
-            {isActive ? <View style={styles.tabIndicator} /> : null}
+            {isActive ? (
+              <View
+                style={[
+                  styles.tabIndicator,
+                  fullWidth && styles.tabIndicatorFullWidth,
+                ]}
+              />
+            ) : null}
           </Pressable>
         );
       })}
@@ -412,6 +421,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     paddingHorizontal: 32,
   },
+  tabsFullWidth: {
+    paddingHorizontal: 0,
+  },
   tabsLine: {
     position: "absolute",
     left: 0,
@@ -441,6 +453,11 @@ const styles = StyleSheet.create({
     marginLeft: -57,
     borderRadius: 1,
     backgroundColor: colors.primary400,
+  },
+  tabIndicatorFullWidth: {
+    left: 0,
+    width: "100%",
+    marginLeft: 0,
   },
   empty: {
     minHeight: 444,
