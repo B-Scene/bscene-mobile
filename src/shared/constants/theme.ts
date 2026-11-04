@@ -1,3 +1,5 @@
+import type { TextStyle, ViewStyle } from "react-native";
+
 export const colors = {
   primary0: "#fff5f8",
   primary50: "#fee5ed",
@@ -50,3 +52,24 @@ export const typography = {
   body: 16,
   caption: 13,
 } as const;
+
+// 웹 styles/tokens/typography.css 와 동일한 텍스트 토큰
+export const textStyles = {
+  h3: { fontSize: 24, fontWeight: "700", lineHeight: 38 },
+  h4: { fontSize: 20, fontWeight: "600", lineHeight: 28 },
+  label1: { fontSize: 18, fontWeight: "700", lineHeight: 20 },
+  label2: { fontSize: 18, fontWeight: "600", lineHeight: 20 },
+  body1: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
+  body2: { fontSize: 15, fontWeight: "500", lineHeight: 20 },
+  body4: { fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  body5: { fontSize: 10, fontWeight: "500", lineHeight: 12 },
+  body6: { fontSize: 15, fontWeight: "700", lineHeight: 20 },
+  caption1: { fontSize: 14, fontWeight: "500", lineHeight: 20 },
+  caption2: { fontSize: 12, fontWeight: "500", lineHeight: 18 },
+  caption3: { fontSize: 12, fontWeight: "600", lineHeight: 18 },
+  caption4: { fontSize: 8, fontWeight: "500", lineHeight: 10 },
+} as const satisfies Record<string, TextStyle>;
+
+export const shadows = {
+  card: { boxShadow: "0px 0px 8px 0px rgba(0, 0, 0, 0.1)" },
+} as const satisfies Record<string, ViewStyle>;

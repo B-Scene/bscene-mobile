@@ -105,6 +105,17 @@ const ACTIVE_COLOR = {
   band: colors.secondary500,
 } as const;
 
+// 웹에서 showBottomNav={false} 그룹에 속한 마이페이지 하위 경로
+const HIDDEN_NAV_PREFIXES = [
+  "/band/my/recruit-alert",
+  "/band/my/live-alert",
+  "/band/my/applications",
+  "/band/my/postings",
+  "/band/my/members",
+  "/band/my/profile",
+  "/fan/my/profile",
+];
+
 type BottomNavigationProps = {
   mode: AppMode;
 };
@@ -125,6 +136,14 @@ export function BottomNavigation({
 
   const activeColor =
     ACTIVE_COLOR[mode];
+
+  if (
+    HIDDEN_NAV_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    )
+  ) {
+    return null;
+  }
 
   return (
     <View
