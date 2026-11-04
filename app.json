@@ -8,7 +8,6 @@
     "scheme": "bscenemobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.bscene.mobile",
       "supportsTablet": false,
       "infoPlist": {
