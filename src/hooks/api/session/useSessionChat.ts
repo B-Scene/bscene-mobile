@@ -27,6 +27,7 @@ import type {
   DirectMessageReadData,
   DirectMessageServerFrame,
 } from "@/types/session/sessionChat";
+import { createClientMsgId } from "@/shared/utils/createClientMsgId";
 
 export const sessionChatKeys = {
   all: ["sessionChat"] as const,
@@ -52,10 +53,6 @@ export const sessionChatKeys = {
 const PING_INTERVAL_MS = 20_000;
 const PONG_TIMEOUT_MS = 10_000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
-
-const createClientMsgId = () => {
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-};
 
 const getReconnectDelay = (attempt: number) => {
   return Math.min(1000 * 2 ** attempt, MAX_RECONNECT_DELAY_MS);

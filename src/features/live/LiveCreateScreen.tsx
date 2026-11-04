@@ -16,12 +16,18 @@ import {
   View,
 } from "react-native";
 
+import type {
+  BandMemberItem,
+} from "@/api/band/bandManagement";
+import { LiveCoHostSelector } from "@/features/live/LiveCoHostSelector";
+import { useBandMembersQuery } from "@/hooks/api/band/useBandManagement";
 import {
   useCancelLiveReservationMutation,
   useCreateLiveMutation,
   useLiveReservationQuery,
   useUpdateLiveReservationMutation,
 } from "@/hooks/api/live/useLive";
+import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppState } from "@/shared/components/AppState";
 import { Screen } from "@/shared/components/Screen";
@@ -30,6 +36,10 @@ import {
   radius,
   spacing,
 } from "@/shared/constants/theme";
+import { useAuthStore } from "@/stores/useAuthStore";
+import type {
+  LiveReservationCoHostCandidate,
+} from "@/types/live/live";
 
 type LiveCreateMode =
   | "instant"
@@ -40,6 +50,87 @@ const DATE_PATTERN =
 
 const TIME_PATTERN =
   /^\d{2}:\d{2}$/;
+
+const INACTIVE_MEMBER_STATUSES =
+  new Set([
+    "PENDING",
+    "INVITED",
+    "WAITING",
+    "REJECTED",
+    "REMOVED",
+    "DELETED",
+    "WITHDRAWN",
+    "CANCELED",
+    "CANCELLED",
+  ]);
+
+const toCoHostCandidate = (
+  member: BandMemberItem,
+  currentUserId:
+    | number
+    | null,
+): LiveReservationCoHostCandidate | null => {
+  if (
+    !member.id ||
+    !member.userId ||
+    !member.bandMemberProfileId ||
+    !member.profileNickname ||
+    INACTIVE_MEMBER_STATUSES.has(
+      member.status?.toUpperCase(),
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    bandMemberId:
+      member.id,
+    bandMemberProfileId:
+      member.bandMemberProfileId,
+    bandMemberProfileImageUrl:
+      null,
+    nickname:
+      member.profileNickname,
+    part:
+      member.part ??
+      member.memberType,
+    status:
+      member.userId ===
+      currentUserId
+        ? "OWNER"
+        : null,
+    userId:
+      member.userId,
+  };
+};
+
+const getInitialCoHostIds = (
+  candidates:
+    LiveReservationCoHostCandidate[],
+) =>
+  candidates
+    .filter(
+      (candidate) =>
+        candidate.status ===
+          "APPROVED" ||
+        candidate.status ===
+          "INVITED",
+    )
+    .map(
+      (candidate) =>
+        candidate.bandMemberId,
+    );
+
+const isSameIds = (
+  left: number[],
+  right: number[],
+) =>
+  [...left]
+    .sort((a, b) => a - b)
+    .join() ===
+  [...right]
+    .sort((a, b) => a - b)
+    .join();
 
 const getTomorrowDateString =
   () => {
@@ -232,6 +323,14 @@ export function LiveCreateScreen() {
     reservedTime,
     setReservedTime,
   ] = useState("20:00");
+  const [
+    selectedCoHostIds,
+    setSelectedCoHostIds,
+  ] = useState<number[]>([]);
+  const [
+    initialCoHostIds,
+    setInitialCoHostIds,
+  ] = useState<number[]>([]);
 
   const createMutation =
     useCreateLiveMutation();
@@ -245,6 +344,106 @@ export function LiveCreateScreen() {
         ? reservationLiveId
         : 0,
     );
+
+  const currentUserId =
+    useAuthStore(
+      (state) =>
+        state.user?.userId ??
+        null,
+    );
+  const activeBandQuery =
+    useActiveBandId();
+  const bandMembersQuery =
+    useBandMembersQuery(
+      activeBandQuery.activeBandId,
+    );
+
+  const coHostCandidates =
+    useMemo(() => {
+      if (isEdit) {
+        return (
+          reservationQuery.data
+            ?.cohostCandidates ?? []
+        );
+      }
+
+      return (
+        bandMembersQuery.data ?? []
+      )
+        .map((member) =>
+          toCoHostCandidate(
+            member,
+            currentUserId,
+          ),
+        )
+        .filter(
+          (
+            candidate,
+          ): candidate is LiveReservationCoHostCandidate =>
+            Boolean(candidate),
+        );
+    }, [
+      bandMembersQuery.data,
+      currentUserId,
+      isEdit,
+      reservationQuery.data,
+    ]);
+
+  const coHostErrorMessage =
+    !isEdit &&
+    !activeBandQuery.isLoading &&
+    !activeBandQuery.activeBandId
+      ? "현재 선택된 밴드 정보를 찾을 수 없어요."
+      : !isEdit &&
+          bandMembersQuery.isError
+        ? "공동 진행 후보를 불러오지 못했어요."
+        : "";
+
+  const getSubmitCoHostIds =
+    () =>
+      selectedCoHostIds.flatMap(
+        (bandMemberId) => {
+          const candidate =
+            coHostCandidates.find(
+              (item) =>
+                item.bandMemberId ===
+                bandMemberId,
+            );
+
+          return candidate &&
+            candidate.status !==
+              "OWNER"
+            ? [
+                candidate.userId ??
+                  bandMembersQuery.data?.find(
+                    (member) =>
+                      member.id ===
+                      bandMemberId,
+                  )?.userId ??
+                  candidate.bandMemberProfileId,
+              ]
+            : [];
+        },
+      );
+
+  const toggleCoHost =
+    (bandMemberId: number) => {
+      setSelectedCoHostIds(
+        (previous) =>
+          previous.includes(
+            bandMemberId,
+          )
+            ? previous.filter(
+                (id) =>
+                  id !==
+                  bandMemberId,
+              )
+            : [
+                ...previous,
+                bandMemberId,
+              ],
+      );
+    };
 
   useEffect(() => {
     if (
@@ -274,6 +473,19 @@ export function LiveCreateScreen() {
         );
         setReservedTime(
           schedule.time,
+        );
+
+        const coHostIds =
+          getInitialCoHostIds(
+            reservation.cohostCandidates ??
+              [],
+          );
+
+        setSelectedCoHostIds(
+          coHostIds,
+        );
+        setInitialCoHostIds(
+          coHostIds,
         );
       }, 0);
 
@@ -395,6 +607,17 @@ export function LiveCreateScreen() {
                     reservedDate,
                     reservedTime,
                   ),
+                thumbnailImageUrl:
+                  reservationQuery.data
+                    ?.thumbnailImageUrl ??
+                  null,
+                coHost:
+                  isSameIds(
+                    selectedCoHostIds,
+                    initialCoHostIds,
+                  )
+                    ? null
+                    : getSubmitCoHostIds(),
               },
             },
           );
@@ -413,7 +636,11 @@ export function LiveCreateScreen() {
 
         const result =
           await createMutation.mutateAsync(
-            payload,
+            {
+              ...payload,
+              coHost:
+                getSubmitCoHostIds(),
+            },
           );
 
         if (
@@ -694,6 +921,24 @@ export function LiveCreateScreen() {
           </View>
         </View>
       </View>
+
+      <LiveCoHostSelector
+        candidates={
+          coHostCandidates
+        }
+        selectedIds={
+          selectedCoHostIds
+        }
+        isLoading={
+          !isEdit &&
+          (activeBandQuery.isLoading ||
+            bandMembersQuery.isLoading)
+        }
+        errorMessage={
+          coHostErrorMessage
+        }
+        onToggle={toggleCoHost}
+      />
 
       <View style={styles.footer}>
         <Pressable

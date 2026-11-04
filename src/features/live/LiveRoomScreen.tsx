@@ -4,6 +4,10 @@ import {
 } from "expo-router";
 
 import {
+    isAxiosError,
+} from "axios";
+
+import {
     useAudioPlayer,
 } from "expo-audio";
 
@@ -30,6 +34,7 @@ import {
 } from "react-native";
 
 import {
+    enterLive,
     resolveLiveMediaUrl,
 } from "@/api/live/live";
 
@@ -43,8 +48,16 @@ import {
 } from "@/hooks/api/live/useLive";
 
 import {
+    useCoPublisherPlayback,
+} from "@/hooks/api/live/useCoPublisherPlayback";
+
+import {
     useLiveChatSocket,
 } from "@/hooks/api/live/useLiveChatSocket";
+
+import {
+    useLiveEvents,
+} from "@/hooks/api/live/useLiveEvents";
 
 import {
     startWhepPlayback,
@@ -77,6 +90,8 @@ import {
 import type {
     EnterLiveResponse,
     LiveChatMessage,
+    LiveCoHostRequester,
+    LiveCoPublisher,
 } from "@/types/live/live";
 
 const RTC_RETRY_DELAY_MS =
@@ -84,6 +99,19 @@ const RTC_RETRY_DELAY_MS =
 
 const MAX_RTC_RETRY_ATTEMPTS =
   5;
+
+const CO_HOST_APPROVAL_POLL_MS =
+  3000;
+
+const getApiErrorCode = (
+  error: unknown,
+) =>
+  isAxiosError<{
+    code?: string;
+  }>(error)
+    ? error.response?.data
+        ?.code
+    : undefined;
 
 const parseId = (
   value?: string | string[],
@@ -158,6 +186,66 @@ export function LiveRoomScreen({
     );
 
   const [
+    coPublishers,
+    setCoPublishers,
+  ] =
+    useState<LiveCoPublisher[]>(
+      [],
+    );
+
+  const [
+    viewerCount,
+    setViewerCount,
+  ] =
+    useState<number | null>(
+      null,
+    );
+
+  const [
+    coHostRequests,
+    setCoHostRequests,
+  ] =
+    useState<LiveCoHostRequester[]>(
+      [],
+    );
+
+  const [
+    isDeepLinkRequestHandled,
+    setIsDeepLinkRequestHandled,
+  ] = useState(false);
+
+  const [
+    isAwaitingCoHostApproval,
+    setIsAwaitingCoHostApproval,
+  ] = useState(false);
+
+  const [
+    isInvitePending,
+    setIsInvitePending,
+  ] = useState(
+    params.coHostInvite ===
+      "1",
+  );
+
+  const isEnteringAsCoHostRef =
+    useRef(false);
+
+  const applyLive =
+    useCallback(
+      (
+        result: EnterLiveResponse,
+      ) => {
+        setLive(result);
+
+        setCoPublishers(
+          result.coPublishers ??
+            [],
+        );
+      },
+      [],
+    );
+
+  const [
     messages,
     setMessages,
   ] =
@@ -202,7 +290,8 @@ export function LiveRoomScreen({
   useEffect(() => {
     if (
       !liveId ||
-      hasEnteredRef.current
+      hasEnteredRef.current ||
+      isInvitePending
     ) {
       return;
     }
@@ -217,7 +306,7 @@ export function LiveRoomScreen({
             liveId,
           );
 
-        setLive(result);
+        applyLive(result);
       } catch {
         Alert.alert(
           "라이브",
@@ -234,7 +323,9 @@ export function LiveRoomScreen({
       }
     })();
   }, [
+    applyLive,
     enterMutation,
+    isInvitePending,
     liveId,
   ]);
 
@@ -557,6 +648,233 @@ export function LiveRoomScreen({
     live?.playback.protocol ===
     "WHIP";
 
+  const canBroadcast =
+    isOwner ||
+    live?.playback.role ===
+      "CO_HOST";
+
+  const otherCoPublishers =
+    useMemo(
+      () =>
+        coPublishers.filter(
+          (publisher) =>
+            publisher.userId !==
+              currentUserId &&
+            Boolean(
+              publisher.whepUrl?.trim(),
+            ),
+        ),
+      [
+        coPublishers,
+        currentUserId,
+      ],
+    );
+
+  const handleCoHostRequested =
+    useCallback(
+      (
+        requester: LiveCoHostRequester | null,
+      ) => {
+        if (!requester) {
+          Alert.alert(
+            "공동 진행 요청",
+            "공동 진행 요청이 도착했지만 요청자 정보를 확인할 수 없어요. 알림에서 확인해 주세요.",
+          );
+
+          return;
+        }
+
+        setCoHostRequests(
+          (previous) =>
+            previous.some(
+              (item) =>
+                item.userId ===
+                requester.userId,
+            )
+              ? previous
+              : [
+                  ...previous,
+                  requester,
+                ],
+        );
+      },
+      [],
+    );
+
+  const enterAsCoHost =
+    useCallback(async () => {
+      if (
+        !liveId ||
+        isEnteringAsCoHostRef.current
+      ) {
+        return false;
+      }
+
+      isEnteringAsCoHostRef.current =
+        true;
+
+      try {
+        const result =
+          await enterLive(
+            liveId,
+          );
+
+        if (
+          result.playback.role !==
+            "CO_HOST" ||
+          result.playback.protocol !==
+            "WHIP" ||
+          !result.playback.playbackUrl
+        ) {
+          return false;
+        }
+
+        setIsAwaitingCoHostApproval(
+          false,
+        );
+
+        applyLive(result);
+
+        return true;
+      } finally {
+        isEnteringAsCoHostRef.current =
+          false;
+      }
+    }, [
+      applyLive,
+      liveId,
+    ]);
+
+  useLiveEvents({
+    liveId:
+      live?.liveId ??
+      null,
+
+    enabled:
+      Boolean(
+        live?.liveId,
+      ),
+
+    onViewerCount:
+      setViewerCount,
+
+    onCoPublishersChanged:
+      setCoPublishers,
+
+    onCoHostUpgradeRequested:
+      handleCoHostRequested,
+
+    onCoHostUpgradeAccepted:
+      () => {
+        if (
+          isAwaitingCoHostApproval
+        ) {
+          void enterAsCoHost().catch(
+            () => {},
+          );
+        }
+      },
+  });
+
+  useCoPublisherPlayback({
+    enabled:
+      canBroadcast &&
+      mediaConnected,
+
+    publishers:
+      otherCoPublishers,
+  });
+
+  useEffect(() => {
+    if (
+      !isAwaitingCoHostApproval
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    let pollTimer:
+      | ReturnType<
+          typeof setTimeout
+        >
+      | null = null;
+
+    const checkApproval =
+      async () => {
+        try {
+          if (
+            await enterAsCoHost()
+          ) {
+            return;
+          }
+        } catch {
+          // 방장이 승인하기 전에는 입장 API가 실패할 수 있다.
+        }
+
+        if (!cancelled) {
+          pollTimer =
+            setTimeout(() => {
+              void checkApproval();
+            }, CO_HOST_APPROVAL_POLL_MS);
+        }
+      };
+
+    pollTimer =
+      setTimeout(() => {
+        void checkApproval();
+      }, CO_HOST_APPROVAL_POLL_MS);
+
+    return () => {
+      cancelled = true;
+
+      if (pollTimer) {
+        clearTimeout(
+          pollTimer,
+        );
+      }
+    };
+  }, [
+    enterAsCoHost,
+    isAwaitingCoHostApproval,
+  ]);
+
+  const currentCoHostRequest:
+    | LiveCoHostRequester
+    | null =
+    !isOwner
+      ? null
+      : (coHostRequests[0] ??
+        (requesterUserId > 0 &&
+        !isDeepLinkRequestHandled
+          ? {
+              userId:
+                requesterUserId,
+              nickname: null,
+            }
+          : null));
+
+  const dismissCoHostRequest =
+    (userId: number) => {
+      setCoHostRequests(
+        (previous) =>
+          previous.filter(
+            (item) =>
+              item.userId !==
+              userId,
+          ),
+      );
+
+      if (
+        userId ===
+        requesterUserId
+      ) {
+        setIsDeepLinkRequestHandled(
+          true,
+        );
+      }
+    };
+
   const toggleMic = () => {
     const rtc =
       rtcRef.current;
@@ -716,11 +1034,32 @@ export function LiveRoomScreen({
           liveId,
         );
 
+        setIsAwaitingCoHostApproval(
+          true,
+        );
+
         Alert.alert(
           "공동 진행 요청",
-          "방장에게 공동 진행 요청을 보냈어요.",
+          "방장에게 공동 진행 요청을 보냈어요. 승인되면 자동으로 송출로 전환돼요.",
         );
-      } catch {
+      } catch (error) {
+        if (
+          getApiErrorCode(
+            error,
+          ) === "LIVE409_8"
+        ) {
+          setIsAwaitingCoHostApproval(
+            true,
+          );
+
+          Alert.alert(
+            "공동 진행 요청",
+            "이미 승인을 기다리는 요청이 있어요.",
+          );
+
+          return;
+        }
+
         Alert.alert(
           "공동 진행 요청",
           "요청을 보내지 못했어요.",
@@ -731,7 +1070,7 @@ export function LiveRoomScreen({
   const acceptRequester =
     async () => {
       if (
-        !requesterUserId
+        !currentCoHostRequest
       ) {
         return;
       }
@@ -741,8 +1080,12 @@ export function LiveRoomScreen({
           {
             liveId,
             userId:
-              requesterUserId,
+              currentCoHostRequest.userId,
           },
+        );
+
+        dismissCoHostRequest(
+          currentCoHostRequest.userId,
         );
 
         Alert.alert(
@@ -769,19 +1112,53 @@ export function LiveRoomScreen({
               accepted,
           },
         );
+      } catch (error) {
+        if (
+          getApiErrorCode(
+            error,
+          ) !== "LIVE409_7"
+        ) {
+          Alert.alert(
+            "공동 진행 초대",
+            "초대를 처리하지 못했어요.",
+          );
 
-        if (accepted) {
-          const result =
-            await enterMutation.mutateAsync(
-              liveId,
-            );
-
-          setLive(result);
+          return;
         }
+      }
+
+      if (!accepted) {
+        router.back();
+
+        return;
+      }
+
+      hasEnteredRef.current =
+        true;
+
+      try {
+        const result =
+          await enterMutation.mutateAsync(
+            liveId,
+          );
+
+        applyLive(result);
+
+        setIsInvitePending(
+          false,
+        );
       } catch {
         Alert.alert(
           "공동 진행 초대",
-          "초대를 처리하지 못했어요.",
+          "초대를 수락했어요. 라이브가 시작되면 입장 버튼으로 참여할 수 있어요.",
+          [
+            {
+              text: "확인",
+
+              onPress: () =>
+                router.back(),
+            },
+          ],
         );
       }
     };
@@ -800,6 +1177,76 @@ export function LiveRoomScreen({
         ),
       [messages],
     );
+
+  if (isInvitePending) {
+    return (
+      <Screen
+        contentStyle={
+          styles.container
+        }
+      >
+        <AppHeader title="라이브" />
+
+        <AppCard
+          style={
+            styles.section
+          }
+        >
+          <Text
+            style={
+              styles.sectionTitle
+            }
+          >
+            공동 진행 초대
+          </Text>
+
+          <Text
+            style={
+              styles.description
+            }
+          >
+            이 라이브의 공동 진행자로
+            초대받았어요.
+          </Text>
+
+          <View
+            style={
+              styles.row
+            }
+          >
+            <AppButton
+              label="거절"
+              variant="secondary"
+              style={
+                styles.rowButton
+              }
+              onPress={() =>
+                void respondInvite(
+                  false,
+                )
+              }
+            />
+
+            <AppButton
+              label="수락"
+              style={
+                styles.rowButton
+              }
+              loading={
+                respondInviteMutation.isPending ||
+                enterMutation.isPending
+              }
+              onPress={() =>
+                void respondInvite(
+                  true,
+                )
+              }
+            />
+          </View>
+        </AppCard>
+      </Screen>
+    );
+  }
 
   if (
     enterMutation.isPending &&
@@ -922,7 +1369,8 @@ export function LiveRoomScreen({
         <Text
           style={styles.meta}
         >
-          {live.viewerCount ??
+          {viewerCount ??
+            live.viewerCount ??
             live.viewCount ??
             0}
           명 시청 중 ·{" "}
@@ -932,6 +1380,19 @@ export function LiveRoomScreen({
               .protocol
           }
         </Text>
+
+        {otherCoPublishers.length >
+        0 ? (
+          <Text
+            style={styles.meta}
+          >
+            공동 진행{" "}
+            {
+              otherCoPublishers.length
+            }
+            명 참여 중
+          </Text>
+        ) : null}
 
         {mediaError ? (
           <Text
@@ -985,8 +1446,7 @@ export function LiveRoomScreen({
         ) : null}
       </AppCard>
 
-      {requesterUserId >
-      0 ? (
+      {currentCoHostRequest ? (
         <AppCard
           style={
             styles.section
@@ -1005,35 +1465,11 @@ export function LiveRoomScreen({
               styles.description
             }
           >
+            {currentCoHostRequest.nickname
+              ? `${currentCoHostRequest.nickname}님의 `
+              : ""}
             공동 진행 요청이
             도착했어요.
-          </Text>
-
-          <AppButton
-            label="공동 진행 수락"
-            loading={
-              acceptCoHostMutation.isPending
-            }
-            onPress={() =>
-              void acceptRequester()
-            }
-          />
-        </AppCard>
-      ) : null}
-
-      {params.coHostInvite ===
-      "1" ? (
-        <AppCard
-          style={
-            styles.section
-          }
-        >
-          <Text
-            style={
-              styles.sectionTitle
-            }
-          >
-            공동 진행 초대
           </Text>
 
           <View
@@ -1042,27 +1478,28 @@ export function LiveRoomScreen({
             }
           >
             <AppButton
-              label="거절"
+              label="닫기"
               variant="secondary"
               style={
                 styles.rowButton
               }
               onPress={() =>
-                void respondInvite(
-                  false,
+                dismissCoHostRequest(
+                  currentCoHostRequest.userId,
                 )
               }
             />
 
             <AppButton
-              label="수락"
+              label="공동 진행 수락"
               style={
                 styles.rowButton
               }
+              loading={
+                acceptCoHostMutation.isPending
+              }
               onPress={() =>
-                void respondInvite(
-                  true,
-                )
+                void acceptRequester()
               }
             />
           </View>
@@ -1071,8 +1508,15 @@ export function LiveRoomScreen({
 
       {canRequestCoHost ? (
         <AppButton
-          label="공동 진행 요청"
+          label={
+            isAwaitingCoHostApproval
+              ? "공동 진행 승인 대기 중"
+              : "공동 진행 요청"
+          }
           variant="secondary"
+          disabled={
+            isAwaitingCoHostApproval
+          }
           loading={
             requestCoHostMutation.isPending
           }

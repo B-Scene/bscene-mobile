@@ -4,12 +4,20 @@ import {
 } from "axios";
 
 import {
+    fetch as expoFetch,
+} from "expo/fetch";
+
+import {
     axiosInstance,
 } from "@/api/axiosInstance";
 
 import {
     config,
 } from "@/shared/constants/config";
+
+import {
+    secureTokenStorage,
+} from "@/shared/utils/secureTokenStorage";
 
 import type {
     CloseLiveResponse,
@@ -18,6 +26,8 @@ import type {
     EnterLiveResponse,
     LiveApiResponse,
     LiveChatTicketResponse,
+    LiveCoHostRequester,
+    LiveCoPublisher,
     LiveHomeResponse,
     LiveNowListFilter,
     LiveNowListResponse,
@@ -234,9 +244,19 @@ export const getLiveReservation =
         `/lives/${liveId}/reservation`,
       );
 
-    return assertSuccess(
-      response,
-    );
+    const result =
+      assertSuccess(
+        response,
+      );
+
+    return {
+      ...result,
+
+      cohostCandidates:
+        result.cohostCandidates ??
+        result.coHostCandidates ??
+        [],
+    };
   };
 
 export const updateLiveReservation =
@@ -285,9 +305,19 @@ export const enterLive =
         `/lives/${liveId}`,
       );
 
-    return assertSuccess(
-      response,
-    );
+    const result =
+      assertSuccess(
+        response,
+      );
+
+    return {
+      ...result,
+
+      coPublishers:
+        result.coPublishers ??
+        result.coPublisher ??
+        [],
+    };
   };
 
 export const leaveLive =
@@ -312,12 +342,12 @@ export const closeLive =
   ) => {
     const response =
       await axiosInstance.post<
-        LiveApiResponse<CloseLiveResponse>
+        LiveApiResponse<CloseLiveResponse | null>
       >(
         `/lives/${liveId}/close`,
       );
 
-    return assertSuccess(
+    return assertNullableSuccess(
       response,
     );
   };
@@ -548,6 +578,392 @@ export const getReplayPlayback =
     return assertSuccess(
       response,
     );
+  };
+
+const toPositiveId = (
+  value: unknown,
+) => {
+  const parsed =
+    Number(value);
+
+  return Number.isFinite(
+    parsed,
+  ) && parsed > 0
+    ? parsed
+    : null;
+};
+
+const toRecord = (
+  value: unknown,
+) =>
+  value &&
+  typeof value === "object"
+    ? (value as RawRecord)
+    : null;
+
+const parseCoHostRequester = (
+  rawData: string,
+): LiveCoHostRequester | null => {
+  const trimmedData =
+    rawData.trim();
+
+  const directUserId =
+    toPositiveId(
+      trimmedData,
+    );
+
+  if (directUserId) {
+    return {
+      userId: directUserId,
+      nickname: null,
+    };
+  }
+
+  try {
+    const record =
+      toRecord(
+        JSON.parse(
+          trimmedData,
+        ),
+      );
+
+    const requester =
+      toRecord(
+        record?.requester,
+      );
+
+    const data =
+      toRecord(
+        record?.data,
+      );
+
+    const userId =
+      [
+        record?.userId,
+        record?.requesterUserId,
+        record?.targetUserId,
+        record?.memberUserId,
+        requester?.userId,
+        data?.userId,
+        data?.requesterUserId,
+      ]
+        .map(toPositiveId)
+        .find(Boolean);
+
+    if (!userId) {
+      return null;
+    }
+
+    const nickname =
+      [
+        record?.nickname,
+        record?.requesterNickname,
+        requester?.nickname,
+        data?.nickname,
+        data?.requesterNickname,
+      ].find(
+        (value) =>
+          typeof value ===
+            "string" &&
+          value.trim(),
+      );
+
+    return {
+      userId,
+
+      nickname:
+        typeof nickname ===
+        "string"
+          ? nickname.trim()
+          : null,
+    };
+  } catch {
+    return null;
+  }
+};
+
+const parseCoPublishers = (
+  rawData: string,
+): LiveCoPublisher[] | null => {
+  try {
+    const parsed =
+      JSON.parse(
+        rawData,
+      ) as unknown;
+
+    const items =
+      Array.isArray(parsed)
+        ? parsed
+        : toRecord(parsed)
+            ?.coPublishers;
+
+    if (
+      !Array.isArray(items)
+    ) {
+      return [];
+    }
+
+    const publishers =
+      new Map<number, string>();
+
+    items.forEach((item) => {
+      const record =
+        toRecord(item);
+
+      const userId =
+        toPositiveId(
+          record?.userId,
+        );
+
+      const whepUrl =
+        typeof record?.whepUrl ===
+        "string"
+          ? record.whepUrl.trim()
+          : "";
+
+      if (
+        userId &&
+        whepUrl
+      ) {
+        publishers.set(
+          userId,
+          whepUrl,
+        );
+      }
+    });
+
+    return Array.from(
+      publishers,
+      ([userId, whepUrl]) => ({
+        userId,
+        whepUrl,
+      }),
+    );
+  } catch {
+    return null;
+  }
+};
+
+export type LiveEventHandlers = {
+  onViewerCount: (
+    viewerCount: number,
+  ) => void;
+
+  onCoPublishersChanged: (
+    publishers: LiveCoPublisher[],
+  ) => void;
+
+  onCoHostUpgradeRequested: (
+    requester: LiveCoHostRequester | null,
+  ) => void;
+
+  onCoHostUpgradeAccepted: () => void;
+};
+
+const handleLiveEvent = (
+  eventText: string,
+  handlers: LiveEventHandlers,
+) => {
+  const lines =
+    eventText.split("\n");
+
+  const eventName =
+    lines
+      .find((line) =>
+        line.startsWith(
+          "event:",
+        ),
+      )
+      ?.replace(
+        /^event:\s?/,
+        "",
+      )
+      .trim();
+
+  const data =
+    lines
+      .filter((line) =>
+        line.startsWith(
+          "data:",
+        ),
+      )
+      .map((line) =>
+        line.replace(
+          /^data:\s?/,
+          "",
+        ),
+      )
+      .join("\n");
+
+  // 명세의 이벤트 이름 표기(Requestd)도 함께 받는다.
+  if (
+    eventName ===
+      "coHostUpgradeRequested" ||
+    eventName ===
+      "coHostUpgradeRequestd"
+  ) {
+    handlers.onCoHostUpgradeRequested(
+      parseCoHostRequester(
+        data,
+      ),
+    );
+
+    return;
+  }
+
+  if (
+    eventName ===
+    "coHostUpgradeAccepted"
+  ) {
+    handlers.onCoHostUpgradeAccepted();
+
+    return;
+  }
+
+  if (!data.trim()) {
+    return;
+  }
+
+  if (
+    !eventName ||
+    eventName ===
+      "viewerCount"
+  ) {
+    const viewerCount =
+      Number(
+        data.trim(),
+      );
+
+    if (
+      Number.isFinite(
+        viewerCount,
+      )
+    ) {
+      handlers.onViewerCount(
+        viewerCount,
+      );
+    }
+
+    return;
+  }
+
+  if (
+    eventName ===
+    "coPublishersChanged"
+  ) {
+    const publishers =
+      parseCoPublishers(
+        data,
+      );
+
+    if (publishers) {
+      handlers.onCoPublishersChanged(
+        publishers,
+      );
+    }
+  }
+};
+
+export const subscribeLiveEvents =
+  async ({
+    liveId,
+    signal,
+    handlers,
+  }: {
+    liveId: number;
+    signal: AbortSignal;
+    handlers: LiveEventHandlers;
+  }) => {
+    const token =
+      await secureTokenStorage.getAccessToken();
+
+    if (!token) {
+      throw new Error(
+        "로그인이 필요합니다.",
+      );
+    }
+
+    const base =
+      config.apiBaseUrl.replace(
+        /\/$/,
+        "",
+      );
+
+    const response =
+      await expoFetch(
+        `${base}/lives/${liveId}/viewers?watchOnly=false`,
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+
+            Accept:
+              "text/event-stream",
+          },
+
+          signal,
+        },
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        `라이브 이벤트 구독 실패: ${response.status}`,
+      );
+    }
+
+    const reader =
+      response.body?.getReader();
+
+    if (!reader) {
+      throw new Error(
+        "라이브 이벤트 스트림을 읽을 수 없어요.",
+      );
+    }
+
+    const decoder =
+      new TextDecoder();
+
+    let buffer = "";
+
+    try {
+      while (true) {
+        const {
+          value,
+          done,
+        } =
+          await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer +=
+          decoder
+            .decode(value, {
+              stream: true,
+            })
+            .replace(
+              /\r\n/g,
+              "\n",
+            );
+
+        const events =
+          buffer.split("\n\n");
+
+        buffer =
+          events.pop() ?? "";
+
+        events.forEach(
+          (eventText) =>
+            handleLiveEvent(
+              eventText,
+              handlers,
+            ),
+        );
+      }
+    } finally {
+      reader.releaseLock();
+    }
   };
 
 export const resolveLiveMediaUrl =
