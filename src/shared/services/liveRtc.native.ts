@@ -1,13 +1,22 @@
 import type { RTCPeerConnection as RTCPeerConnectionType } from "react-native-webrtc";
+import { NativeModules } from "react-native";
 
 import { resolveLiveMediaUrl } from "@/api/live/live";
 import { secureTokenStorage } from "@/shared/utils/secureTokenStorage";
 
 type WebRtcModule = typeof import("react-native-webrtc");
 
+const WEB_RTC_UNSUPPORTED_MESSAGE =
+  "Live 송출 및 공동 진행은 Expo Go에서 지원되지 않아요. Development Build에서 테스트해 주세요.";
+
 let webRtcModulePromise: Promise<WebRtcModule> | null = null;
 
 const loadWebRtcModule = async (): Promise<WebRtcModule> => {
+  // 네이티브 모듈 없이 import하면 Metro가 catch 전에 fatal error로 보고한다.
+  if (!NativeModules.WebRTCModule) {
+    throw new Error(WEB_RTC_UNSUPPORTED_MESSAGE);
+  }
+
   if (!webRtcModulePromise) {
     webRtcModulePromise = import("react-native-webrtc")
       .then((module) => {
@@ -25,9 +34,7 @@ const loadWebRtcModule = async (): Promise<WebRtcModule> => {
   try {
     return await webRtcModulePromise;
   } catch {
-    throw new Error(
-      "Live 송출 및 공동 진행은 Expo Go에서 지원되지 않아요. Development Build에서 테스트해 주세요.",
-    );
+    throw new Error(WEB_RTC_UNSUPPORTED_MESSAGE);
   }
 };
 
