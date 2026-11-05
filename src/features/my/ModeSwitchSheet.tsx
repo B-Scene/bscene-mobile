@@ -23,6 +23,7 @@ import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 
 const FAN_START_ID = "fan-start";
 const BAND_START_ID = "band-start";
+const BAND_CREATE_PATH = "/band/my/profile/new" as Href;
 
 function AccountRow({
   avatar,
@@ -139,6 +140,38 @@ export function ModeSwitchSheet({
     router.replace(isFanSelected ? "/fan/home" : "/band/home");
   };
 
+  const openBandCreate = () => {
+    if (!isFanMode) {
+      close();
+      router.push(BAND_CREATE_PATH);
+      return;
+    }
+
+    // 밴드 화면은 밴드 모드에서만 열리므로 먼저 전환한 뒤 이동한다.
+    const enterBandCreate = () => {
+      setMode("band");
+      void setCurrentMode("BAND");
+      close();
+      router.replace("/band/home");
+      router.push(BAND_CREATE_PATH);
+    };
+    const onError = () => setShowError(true);
+    const band =
+      bandAccounts.find((account) => account.isActive) ?? bandAccounts[0];
+
+    setShowError(false);
+
+    if (band) {
+      changeUserMode.mutate(
+        { profileId: band.bandMemberProfileId, type: "BAND" },
+        { onSuccess: enterBandCreate, onError },
+      );
+      return;
+    }
+
+    toggleUserMode.mutate(undefined, { onSuccess: enterBandCreate, onError });
+  };
+
   const switchMode = () => {
     if (selectedId === FAN_START_ID) {
       setOnboardingModes(["FAN", "BAND"], "FAN");
@@ -246,21 +279,15 @@ export function ModeSwitchSheet({
           </View>
         </ScrollView>
 
-        {!isFanMode ? (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              accessibilityRole="button"
-              style={styles.createBand}
-              onPress={() => {
-                close();
-                router.push("/band/my/profile/new" as Href);
-              }}
-            >
-              <Text style={styles.createBandText}>+ 새 밴드 만들기</Text>
-            </Pressable>
-          </>
-        ) : null}
+        <View style={styles.divider} />
+        <Pressable
+          accessibilityRole="button"
+          disabled={changeUserMode.isPending || toggleUserMode.isPending}
+          style={styles.createBand}
+          onPress={openBandCreate}
+        >
+          <Text style={styles.createBandText}>+ 새 밴드 만들기</Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
