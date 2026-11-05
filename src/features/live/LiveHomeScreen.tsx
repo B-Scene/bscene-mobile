@@ -4,6 +4,8 @@ import {
   Alert,
   Image,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -49,7 +51,8 @@ export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
       <BandLiveHome
         data={data}
         isLoading={query.isLoading}
-        isError={query.isError || !data}
+        isError={query.isError}
+        isRefreshing={query.isRefetching}
         onRetry={() => void query.refetch()}
       />
     );
@@ -69,14 +72,18 @@ function BandLiveHome({
   data,
   isLoading,
   isError,
+  isRefreshing,
   onRetry,
 }: {
   data: ReturnType<typeof useLiveHomeQuery>["data"];
   isLoading: boolean;
   isError: boolean;
+  isRefreshing: boolean;
   onRetry: () => void;
 }) {
   const now = useScheduledLiveNow();
+  const liveNow = data?.liveNow ?? [];
+  const scheduled = data?.scheduled ?? [];
 
   const handleScheduledAction =
     (live: ScheduledLiveItem) => {
@@ -100,7 +107,18 @@ function BandLiveHome({
     };
 
   return (
-    <Screen edges={["top"]} contentStyle={styles.bandContainer}>
+    <Screen edges={["top"]} scroll={false} contentStyle={styles.bandScreen}>
+      <ScrollView
+        contentContainerStyle={styles.bandContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            tintColor={colors.secondary500}
+            colors={[colors.secondary500]}
+            onRefresh={onRetry}
+          />
+        }
+      >
       <View style={styles.bandHeader}>
         <Text style={styles.bandHeaderTitle}>라이브</Text>
       </View>
@@ -137,7 +155,7 @@ function BandLiveHome({
           <Text style={styles.bandStateText}>라이브를 불러오는 중이에요.</Text>
         ) : null}
 
-        {!isLoading && isError ? (
+        {isError ? (
           <View style={styles.bandStateCard}>
             <Text style={styles.bandStateCardText}>라이브 정보를 불러오지 못했어요.</Text>
             <Pressable
@@ -150,8 +168,7 @@ function BandLiveHome({
           </View>
         ) : null}
 
-        {!isLoading && !isError && data ? (
-          <>
+        <>
             <View style={styles.bandSection}>
               <BandSectionHeader
                 title="진행 중인 라이브"
@@ -162,8 +179,8 @@ function BandLiveHome({
                 }
               />
               <View style={styles.bandCardList}>
-                {data.liveNow.length > 0 ? (
-                  data.liveNow.map((live) => (
+                {liveNow.length > 0 ? (
+                  liveNow.map((live) => (
                     <BandLiveNowCard key={live.liveId} live={live} />
                   ))
                 ) : (
@@ -184,8 +201,8 @@ function BandLiveHome({
                 }
               />
               <View style={styles.bandCardList}>
-                {data.scheduled.length > 0 ? (
-                  data.scheduled.map((live) => (
+                {scheduled.length > 0 ? (
+                  scheduled.map((live) => (
                     <BandScheduledLiveCard
                       key={live.liveId}
                       live={live}
@@ -202,9 +219,9 @@ function BandLiveHome({
                 )}
               </View>
             </View>
-          </>
-        ) : null}
+        </>
       </View>
+      </ScrollView>
     </Screen>
   );
 }
@@ -254,16 +271,35 @@ export function BandLiveListScreen({
     };
 
   return (
-    <Screen contentStyle={styles.bandListContainer}>
+    <Screen scroll={false} contentStyle={styles.bandScreen}>
       <AppHeader title={title} style={styles.bandListHeader} />
 
+      <ScrollView
+        contentContainerStyle={styles.bandListContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={query.isRefetching}
+            tintColor={colors.secondary500}
+            colors={[colors.secondary500]}
+            onRefresh={() => void query.refetch()}
+          />
+        }
+      >
       {query.isLoading ? (
-        <Text style={styles.listMessage}>라이브 목록을 불러오는 중이에요.</Text>
+        <Text style={styles.listMessage}>
+          {kind === "now"
+            ? "라이브 목록을 불러오는 중이에요."
+            : "예정된 라이브를 불러오는 중이에요."}
+        </Text>
       ) : null}
 
       {!query.isLoading && query.isError ? (
         <View style={styles.listMessageBox}>
-          <Text style={styles.listMessageText}>라이브 목록을 불러오지 못했어요.</Text>
+          <Text style={styles.listMessageText}>
+            {kind === "now"
+              ? "라이브 목록을 불러오지 못했어요."
+              : "예정된 라이브를 불러오지 못했어요."}
+          </Text>
           <Pressable
             accessibilityRole="button"
             style={styles.retryButton}
@@ -312,6 +348,7 @@ export function BandLiveListScreen({
           )}
         </View>
       ) : null}
+      </ScrollView>
     </Screen>
   );
 }
@@ -812,17 +849,18 @@ function useScheduledLiveNow() {
 }
 
 const styles = StyleSheet.create({
-  bandContainer: {
+  bandScreen: {
     paddingHorizontal: 0,
     paddingVertical: 0,
-    paddingBottom: 24,
     backgroundColor: colors.white,
   },
+  bandContainer: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
   bandListContainer: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
+    flexGrow: 1,
     paddingBottom: 32,
-    backgroundColor: colors.white,
   },
   bandHeader: {
     height: 48,

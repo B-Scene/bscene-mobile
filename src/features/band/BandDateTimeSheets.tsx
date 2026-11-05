@@ -83,12 +83,14 @@ export function DatePickerSheet({
   open,
   startDate,
   endDate,
+  selectionMode = "range",
   onClose,
   onSelect,
 }: {
   open: boolean;
   startDate: string;
   endDate: string;
+  selectionMode?: "single" | "range";
   onClose: () => void;
   onSelect: (range: { start: string; end: string }) => void;
 }) {
@@ -125,6 +127,12 @@ export function DatePickerSheet({
   };
 
   const pressDay = (dateKey: string) => {
+    if (selectionMode === "single") {
+      setRangeStart(dateKey);
+      onSelect({ start: dateKey, end: dateKey });
+      return;
+    }
+
     if (!rangeStart || rangeEnd || dateKey < rangeStart) {
       setRangeStart(dateKey);
       setRangeEnd("");

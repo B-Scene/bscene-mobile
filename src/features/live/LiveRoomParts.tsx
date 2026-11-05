@@ -114,21 +114,33 @@ export function LiveRoomHeader({
 export function LiveRoomBanner({
   message,
   backgroundColor,
+  floating = false,
 }: {
   message: string;
   backgroundColor: string;
+  floating?: boolean;
 }) {
   return (
-    <Text style={[styles.banner, { backgroundColor }]}>{message}</Text>
+    <Text
+      style={[
+        styles.banner,
+        floating && styles.bannerFloating,
+        { backgroundColor },
+      ]}
+    >
+      {message}
+    </Text>
   );
 }
 
 export function LiveRoomPill({
   label,
+  top,
   disabled = false,
   onPress,
 }: {
   label: string;
+  top: number;
   disabled?: boolean;
   onPress: () => void;
 }) {
@@ -136,7 +148,7 @@ export function LiveRoomPill({
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      style={[styles.pill, disabled && styles.dimmed]}
+      style={[styles.pill, { top }, disabled && styles.dimmed]}
       onPress={onPress}
     >
       <Text style={styles.pillText}>{label}</Text>
@@ -174,7 +186,7 @@ export function LiveRoomStage({
         <LiveWaveform isActive={isAudioActive} side="right" tone={tone} />
       </View>
 
-      <View style={styles.heroText}>
+      <View style={[styles.heroText, tone === "band" && styles.heroTextBand]}>
         <View style={styles.bandRow}>
           <Text numberOfLines={1} style={styles.bandName}>
             {bandName}
@@ -198,12 +210,17 @@ function ChatRow({
   tone,
   message,
   highlighted,
+  onProfilePress,
 }: {
   tone: LiveRoomTone;
   message: LiveChatMessage;
   highlighted: boolean;
+  onProfilePress?: (message: LiveChatMessage) => void;
 }) {
   const time = formatChatTime(message.sentAt);
+  const openProfile = onProfilePress
+    ? () => onProfilePress(message)
+    : undefined;
 
   if (highlighted) {
     return (
@@ -223,7 +240,9 @@ function ChatRow({
               variant="band"
             />
           </View>
-          <View style={styles.micBadge}>
+          <View
+            style={[styles.micBadge, tone === "band" && styles.micBadgeBand]}
+          >
             <AppIcon
               name={tone === "band" ? "micBand" : "volume"}
               size={10}
@@ -231,32 +250,53 @@ function ChatRow({
           </View>
         </View>
 
-        <View
+        <Pressable
+          disabled={!openProfile}
           style={[
             styles.highlightBubble,
             tone === "band"
               ? styles.highlightBubbleBand
               : styles.highlightBubbleFan,
           ]}
+          onPress={openProfile}
         >
           <Text numberOfLines={1} style={styles.chatName}>
             {message.senderName}
           </Text>
-          <Text style={styles.chatBody}>{message.content}</Text>
-          <Text style={styles.highlightTime}>{time}</Text>
-        </View>
+          <Text
+            style={[styles.chatBody, tone === "band" && styles.highlightBody]}
+          >
+            {message.content}
+          </Text>
+          <Text
+            style={[
+              styles.highlightTime,
+              tone === "band" && styles.highlightTimeBand,
+            ]}
+          >
+            {time}
+          </Text>
+        </Pressable>
       </View>
     );
   }
 
   return (
     <View style={styles.chatRow}>
-      <ProfileImage imageUrl={message.senderProfileImageUrl} size={40} />
+      <Pressable
+        accessibilityLabel="채팅 사용자 메뉴 열기"
+        disabled={!openProfile}
+        onPress={openProfile}
+      >
+        <ProfileImage imageUrl={message.senderProfileImageUrl} size={40} />
+      </Pressable>
 
       <View style={styles.chatContent}>
-        <Text numberOfLines={1} style={styles.chatName}>
-          {message.senderName}
-        </Text>
+        <Pressable disabled={!openProfile} onPress={openProfile}>
+          <Text numberOfLines={1} style={styles.chatName}>
+            {message.senderName}
+          </Text>
+        </Pressable>
         <View style={styles.bubble}>
           <Text style={styles.chatBody}>{message.content}</Text>
         </View>
@@ -272,11 +312,13 @@ export function LiveRoomChatList({
   messages,
   composerOpen,
   isHighlighted,
+  onProfilePress,
 }: {
   tone: LiveRoomTone;
   messages: LiveChatMessage[];
   composerOpen: boolean;
   isHighlighted: (message: LiveChatMessage) => boolean;
+  onProfilePress?: (message: LiveChatMessage) => void;
 }) {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
@@ -317,6 +359,7 @@ export function LiveRoomChatList({
               tone={tone}
               message={message}
               highlighted={isHighlighted(message)}
+              onProfilePress={onProfilePress}
             />
           ))}
         </ScrollView>
@@ -347,7 +390,7 @@ export function LiveRoomComposer({
         <Text style={styles.composerError}>{errorMessage}</Text>
       ) : null}
 
-      <View style={styles.composer}>
+      <View style={[styles.composer, styles.barWidth]}>
         <TextInput
           value={value}
           maxLength={500}
@@ -425,20 +468,22 @@ export function LiveRoomActionBar({
   onToggleChat: () => void;
 }) {
   return (
-    <View style={styles.actionBar}>
-      <ActionItem
-        tone={tone}
-        icon="users"
-        label="멤버"
-        onPress={onOpenMembers}
-      />
-      <View style={styles.actionCenter}>{center}</View>
-      <ActionItem
-        tone={tone}
-        icon="chat"
-        label="채팅"
-        onPress={onToggleChat}
-      />
+    <View style={styles.actionBarWrap}>
+      <View style={[styles.actionBar, styles.barWidth]}>
+        <ActionItem
+          tone={tone}
+          icon="users"
+          label="멤버"
+          onPress={onOpenMembers}
+        />
+        <View style={styles.actionCenter}>{center}</View>
+        <ActionItem
+          tone={tone}
+          icon="chat"
+          label="채팅"
+          onPress={onToggleChat}
+        />
+      </View>
     </View>
   );
 }
@@ -505,19 +550,23 @@ export function LiveRoomMemberSheet({
     enabled: open && liveId > 0,
   });
   const members = query.data?.members ?? [];
+  const isBand = tone === "band";
+  const messageStyle = [styles.sheetMessage, isBand && styles.sheetMessageBand];
 
   return (
     <BottomSheetModal open={open} maxHeight="72%" onClose={onClose}>
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, isBand && styles.sheetBand]}>
         <View style={styles.sheetHandle} />
-        <Text style={styles.sheetTitle}>멤버</Text>
+        <Text style={[styles.sheetTitle, isBand && styles.sheetTitleBand]}>
+          멤버
+        </Text>
 
         {query.isLoading ? (
-          <Text style={styles.sheetMessage}>멤버를 불러오는 중이에요.</Text>
+          <Text style={messageStyle}>멤버를 불러오는 중이에요.</Text>
         ) : query.isError ? (
-          <Text style={styles.sheetMessage}>멤버를 불러오지 못했어요.</Text>
+          <Text style={messageStyle}>멤버를 불러오지 못했어요.</Text>
         ) : members.length === 0 ? (
-          <Text style={styles.sheetMessage}>표시할 멤버가 없어요.</Text>
+          <Text style={messageStyle}>표시할 멤버가 없어요.</Text>
         ) : (
           <ScrollView contentContainerStyle={styles.sheetList}>
             {members.map((member, index) => (
@@ -554,7 +603,9 @@ export function LiveRoomMemberSheet({
                   </View>
                   <Text numberOfLines={1} style={styles.memberPart}>
                     {member.part.length > 0
-                      ? member.part.map(getPartLabel).join(" · ")
+                      ? member.part
+                          .map(getPartLabel)
+                          .join(isBand ? ", " : " · ")
                       : "포지션 미정"}
                   </Text>
                 </View>
@@ -632,12 +683,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     textAlign: "center",
   },
+  bannerFloating: {
+    position: "absolute",
+    top: 56,
+    zIndex: 20,
+    marginTop: 0,
+  },
   pill: {
-    alignSelf: "flex-end",
+    position: "absolute",
+    right: 20,
+    zIndex: 30,
     borderRadius: 999,
     backgroundColor: colors.secondary500,
-    marginRight: 20,
-    marginTop: 4,
     paddingHorizontal: 16,
     paddingVertical: 8,
     boxShadow: "0px 2px 10px 0px rgba(20, 20, 20, 0.15)",
@@ -684,6 +741,11 @@ const styles = StyleSheet.create({
     marginTop: 32,
     paddingHorizontal: 20,
     paddingBottom: 16,
+  },
+  heroTextBand: {
+    height: 80,
+    marginBottom: 24,
+    paddingBottom: 0,
   },
   bandRow: {
     height: 24,
@@ -785,6 +847,19 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: colors.white,
   },
+  micBadgeBand: {
+    top: undefined,
+    left: undefined,
+    right: -2,
+    bottom: -2,
+    boxShadow: "0px 1px 4px 0px rgba(20, 20, 20, 0.12)",
+  },
+  highlightBody: {
+    marginTop: 4,
+  },
+  highlightTimeBand: {
+    transform: [{ translateY: "-50%" }],
+  },
   highlightBubble: {
     flex: 1,
     minWidth: 0,
@@ -838,6 +913,11 @@ const styles = StyleSheet.create({
     right: 20,
     bottom: 112,
     zIndex: 30,
+    alignItems: "center",
+  },
+  barWidth: {
+    width: "100%",
+    maxWidth: 353,
   },
   composerError: {
     ...textStyles.caption4,
@@ -877,13 +957,16 @@ const styles = StyleSheet.create({
   sendIcon: {
     transform: [{ translateX: 2 }],
   },
-  actionBar: {
-    ...shadows.card,
+  actionBarWrap: {
     position: "absolute",
     left: 20,
     right: 20,
     bottom: 24,
     zIndex: 30,
+    alignItems: "center",
+  },
+  actionBar: {
+    ...shadows.card,
     height: 62,
     flexDirection: "row",
     alignItems: "center",
@@ -944,6 +1027,20 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     paddingHorizontal: 20,
     paddingTop: 10,
+  },
+  sheetBand: {
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 32,
+  },
+  sheetTitleBand: {
+    ...textStyles.h4,
+    fontWeight: "700",
+    marginTop: 28,
+  },
+  sheetMessageBand: {
+    color: colors.neutral500,
+    paddingVertical: 24,
   },
   sheetHandle: {
     alignSelf: "center",

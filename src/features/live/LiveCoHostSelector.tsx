@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppHeader } from "@/shared/components/AppHeader";
 import { AppIcon } from "@/shared/components/AppIcon";
 import { ProfileImage } from "@/shared/components/ProfileImage";
 import {
@@ -112,24 +111,27 @@ export function LiveCoHostSelector({
         onRequestClose={close}
       >
         <SafeAreaView style={styles.modal}>
-          <AppHeader
-            title="공동 진행"
-            rightContent={
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="닫기"
-                hitSlop={12}
-                onPress={close}
-              >
-                <AppIcon
-                  name="closeHeader"
-                  size={28}
-                />
-              </Pressable>
-            }
-            onBack={close}
-            style={styles.modalHeader}
-          />
+          <View style={styles.modalHeader}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="뒤로가기"
+              hitSlop={12}
+              onPress={close}
+            >
+              <AppIcon name="arrowLeft" size={24} />
+            </Pressable>
+
+            <Text style={styles.modalTitle}>공동 진행</Text>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+              hitSlop={12}
+              onPress={close}
+            >
+              <AppIcon name="closeHeader" size={28} />
+            </Pressable>
+          </View>
 
           <ScrollView
             contentContainerStyle={
@@ -259,7 +261,7 @@ function CandidateRow({
 const styles =
   StyleSheet.create({
     card: {
-      minHeight: 64,
+      height: 64,
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
@@ -267,7 +269,6 @@ const styles =
       backgroundColor:
         colors.white,
       paddingHorizontal: 18,
-      paddingVertical: 8,
       boxShadow:
         "0px 4px 15px 0px rgba(20, 20, 20, 0.08)",
     },
@@ -278,7 +279,6 @@ const styles =
 
     cardText: {
       flex: 1,
-      gap: 2,
     },
 
     cardTitle: {
@@ -324,7 +324,17 @@ const styles =
 
     modalHeader: {
       height: 52,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       paddingHorizontal: 20,
+    },
+
+    modalTitle: {
+      ...textStyles.h4,
+      color:
+        colors.neutral900,
+      fontWeight: "700",
     },
 
     list: {
@@ -350,7 +360,7 @@ const styles =
     },
 
     row: {
-      minHeight: 60,
+      height: 60,
       flexDirection: "row",
       alignItems: "center",
       borderRadius: 8,
@@ -368,7 +378,8 @@ const styles =
     },
 
     nickname: {
-      ...textStyles.caption3,
+      ...textStyles.body3,
+      fontWeight: "600",
       color:
         colors.neutral900,
     },
@@ -380,13 +391,15 @@ const styles =
     },
 
     ownerLabel: {
-      ...textStyles.caption3,
+      ...textStyles.body3,
+      fontWeight: "600",
       color:
         colors.neutral900,
     },
 
     inviteLabel: {
-      ...textStyles.caption3,
+      ...textStyles.body3,
+      fontWeight: "600",
       color:
         colors.secondary500,
     },
@@ -414,7 +427,8 @@ const styles =
     },
 
     confirmText: {
-      ...textStyles.label2,
+      ...textStyles.label1,
+      fontWeight: "600",
       color:
         colors.white,
     },

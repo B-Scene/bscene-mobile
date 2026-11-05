@@ -1,3 +1,4 @@
+import * as ImagePicker from "expo-image-picker";
 import {
   router,
   useLocalSearchParams,
@@ -9,6 +10,7 @@ import {
 } from "react";
 import {
   Alert,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -19,7 +21,13 @@ import {
 import type {
   BandMemberItem,
 } from "@/api/band/bandManagement";
+import { uploadMediaAsset } from "@/api/media/media";
+import {
+  DatePickerSheet,
+  TimePickerSheet,
+} from "@/features/band/BandDateTimeSheets";
 import { LiveCoHostSelector } from "@/features/live/LiveCoHostSelector";
+import { LiveMicTestScreen } from "@/features/live/LiveMicTestScreen";
 import { useBandMembersQuery } from "@/hooks/api/band/useBandManagement";
 import {
   useCancelLiveReservationMutation,
@@ -30,7 +38,6 @@ import {
 import { useActiveBandId } from "@/hooks/api/user/useMyProfiles";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppIcon } from "@/shared/components/AppIcon";
-import { AppState } from "@/shared/components/AppState";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
 import {
@@ -38,9 +45,11 @@ import {
   radius,
   textStyles,
 } from "@/shared/constants/theme";
+import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type {
   LiveReservationCoHostCandidate,
+  LiveReservationResponse,
 } from "@/types/live/live";
 
 type LiveCreateMode =
@@ -65,6 +74,63 @@ const INACTIVE_MEMBER_STATUSES =
     "CANCELED",
     "CANCELLED",
   ]);
+
+type ThumbnailAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
+
+const getReservationThumbnailUrl = (
+  reservation?: LiveReservationResponse,
+) =>
+  reservation?.thumbnailImageUrl ||
+  reservation?.thumbnailUrl ||
+  reservation?.liveThumbnailImageUrl ||
+  reservation?.liveThumbnailUrl ||
+  "";
+
+const formatDateLabel = (
+  dateValue: string,
+) => {
+  if (!dateValue) {
+    return "날짜 선택";
+  }
+
+  const [
+    year,
+    month,
+    day,
+  ] = dateValue
+    .split("-")
+    .map(Number);
+
+  if (
+    !year ||
+    !month ||
+    !day
+  ) {
+    return dateValue;
+  }
+
+  const weekDay = [
+    "일",
+    "월",
+    "화",
+    "수",
+    "목",
+    "금",
+    "토",
+  ][
+    new Date(
+      year,
+      month - 1,
+      day,
+    ).getDay()
+  ];
+
+  return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(2, "0")}. (${weekDay})`;
+};
 
 const toCoHostCandidate = (
   member: BandMemberItem,
@@ -333,6 +399,36 @@ export function LiveCreateScreen() {
     initialCoHostIds,
     setInitialCoHostIds,
   ] = useState<number[]>([]);
+  const [
+    thumbnail,
+    setThumbnail,
+  ] = useState<ThumbnailAsset | null>(
+    null,
+  );
+  const [
+    isUploadingThumbnail,
+    setIsUploadingThumbnail,
+  ] = useState(false);
+  const [
+    isDatePickerOpen,
+    setIsDatePickerOpen,
+  ] = useState(false);
+  const [
+    isTimePickerOpen,
+    setIsTimePickerOpen,
+  ] = useState(false);
+  const [
+    isMicTestOpen,
+    setIsMicTestOpen,
+  ] = useState(false);
+  const [
+    isLeaveConfirmOpen,
+    setIsLeaveConfirmOpen,
+  ] = useState(false);
+  const [
+    submitErrorMessage,
+    setSubmitErrorMessage,
+  ] = useState("");
 
   const createMutation =
     useCreateLiveMutation();
@@ -502,19 +598,102 @@ export function LiveCreateScreen() {
     setIsCancelConfirmOpen,
   ] = useState(false);
 
+  const isReservationMode =
+    mode === "reserve";
+
+  const requestLeave =
+    () => {
+      if (isReservationMode) {
+        setIsLeaveConfirmOpen(true);
+        return;
+      }
+
+      router.back();
+    };
+
+  const pickThumbnail =
+    async () => {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permission.granted) {
+        Alert.alert(
+          "사진 접근 권한",
+          "썸네일을 선택하려면 사진 접근 권한이 필요해요.",
+        );
+        return;
+      }
+
+      const result =
+        await ImagePicker.launchImageLibraryAsync(
+          {
+            mediaTypes: ["images"],
+            quality: 0.85,
+          },
+        );
+      const asset =
+        result.assets?.[0];
+
+      if (
+        result.canceled ||
+        !asset
+      ) {
+        return;
+      }
+
+      setThumbnail({
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+      });
+    };
+
+  const savedThumbnailUrl =
+    getReservationThumbnailUrl(
+      reservationQuery.data,
+    );
+  const thumbnailPreviewUrl =
+    thumbnail?.uri ||
+    savedThumbnailUrl;
+
+  const uploadThumbnailIfNeeded =
+    async () => {
+      if (!thumbnail) {
+        return savedThumbnailUrl;
+      }
+
+      setIsUploadingThumbnail(true);
+
+      try {
+        return await uploadMediaAsset(
+          {
+            category:
+              "STREAM_THUMBNAIL",
+            uri: thumbnail.uri,
+            fileName:
+              thumbnail.fileName,
+            mimeType:
+              thumbnail.mimeType,
+          },
+        );
+      } finally {
+        setIsUploadingThumbnail(false);
+      }
+    };
+
   const closeButton = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="닫기"
       hitSlop={12}
-      onPress={() => router.back()}
+      onPress={requestLeave}
     >
       <AppIcon name="closeHeader" size={28} />
     </Pressable>
   );
 
   const titleText =
-    isEdit
+    isReservationMode
       ? "라이브 예약 수정"
       : "라이브 시작";
   const scheduleError =
@@ -557,53 +736,88 @@ export function LiveCreateScreen() {
       reservedTime,
     ]);
 
+  const isReservationLoading =
+    isEdit &&
+    reservationQuery.isLoading;
   const isPending =
+    isUploadingThumbnail ||
+    isReservationLoading ||
     createMutation.isPending ||
     updateReservationMutation.isPending ||
     cancelReservationMutation.isPending;
-  const canSubmit =
-    Boolean(
-      title.trim(),
-    ) &&
-    !scheduleError &&
-    !isPending;
+  const errorMessage =
+    submitErrorMessage ||
+    (isEdit &&
+    reservationQuery.isError
+      ? "라이브 예약 정보를 불러오지 못했어요."
+      : "");
+
+  const submitLabel =
+    (() => {
+      if (isReservationLoading) {
+        return "불러오는 중";
+      }
+
+      if (isUploadingThumbnail) {
+        return "이미지 업로드 중";
+      }
+
+      if (
+        cancelReservationMutation.isPending
+      ) {
+        return "취소 중";
+      }
+
+      if (
+        createMutation.isPending ||
+        updateReservationMutation.isPending
+      ) {
+        return isReservationMode
+          ? "저장 중"
+          : "라이브 준비 중";
+      }
+
+      return isReservationMode
+        ? "저장"
+        : "라이브 시작하기";
+    })();
 
   const submit =
     async () => {
+      setSubmitErrorMessage("");
+
       if (
         !title.trim()
       ) {
-        Alert.alert(
-          "라이브",
-          "라이브 제목을 입력해 주세요.",
+        setSubmitErrorMessage(
+          "라이브 제목을 입력해주세요.",
         );
         return;
       }
 
       if (scheduleError) {
-        Alert.alert(
-          "라이브 예약",
-          scheduleError,
-        );
         return;
       }
 
-      const payload = {
-        title:
-          title.trim(),
-        description:
-          description.trim() ||
-          null,
-        scheduledAt:
-          mode === "reserve"
-            ? toScheduledAt(
-                reservedDate,
-                reservedTime,
-              )
-            : null,
-      };
-
       try {
+        const thumbnailImageUrl =
+          await uploadThumbnailIfNeeded();
+
+        const payload = {
+          title:
+            title.trim(),
+          description:
+            description.trim() ||
+            null,
+          scheduledAt:
+            mode === "reserve"
+              ? toScheduledAt(
+                  reservedDate,
+                  reservedTime,
+                )
+              : null,
+        };
+
         if (isEdit) {
           await updateReservationMutation.mutateAsync(
             {
@@ -617,8 +831,7 @@ export function LiveCreateScreen() {
                     reservedTime,
                   ),
                 thumbnailImageUrl:
-                  reservationQuery.data
-                    ?.thumbnailImageUrl ??
+                  thumbnailImageUrl ||
                   null,
                 coHost:
                   isSameIds(
@@ -631,10 +844,6 @@ export function LiveCreateScreen() {
             },
           );
 
-          Alert.alert(
-            "라이브 예약",
-            "예약을 수정했어요.",
-          );
           router.replace(
             "/band/live" as Parameters<
               typeof router.replace
@@ -647,6 +856,9 @@ export function LiveCreateScreen() {
           await createMutation.mutateAsync(
             {
               ...payload,
+              thumbnailImageUrl:
+                thumbnailImageUrl ||
+                undefined,
               coHost:
                 getSubmitCoHostIds(),
             },
@@ -655,10 +867,6 @@ export function LiveCreateScreen() {
         if (
           mode === "reserve"
         ) {
-          Alert.alert(
-            "라이브 예약",
-            "라이브 예약이 완료됐어요.",
-          );
           router.replace(
             "/band/live" as Parameters<
               typeof router.replace
@@ -676,14 +884,14 @@ export function LiveCreateScreen() {
             typeof router.replace
           >[0],
         );
-      } catch {
-        Alert.alert(
-          "라이브",
-          isEdit
-            ? "라이브 예약을 수정하지 못했어요."
-            : mode === "reserve"
-              ? "라이브를 예약하지 못했어요."
-              : "라이브를 시작하지 못했어요.",
+      } catch (error) {
+        setSubmitErrorMessage(
+          getApiErrorMessage(
+            error,
+            isEdit
+              ? "라이브 예약 수정에 실패했어요. 잠시 후 다시 시도해주세요."
+              : "라이브 생성에 실패했어요. 잠시 후 다시 시도해주세요.",
+          ),
         );
       }
     };
@@ -691,77 +899,34 @@ export function LiveCreateScreen() {
   const cancelReservation =
     async () => {
       if (!isEdit) {
+        setIsCancelConfirmOpen(false);
+        router.back();
         return;
       }
 
-      setIsCancelConfirmOpen(false);
+      setSubmitErrorMessage("");
 
       try {
         await cancelReservationMutation.mutateAsync(
           reservationLiveId,
         );
 
-        Alert.alert(
-          "라이브 예약",
-          "예약을 취소했어요.",
-        );
+        setIsCancelConfirmOpen(false);
         router.replace(
           "/band/live" as Parameters<
             typeof router.replace
           >[0],
         );
-      } catch {
-        Alert.alert(
-          "라이브 예약",
-          "예약을 취소하지 못했어요.",
+      } catch (error) {
+        setIsCancelConfirmOpen(false);
+        setSubmitErrorMessage(
+          getApiErrorMessage(
+            error,
+            "라이브 예약 취소에 실패했어요. 잠시 후 다시 시도해주세요.",
+          ),
         );
       }
     };
-
-  if (
-    isEdit &&
-    reservationQuery.isLoading
-  ) {
-    return (
-      <Screen
-        contentStyle={
-          styles.container
-        }
-      >
-        <AppHeader
-          title={titleText}
-        />
-        <AppState
-          loading
-          title="예약 정보를 불러오는 중이에요"
-        />
-      </Screen>
-    );
-  }
-
-  if (
-    isEdit &&
-    reservationQuery.isError
-  ) {
-    return (
-      <Screen
-        contentStyle={
-          styles.container
-        }
-      >
-        <AppHeader
-          title={titleText}
-        />
-        <AppState
-          title="예약 정보를 불러오지 못했어요"
-          actionLabel="다시 시도"
-          onAction={() =>
-            void reservationQuery.refetch()
-          }
-        />
-      </Screen>
-    );
-  }
 
   return (
     <Screen
@@ -774,6 +939,7 @@ export function LiveCreateScreen() {
         title={titleText}
         rightContent={closeButton}
         style={styles.header}
+        onBack={requestLeave}
       />
 
       <View style={styles.content}>
@@ -861,6 +1027,42 @@ export function LiveCreateScreen() {
                 }
               />
             </View>
+
+            <View style={styles.thumbnailRow}>
+              <Text style={styles.thumbnailLabel}>
+                썸네일 이미지
+              </Text>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="썸네일 이미지 추가"
+                style={styles.thumbnailBox}
+                onPress={() =>
+                  void pickThumbnail()
+                }
+              >
+                {thumbnailPreviewUrl ? (
+                  <Image
+                    source={{
+                      uri: thumbnailPreviewUrl,
+                    }}
+                    style={styles.thumbnailImage}
+                  />
+                ) : (
+                  <AppIcon
+                    name="formAddImage"
+                    size={24}
+                  />
+                )}
+              </Pressable>
+
+              <Text style={styles.thumbnailHint}>
+                {"라이브를 대표할 이미지에요.\n"}
+                <Text style={styles.thumbnailHintSize}>
+                  권장 사이즈 16:9 (1280*720)
+                </Text>
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -871,43 +1073,64 @@ export function LiveCreateScreen() {
             </Text>
 
             <View style={styles.scheduleBox}>
-              <View style={styles.scheduleRow}>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.scheduleRow}
+                onPress={() => {
+                  setIsTimePickerOpen(
+                    false,
+                  );
+                  setIsDatePickerOpen(
+                    true,
+                  );
+                }}
+              >
                 <AppIcon name="calendarDark" />
-                <Text style={styles.scheduleLabel}>
-                  날짜 선택
-                </Text>
-                <TextInput
-                  value={reservedDate}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={
-                    colors.neutral400
-                  }
-                  style={styles.scheduleInput}
-                  onChangeText={
-                    setReservedDate
-                  }
+                <View style={styles.scheduleTexts}>
+                  <Text style={styles.scheduleLabel}>
+                    날짜 선택
+                  </Text>
+                  <Text style={styles.scheduleValue}>
+                    {formatDateLabel(
+                      reservedDate,
+                    )}
+                  </Text>
+                </View>
+                <AppIcon
+                  name="arrowDownGray"
+                  size={16}
                 />
-              </View>
+              </Pressable>
 
               <View style={styles.scheduleDivider} />
 
-              <View style={styles.scheduleRow}>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.scheduleRow}
+                onPress={() => {
+                  setIsDatePickerOpen(
+                    false,
+                  );
+                  setIsTimePickerOpen(
+                    true,
+                  );
+                }}
+              >
                 <AppIcon name="clockDark" />
-                <Text style={styles.scheduleLabel}>
-                  시작 시간
-                </Text>
-                <TextInput
-                  value={reservedTime}
-                  placeholder="HH:mm"
-                  placeholderTextColor={
-                    colors.neutral400
-                  }
-                  style={styles.scheduleInput}
-                  onChangeText={
-                    setReservedTime
-                  }
+                <View style={styles.scheduleTexts}>
+                  <Text style={styles.scheduleLabel}>
+                    시작 시간
+                  </Text>
+                  <Text style={styles.scheduleValue}>
+                    {reservedTime ||
+                      "시간 선택"}
+                  </Text>
+                </View>
+                <AppIcon
+                  name="arrowDownGray"
+                  size={16}
                 />
-              </View>
+              </Pressable>
             </View>
 
             {scheduleError ? (
@@ -936,19 +1159,50 @@ export function LiveCreateScreen() {
           onToggle={toggleCoHost}
         />
 
+        {!isReservationMode ? (
+          <View style={styles.micCard}>
+            <View>
+              <Text style={styles.cardTitle}>
+                마이크 테스트
+              </Text>
+              <Text style={styles.micDescription}>
+                {"방송 전에 음질과 마이크를\n테스트해보세요"}
+              </Text>
+            </View>
+
+            <Pressable
+              accessibilityRole="button"
+              style={styles.micButton}
+              onPress={() =>
+                setIsMicTestOpen(true)
+              }
+            >
+              <Text style={styles.micButtonText}>
+                테스트 시작
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {errorMessage ? (
+          <Text style={styles.errorText}>
+            {errorMessage}
+          </Text>
+        ) : null}
+
         <View
           style={[
             styles.footer,
-            isEdit && styles.footerRow,
+            isReservationMode && styles.footerRow,
           ]}
         >
           <Pressable
             accessibilityRole="button"
-            disabled={!canSubmit}
+            disabled={isPending}
             style={[
               styles.submitButton,
-              isEdit && styles.footerRowButton,
-              !canSubmit && styles.buttonDisabled,
+              isReservationMode && styles.footerRowButton,
+              isPending && styles.buttonDisabled,
             ]}
             onPress={() =>
               void submit()
@@ -961,15 +1215,11 @@ export function LiveCreateScreen() {
                   : styles.submitButtonText
               }
             >
-              {isPending
-                ? "저장 중"
-                : mode === "reserve"
-                  ? "저장"
-                  : "라이브 시작하기"}
+              {submitLabel}
             </Text>
           </Pressable>
 
-          {isEdit ? (
+          {isReservationMode ? (
             <Pressable
               accessibilityRole="button"
               disabled={isPending}
@@ -996,6 +1246,11 @@ export function LiveCreateScreen() {
         tone="orange"
         title="예약을 취소할까요?"
         description={"취소된 라이브 예약은\n복구할 수 없어요"}
+        confirmLabel={
+          cancelReservationMutation.isPending
+            ? "취소 중"
+            : "확인"
+        }
         onCancel={() =>
           setIsCancelConfirmOpen(
             false,
@@ -1005,6 +1260,73 @@ export function LiveCreateScreen() {
           void cancelReservation()
         }
       />
+
+      <ConfirmModal
+        open={isLeaveConfirmOpen}
+        tone="orange"
+        title="수정을 취소할까요?"
+        description={"저장하지 않은 변경 사항은\n모두 사라집니다"}
+        onCancel={() =>
+          setIsLeaveConfirmOpen(
+            false,
+          )
+        }
+        onConfirm={() => {
+          setIsLeaveConfirmOpen(
+            false,
+          );
+          router.back();
+        }}
+      />
+
+      <DatePickerSheet
+        open={isDatePickerOpen}
+        startDate={reservedDate}
+        endDate=""
+        selectionMode="single"
+        onClose={() =>
+          setIsDatePickerOpen(
+            false,
+          )
+        }
+        onSelect={({ start }) => {
+          setReservedDate(start);
+          setIsDatePickerOpen(
+            false,
+          );
+        }}
+      />
+
+      <TimePickerSheet
+        open={isTimePickerOpen}
+        value={reservedTime}
+        title="라이브 시작 시간"
+        onClose={() =>
+          setIsTimePickerOpen(
+            false,
+          )
+        }
+        onConfirm={(time) => {
+          setReservedTime(time);
+          setIsTimePickerOpen(
+            false,
+          );
+        }}
+      />
+
+      {isMicTestOpen ? (
+        <LiveMicTestScreen
+          onBack={() =>
+            setIsMicTestOpen(false)
+          }
+          onClose={() =>
+            setIsMicTestOpen(false)
+          }
+          onComplete={() =>
+            setIsMicTestOpen(false)
+          }
+        />
+      ) : null}
     </Screen>
   );
 }
@@ -1149,13 +1471,13 @@ const styles =
       borderColor:
         colors.secondary500,
       backgroundColor:
-        colors.secondary0,
+        "#FFFAF0",
     },
 
     radioDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
+      width: 4,
+      height: 4,
+      borderRadius: 2,
       backgroundColor:
         colors.secondary500,
     },
@@ -1195,20 +1517,21 @@ const styles =
       gap: 16,
     },
 
+    scheduleTexts: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    scheduleValue: {
+      ...textStyles.body2,
+      color:
+        colors.neutral900,
+    },
+
     scheduleLabel: {
       ...textStyles.caption2,
       color:
         colors.neutral500,
-    },
-
-    scheduleInput: {
-      ...textStyles.body2,
-      flex: 1,
-      minWidth: 0,
-      color:
-        colors.neutral900,
-      paddingVertical: 0,
-      textAlign: "right",
     },
 
     scheduleDivider: {
@@ -1279,6 +1602,88 @@ const styles =
         colors.neutral900,
       paddingHorizontal: 16,
       paddingVertical: 4,
+    },
+
+    thumbnailRow: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    thumbnailLabel: {
+      ...textStyles.body3,
+      width: 76,
+      color:
+        colors.neutral900,
+      fontWeight: "600",
+    },
+
+    thumbnailBox: {
+      width: 56,
+      height: 56,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor:
+        colors.neutral300,
+      borderRadius: 4,
+      backgroundColor:
+        colors.white,
+    },
+
+    thumbnailImage: {
+      width: "100%",
+      height: "100%",
+    },
+
+    thumbnailHint: {
+      ...textStyles.caption2,
+      flex: 1,
+      minWidth: 0,
+      marginLeft: 12,
+      color:
+        colors.neutral500,
+    },
+
+    thumbnailHintSize: {
+      ...textStyles.caption4,
+      lineHeight: 13,
+    },
+
+    micCard: {
+      height: 88,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderRadius: 14,
+      backgroundColor:
+        colors.white,
+      paddingHorizontal: 18,
+      boxShadow:
+        "0px 4px 15px 0px rgba(20, 20, 20, 0.08)",
+    },
+
+    micDescription: {
+      ...textStyles.caption2,
+      marginTop: 8,
+      color:
+        colors.neutral600,
+    },
+
+    micButton: {
+      width: 82,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 8,
+      backgroundColor:
+        colors.secondary0,
+    },
+
+    micButtonText: {
+      ...textStyles.caption3,
+      color:
+        colors.secondary500,
     },
 
     footer: {

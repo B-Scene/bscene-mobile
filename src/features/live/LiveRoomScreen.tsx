@@ -65,6 +65,26 @@ import {
 } from "@/shared/utils/secureTokenStorage";
 
 import {
+    LiveChatProfileActionSheet,
+    LiveReportCompletePage,
+    LiveReportPage,
+} from "@/features/live/LiveReportFlow";
+
+import {
+    useBlockLiveUserMutation,
+    useReportLiveUserMutation,
+    useUnblockLiveUserMutation,
+} from "@/hooks/api/live/useLiveRoomActions";
+
+import {
+    getApiErrorMessage,
+} from "@/shared/utils/getApiErrorMessage";
+
+import type {
+    LiveReportType,
+} from "@/api/live/liveRoomActions";
+
+import {
     LiveRoomActionBar,
     LiveRoomBanner,
     LiveRoomChatList,
@@ -290,6 +310,11 @@ export function LiveRoomScreen({
     isMicMuted,
     setIsMicMuted,
   ] = useState(true);
+
+  const [
+    isMicNoticeVisible,
+    setIsMicNoticeVisible,
+  ] = useState(false);
 
   const isMicMutedRef =
     useRef(true);
@@ -633,6 +658,21 @@ export function LiveRoomScreen({
       },
 
       onEnded: () => {
+        if (
+          mode === "band" &&
+          live &&
+          live.playback.role !==
+            "CO_HOST"
+        ) {
+          router.replace(
+            `/band/live/ended/${live.liveId}` as Parameters<
+              typeof router.replace
+            >[0],
+          );
+
+          return;
+        }
+
         Alert.alert(
           "라이브 종료",
           "라이브가 종료되었어요.",
@@ -917,6 +957,10 @@ export function LiveRoomScreen({
     setIsMicMuted(
       nextMuted,
     );
+
+    setIsMicNoticeVisible(
+      nextMuted,
+    );
   };
 
   const sendMessage =
@@ -938,11 +982,15 @@ export function LiveRoomScreen({
         return;
       }
 
+      let isClosed = false;
+
       try {
         if (isOwner) {
           await closeMutation.mutateAsync(
             liveId,
           );
+
+          isClosed = true;
         } else {
           await leaveMutation.mutateAsync(
             liveId,
@@ -965,7 +1013,9 @@ export function LiveRoomScreen({
       audioPlayer.pause();
 
       router.replace(
-        `/${mode}/live` as Parameters<
+        (mode === "band" && isClosed
+          ? `/band/live/ended/${liveId}`
+          : `/${mode}/live`) as Parameters<
           typeof router.replace
         >[0],
       );
@@ -998,6 +1048,47 @@ export function LiveRoomScreen({
     setIsMemberSheetOpen,
   ] = useState(false);
 
+  const [
+    roomView,
+    setRoomView,
+  ] = useState<
+    "room" | "report" | "reportComplete"
+  >("room");
+
+  const [
+    isProfileSheetOpen,
+    setIsProfileSheetOpen,
+  ] = useState(false);
+
+  const [
+    isBlockConfirmOpen,
+    setIsBlockConfirmOpen,
+  ] = useState(false);
+
+  const [
+    reportTarget,
+    setReportTarget,
+  ] = useState<{
+    targetUserId: number;
+    chatMessage: string;
+  } | null>(null);
+
+  const [
+    blockedUserIds,
+    setBlockedUserIds,
+  ] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
+
+  const reportMutation =
+    useReportLiveUserMutation();
+
+  const blockMutation =
+    useBlockLiveUserMutation();
+
+  const unblockMutation =
+    useUnblockLiveUserMutation();
+
   const confirmExitLive =
     useCallback(() => {
       if (
@@ -1024,6 +1115,14 @@ export function LiveRoomScreen({
             return false;
           }
 
+          if (
+            roomView !== "room"
+          ) {
+            setRoomView("room");
+
+            return true;
+          }
+
           confirmExitLive();
           return true;
         },
@@ -1035,6 +1134,7 @@ export function LiveRoomScreen({
   }, [
     confirmExitLive,
     live,
+    roomView,
   ]);
 
   const requestCoHost =
@@ -1106,6 +1206,134 @@ export function LiveRoomScreen({
         Alert.alert(
           "공동 진행",
           "공동 진행 요청을 처리하지 못했어요.",
+        );
+      }
+    };
+
+  const submitReport =
+    async (request: {
+      reportType: LiveReportType;
+      comment: string | null;
+    }) => {
+      if (!reportTarget) {
+        return;
+      }
+
+      try {
+        await reportMutation.mutateAsync(
+          {
+            liveId,
+            request: {
+              ...request,
+              ...reportTarget,
+            },
+          },
+        );
+
+        setRoomView(
+          "reportComplete",
+        );
+      } catch (error) {
+        Alert.alert(
+          "신고",
+          getApiErrorMessage(
+            error,
+            "신고를 접수하지 못했어요.",
+          ),
+        );
+      }
+    };
+
+  const confirmBlock =
+    async () => {
+      if (!reportTarget) {
+        return;
+      }
+
+      const { targetUserId } =
+        reportTarget;
+
+      try {
+        await blockMutation.mutateAsync(
+          {
+            liveId,
+            targetUserId,
+          },
+        );
+
+        setBlockedUserIds(
+          (current) =>
+            new Set(current).add(
+              targetUserId,
+            ),
+        );
+
+        setIsBlockConfirmOpen(
+          false,
+        );
+      } catch (error) {
+        Alert.alert(
+          "차단",
+          getApiErrorMessage(
+            error,
+            "사용자를 차단하지 못했어요.",
+          ),
+        );
+      }
+    };
+
+  const toggleBlock =
+    async () => {
+      if (!reportTarget) {
+        return;
+      }
+
+      const { targetUserId } =
+        reportTarget;
+
+      if (
+        !blockedUserIds.has(
+          targetUserId,
+        )
+      ) {
+        setIsProfileSheetOpen(
+          false,
+        );
+
+        setIsBlockConfirmOpen(
+          true,
+        );
+
+        return;
+      }
+
+      try {
+        await unblockMutation.mutateAsync(
+          {
+            liveId,
+            targetUserId,
+          },
+        );
+
+        setBlockedUserIds(
+          (current) => {
+            const next =
+              new Set(current);
+
+            next.delete(
+              targetUserId,
+            );
+
+            return next;
+          },
+        );
+      } catch (error) {
+        Alert.alert(
+          "차단",
+          getApiErrorMessage(
+            error,
+            "사용자 차단을 해제하지 못했어요.",
+          ),
         );
       }
     };
@@ -1212,6 +1440,21 @@ export function LiveRoomScreen({
             ).getTime(),
         ),
       [messages],
+    );
+
+  const visibleMessages =
+    useMemo(
+      () =>
+        sortedMessages.filter(
+          (message) =>
+            !blockedUserIds.has(
+              message.senderId,
+            ),
+        ),
+      [
+        blockedUserIds,
+        sortedMessages,
+      ],
     );
 
   if (
@@ -1339,6 +1582,46 @@ export function LiveRoomScreen({
     );
   }
 
+  if (
+    roomView === "report"
+  ) {
+    return (
+      <LiveReportPage
+        isSubmitting={
+          reportMutation.isPending
+        }
+        onBack={() =>
+          setRoomView("room")
+        }
+        onSubmit={(request) =>
+          void submitReport(
+            request,
+          )
+        }
+      />
+    );
+  }
+
+  if (
+    roomView ===
+    "reportComplete"
+  ) {
+    return (
+      <LiveReportCompletePage
+        onBackToLive={() =>
+          setRoomView("room")
+        }
+        onBlockUser={() => {
+          setRoomView("room");
+
+          setIsBlockConfirmOpen(
+            true,
+          );
+        }}
+      />
+    );
+  }
+
   const tone =
     mode;
 
@@ -1355,6 +1638,23 @@ export function LiveRoomScreen({
   const coHostNickname =
     currentCoHostRequest?.nickname ??
     null;
+
+  const topNotice =
+    mediaError ||
+    (isBroadcastProtocol &&
+    mediaConnected &&
+    isMicMuted &&
+    isMicNoticeVisible
+      ? "마이크가 음소거됐어요. 다시 누르면 송출돼요."
+      : "");
+
+  const pillTop =
+    topNotice ? 108 : 58;
+
+  const coHostCountNotice =
+    coHostRequests.length > 1
+      ? `\n현재 총 ${coHostRequests.length}건의 요청이 대기 중이에요.`
+      : "";
 
   return (
     <Screen
@@ -1381,30 +1681,23 @@ export function LiveRoomScreen({
         onExit={confirmExitLive}
       />
 
-      {mediaError ? (
+      {topNotice ? (
         <LiveRoomBanner
-          message={mediaError}
+          floating={tone === "band"}
+          message={topNotice}
           backgroundColor={
-            tone === "band"
-              ? colors.error
-              : colors.primary400
-          }
-        />
-      ) : null}
-
-      {isBroadcastProtocol &&
-      mediaConnected &&
-      isMicMuted ? (
-        <LiveRoomBanner
-          message="마이크가 음소거됐어요. 다시 누르면 송출돼요."
-          backgroundColor={
-            colors.secondary500
+            !mediaError
+              ? colors.secondary500
+              : tone === "band"
+                ? colors.error
+                : colors.primary400
           }
         />
       ) : null}
 
       {currentCoHostRequest ? (
         <LiveRoomPill
+          top={pillTop}
           label={
             coHostRequests.length > 1
               ? `공동 진행 요청 ${coHostRequests.length}건 확인`
@@ -1422,6 +1715,7 @@ export function LiveRoomScreen({
 
       {canRequestCoHost ? (
         <LiveRoomPill
+          top={pillTop}
           label={
             isAwaitingCoHostApproval
               ? "공동 진행 승인 대기 중"
@@ -1455,7 +1749,7 @@ export function LiveRoomScreen({
       <LiveRoomChatList
         tone={tone}
         messages={
-          sortedMessages
+          visibleMessages
         }
         composerOpen={
           isComposerOpen
@@ -1468,6 +1762,22 @@ export function LiveRoomScreen({
           ) &&
             message.senderProfileImageUrl ===
               live.bandProfileImageUrl)
+        }
+        onProfilePress={
+          mode === "band"
+            ? (message) => {
+                setReportTarget({
+                  targetUserId:
+                    message.senderId,
+                  chatMessage:
+                    message.content,
+                });
+
+                setIsProfileSheetOpen(
+                  true,
+                );
+              }
+            : undefined
         }
       />
 
@@ -1588,8 +1898,8 @@ export function LiveRoomScreen({
         }
         description={
           coHostNickname
-            ? `승인하면 ${coHostNickname}님이\n공동 진행자로 라이브에 참여해요.`
-            : "승인하면 공동 진행자로\n라이브에 참여해요."
+            ? `승인하면 ${coHostNickname}님이\n공동 진행자로 라이브에 참여해요.${coHostCountNotice}`
+            : `승인하면 요청한 밴드 멤버가\n공동 진행자로 라이브에 참여해요.${coHostCountNotice}`
         }
         cancelLabel="닫기"
         confirmLabel={
@@ -1625,6 +1935,61 @@ export function LiveRoomScreen({
 
           void acceptRequester();
         }}
+      />
+
+      <LiveChatProfileActionSheet
+        open={isProfileSheetOpen}
+        isBlocked={
+          reportTarget
+            ? blockedUserIds.has(
+                reportTarget.targetUserId,
+              )
+            : false
+        }
+        isBlockPending={
+          blockMutation.isPending ||
+          unblockMutation.isPending
+        }
+        onBlockToggle={() =>
+          void toggleBlock()
+        }
+        onClose={() =>
+          setIsProfileSheetOpen(
+            false,
+          )
+        }
+        onReport={() => {
+          setIsProfileSheetOpen(
+            false,
+          );
+
+          setRoomView("report");
+        }}
+      />
+
+      <ConfirmModal
+        open={isBlockConfirmOpen}
+        tone="orange"
+        title="이 사용자를 차단할까요?"
+        description={
+          "이 라이브에서 서로의 메시지를\n더 이상 볼 수 없어요."
+        }
+        confirmLabel={
+          blockMutation.isPending
+            ? "차단 중"
+            : "차단하기"
+        }
+        confirmDisabled={
+          blockMutation.isPending
+        }
+        onCancel={() =>
+          setIsBlockConfirmOpen(
+            false,
+          )
+        }
+        onConfirm={() =>
+          void confirmBlock()
+        }
       />
     </Screen>
   );
