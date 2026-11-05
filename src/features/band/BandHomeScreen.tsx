@@ -1872,9 +1872,10 @@ function NoBandState({
 }) {
   const openBandCreate =
     () => {
-      Alert.alert(
-        "밴드 등록",
-        "밴드 등록 화면은 이후 원본 디자인 이식 단계에서 연결할게요.",
+      router.push(
+        "/band/my/profile/new" as Parameters<
+          typeof router.push
+        >[0],
       );
     };
 

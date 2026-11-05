@@ -123,6 +123,8 @@ export function BandMyScreen() {
                     description={
                       "밴드를 등록하면 콘텐츠, 공연, 라이브 등\n다양한 활동을 관리할 수 있어요"
                     }
+                    actionLabel="밴드 등록하기"
+                    onAction={go("/band/my/profile/new")}
                   />
                 </View>
 

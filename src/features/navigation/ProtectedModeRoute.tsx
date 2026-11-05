@@ -101,18 +101,21 @@ export function ProtectedModeRoute({
       onboardingStatus.data
         ?.availableModes;
 
+    const currentMode =
+      onboardingStatus.data
+        ?.currentMode ??
+      user?.currentMode ??
+      null;
+
+    // 팬으로 가입한 뒤 밴드 모드로 전환하면 availableModes에 BAND가 없을 수 있다.
     if (
       availableModes &&
       !availableModes.includes(
         requiredMode,
-      )
+      ) &&
+      currentMode !==
+        requiredMode
     ) {
-      const currentMode =
-        onboardingStatus.data
-          ?.currentMode ??
-        user?.currentMode ??
-        null;
-
       router.replace(
         getHomePathForMode(
           currentMode,
@@ -149,7 +152,11 @@ export function ProtectedModeRoute({
     ) &&
     !onboardingStatus.data?.availableModes.includes(
       requiredMode,
-    );
+    ) &&
+    (onboardingStatus.data
+      ?.currentMode ??
+      user?.currentMode ??
+      null) !== requiredMode;
 
   if (
     isRestoring ||

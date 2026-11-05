@@ -31,3 +31,17 @@ export const changeUserMode = async (body: ChangeUserModeRequest) => {
 
   return data.result;
 };
+
+export const toggleUserMode = async () => {
+  const { data } = await axiosInstance.put<
+    ApiResponse<ChangeUserModeResponse | null>
+  >("/users/me/mode");
+
+  if (!data.isSuccess) {
+    throw new Error(data.message || "모드 전환에 실패했어요.");
+  }
+
+  await persistModeTokens(data.result);
+
+  return data.result;
+};
