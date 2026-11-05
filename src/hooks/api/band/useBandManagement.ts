@@ -6,6 +6,8 @@ import {
 
 import {
     acceptBandInvite,
+    createBand,
+    createBandMemberProfile,
     getBandMemberProfile,
     getBandMembers,
     inviteBandMember,
@@ -16,6 +18,7 @@ import {
     updateBandProfile,
     type BandMemberPart,
     type BandMemberType,
+    type CreateBandRequest,
     type UpdateBandProfileRequest,
 } from "@/api/band/bandManagement";
 
@@ -264,6 +267,39 @@ export const useInviteBandMember =
       },
     });
   };
+
+export const useCreateBandMemberProfile = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: { nickname: string; part: BandMemberPart }) =>
+      createBandMemberProfile(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: bandManagementKeys.all,
+      });
+    },
+  });
+};
+
+export const useCreateBand = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (body: CreateBandRequest) => createBand(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: bandKeys.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: bandManagementKeys.all,
+      });
+      queryClient.invalidateQueries({
+        queryKey: myProfilesKeys.all,
+      });
+    },
+  });
+};
 
 export const useAcceptBandInviteMutation = () => {
   const queryClient = useQueryClient();

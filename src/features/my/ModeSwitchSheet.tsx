@@ -1,4 +1,4 @@
-import { router, usePathname } from "expo-router";
+import { router, usePathname, type Href } from "expo-router";
 import { useState, type ReactNode } from "react";
 import {
   Pressable,
@@ -246,6 +246,22 @@ export function ModeSwitchSheet({
           </View>
         </ScrollView>
 
+        {!isFanMode ? (
+          <>
+            <View style={styles.divider} />
+            <Pressable
+              accessibilityRole="button"
+              style={styles.createBand}
+              onPress={() => {
+                close();
+                router.push("/band/my/profile/new" as Href);
+              }}
+            >
+              <Text style={styles.createBandText}>+ 새 밴드 만들기</Text>
+            </Pressable>
+          </>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           disabled={isDisabled}
@@ -366,6 +382,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 20,
     backgroundColor: colors.neutral300,
+  },
+  divider: {
+    alignSelf: "stretch",
+    height: 1,
+    backgroundColor: colors.neutral400,
+  },
+  createBand: {
+    alignSelf: "stretch",
+    paddingHorizontal: 9,
+  },
+  createBandText: {
+    ...textStyles.label2,
+    color: "#71717A",
   },
   submit: {
     alignSelf: "stretch",
