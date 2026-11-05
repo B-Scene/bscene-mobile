@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { useState, type ReactNode } from "react";
 import {
   Pressable,
@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useChangeUserMode } from "@/hooks/api/user/useMode";
+import { useChangeUserMode, useToggleUserMode } from "@/hooks/api/user/useMode";
 import { useMyProfilesQuery } from "@/hooks/api/user/useMyProfiles";
 import { AppIcon } from "@/shared/components/AppIcon";
 import { ProfileImage } from "@/shared/components/ProfileImage";
@@ -22,6 +22,7 @@ import { useOnboardingDraftStore } from "@/stores/useOnboardingDraftStore";
 import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 
 const FAN_START_ID = "fan-start";
+const BAND_START_ID = "band-start";
 
 function AccountRow({
   avatar,
@@ -83,10 +84,12 @@ export function ModeSwitchSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const setMode = useModeStore((state) => state.setMode);
   const setCurrentMode = useAuthStore((state) => state.setCurrentMode);
   const setOnboardingModes = useOnboardingDraftStore((state) => state.setModes);
   const changeUserMode = useChangeUserMode();
+  const toggleUserMode = useToggleUserMode();
   const { data: profiles } = useMyProfilesQuery({ type: "all" });
   const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
 
@@ -103,10 +106,13 @@ export function ModeSwitchSheet({
     id: `band-${band.bandId}`,
     subtitle: `${getGenreLabel(band.genre)} · ${getRegionLabel(band.region)}`,
   }));
+  const isFanMode = pathname.startsWith("/fan");
   const initialSelectedId =
-    bandAccounts.find((band) => band.isActive)?.id ??
-    bandAccounts[0]?.id ??
-    fanAccountId;
+    isFanMode && fanProfile
+      ? fanAccountId
+      : (bandAccounts.find((band) => band.isActive)?.id ??
+        bandAccounts[0]?.id ??
+        (isFanMode ? FAN_START_ID : BAND_START_ID));
 
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [showError, setShowError] = useState(false);
@@ -119,14 +125,34 @@ export function ModeSwitchSheet({
   };
 
   const isSelectionUnchanged = selectedId === initialSelectedId;
-  const isDisabled = isSelectionUnchanged || changeUserMode.isPending;
+  const isDisabled =
+    isSelectionUnchanged ||
+    changeUserMode.isPending ||
+    toggleUserMode.isPending;
   const isFanSelected = selectedId.startsWith("fan");
+
+  const finishSwitch = () => {
+    setMode(isFanSelected ? "fan" : "band");
+    // 재시작 시 SplashScreen이 이 값으로 첫 화면을 정한다.
+    void setCurrentMode(isFanSelected ? "FAN" : "BAND");
+    close();
+    router.replace(isFanSelected ? "/fan/home" : "/band/home");
+  };
 
   const switchMode = () => {
     if (selectedId === FAN_START_ID) {
       setOnboardingModes(["FAN", "BAND"], "FAN");
       close();
       router.push("/onboarding/fan-nickname");
+      return;
+    }
+
+    if (selectedId === BAND_START_ID) {
+      setShowError(false);
+      toggleUserMode.mutate(undefined, {
+        onSuccess: finishSwitch,
+        onError: () => setShowError(true),
+      });
       return;
     }
 
@@ -141,13 +167,7 @@ export function ModeSwitchSheet({
     changeUserMode.mutate(
       { profileId, type: isFanSelected ? "FAN" : "BAND" },
       {
-        onSuccess: () => {
-          setMode(isFanSelected ? "fan" : "band");
-          // 재시작 시 SplashScreen이 이 값으로 첫 화면을 정한다.
-          void setCurrentMode(isFanSelected ? "FAN" : "BAND");
-          close();
-          router.replace(isFanSelected ? "/fan/home" : "/band/home");
-        },
+        onSuccess: finishSwitch,
         onError: () => setShowError(true),
       },
     );
@@ -192,23 +212,37 @@ export function ModeSwitchSheet({
             <Text style={[styles.sectionTitle, styles.bandTitle]}>
               밴드 모드
             </Text>
-            {bandAccounts.map((band) => (
+            {bandAccounts.length > 0 ? (
+              bandAccounts.map((band) => (
+                <AccountRow
+                  key={band.id}
+                  avatar={
+                    <ProfileImage
+                      imageUrl={band.profileImageUrl}
+                      size={40}
+                      variant="band"
+                    />
+                  }
+                  name={band.bandName}
+                  subtitle={band.subtitle}
+                  selected={selectedId === band.id}
+                  selectedTone="band"
+                  onSelect={() => setPickedId(band.id)}
+                />
+              ))
+            ) : (
               <AccountRow
-                key={band.id}
                 avatar={
-                  <ProfileImage
-                    imageUrl={band.profileImageUrl}
-                    size={40}
-                    variant="band"
-                  />
+                  <View style={styles.plusAvatar}>
+                    <AppIcon name="plus" />
+                  </View>
                 }
-                name={band.bandName}
-                subtitle={band.subtitle}
-                selected={selectedId === band.id}
+                name="밴드 모드 시작하기"
+                selected={selectedId === BAND_START_ID}
                 selectedTone="band"
-                onSelect={() => setPickedId(band.id)}
+                onSelect={() => setPickedId(BAND_START_ID)}
               />
-            ))}
+            )}
           </View>
         </ScrollView>
 
