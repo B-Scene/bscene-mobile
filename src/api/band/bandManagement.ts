@@ -119,6 +119,52 @@ const assertNullableSuccess =
     return data.result;
   };
 
+export interface CreateBandRequest {
+  name: string;
+  genre: string;
+  region: string;
+  bandMemberProfileId: number;
+  profileImageUrl?: string;
+  description?: string;
+}
+
+export const createBand =
+  async (
+    body: CreateBandRequest,
+  ) => {
+    const response =
+      await axiosInstance.post<
+        BandManagementApiResponse<unknown>
+      >(
+        "/bands",
+        body,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
+export const createBandMemberProfile =
+  async (
+    body: {
+      nickname: string;
+      part: BandMemberPart;
+    },
+  ) => {
+    const response =
+      await axiosInstance.post<
+        BandManagementApiResponse<BandMemberProfile>
+      >(
+        "/band-member-profiles",
+        body,
+      );
+
+    return assertSuccess(
+      response,
+    );
+  };
+
 export const updateBandProfile =
   async (
     bandId: number,

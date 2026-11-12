@@ -144,15 +144,28 @@ export function MenuDivider() {
 export function EmptyState({
   title,
   description,
+  actionLabel,
+  onAction,
 }: {
   title: ReactNode;
   description?: ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <View style={styles.empty}>
       <Text style={styles.emptyTitle}>{title}</Text>
       {description ? (
         <Text style={styles.emptyDescription}>{description}</Text>
+      ) : null}
+      {actionLabel ? (
+        <Pressable
+          accessibilityRole="button"
+          style={styles.emptyAction}
+          onPress={onAction}
+        >
+          <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -269,5 +282,19 @@ const styles = StyleSheet.create({
     ...textStyles.caption1,
     color: colors.neutral600,
     textAlign: "center",
+  },
+  emptyAction: {
+    height: 38,
+    minWidth: 110,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: colors.secondary400,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  emptyActionText: {
+    ...textStyles.body1,
+    color: colors.white,
   },
 });
