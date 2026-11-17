@@ -29,7 +29,6 @@ import {
 import { useRegisterPushToken } from "@/hooks/api/notification/useNotification";
 import { colors } from "@/shared/constants/theme";
 import { requestExpoPushToken } from "@/shared/utils/expoNotifications";
-import { useAuthStore } from "@/stores/useAuthStore";
 import { getHomePathForMode, useModeStore } from "@/stores/useModeStore";
 import { useOnboardingDraftStore } from "@/stores/useOnboardingDraftStore";
 import type { ModeCode } from "@/types/onboarding/onboarding";
@@ -49,6 +48,8 @@ type OnboardingStepScreenProps = {
 };
 
 type ModeOption = "fan" | "band" | "both";
+
+type AdditionalInfoField = "name" | "birthDatePrefix" | "genderCode";
 
 const fallbackGenres = [
   { code: "INDIE", name: "인디" },
@@ -136,13 +137,14 @@ const getInitialMode = (mode: ModeOption): ModeCode => {
 export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   const { height: viewportHeight } = useWindowDimensions();
   const draft = useOnboardingDraftStore();
-  const accountName = useAuthStore((state) => state.user?.name ?? "");
   const setMode = useModeStore((state) => state.setMode);
   const [acceptedAgreements, setAcceptedAgreements] = useState<
     Partial<Record<AgreementKey, boolean>>
   >({});
   const [selectedAgreementKey, setSelectedAgreementKey] =
     useState<AgreementKey | null>(null);
+  const [focusedAdditionalField, setFocusedAdditionalField] =
+    useState<AdditionalInfoField | null>(null);
   const [nicknameAvailable, setNicknameAvailable] = useState<boolean | null>(null);
   const checkNicknameMutation = useCheckFanNickname();
   const saveOnboardingMutation = useSaveOnboarding();
@@ -161,11 +163,6 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
     draft.name.trim().length > 0 &&
     draft.birthDatePrefix.length === 6 &&
     /^[1-4]$/.test(draft.genderCode);
-
-  useEffect(() => {
-    if (step !== "agreement" || draft.name || !accountName) return;
-    draft.setAdditionalInfo("name", accountName);
-  }, [accountName, draft, step]);
 
   useEffect(() => {
     if (step !== "fan-nickname") return;
@@ -250,7 +247,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
 
     return (
       <OnboardingFrame
-        title="약관 동의"
+        title="회원 가입"
         showCenteredTitle
         footer={
           <PrimaryButton
@@ -272,8 +269,14 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
               value={draft.name}
               placeholder="이름을 입력해주세요"
               placeholderTextColor={colors.neutral400}
-              style={styles.additionalInput}
+              style={[
+                styles.additionalInput,
+                draft.name.trim().length > 0 && styles.additionalInputFilled,
+                focusedAdditionalField === "name" && styles.additionalInputFocused,
+              ]}
+              onBlur={() => setFocusedAdditionalField(null)}
               onChangeText={(value) => draft.setAdditionalInfo("name", value)}
+              onFocus={() => setFocusedAdditionalField("name")}
             />
           </View>
 
@@ -289,13 +292,21 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                 placeholderTextColor={colors.neutral400}
                 keyboardType="number-pad"
                 maxLength={6}
-                style={[styles.additionalInput, styles.birthInput]}
+                style={[
+                  styles.additionalInput,
+                  styles.birthInput,
+                  draft.birthDatePrefix.length > 0 && styles.additionalInputFilled,
+                  focusedAdditionalField === "birthDatePrefix" &&
+                    styles.additionalInputFocused,
+                ]}
+                onBlur={() => setFocusedAdditionalField(null)}
                 onChangeText={(value) =>
                   draft.setAdditionalInfo(
                     "birthDatePrefix",
                     value.replace(/\D/g, "").slice(0, 6),
                   )
                 }
+                onFocus={() => setFocusedAdditionalField("birthDatePrefix")}
               />
               <Text style={styles.birthDash}>-</Text>
               <TextInput
@@ -303,13 +314,21 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                 keyboardType="number-pad"
                 maxLength={1}
                 textAlign="center"
-                style={[styles.additionalInput, styles.genderInput]}
+                style={[
+                  styles.additionalInput,
+                  styles.genderInput,
+                  draft.genderCode.length > 0 && styles.additionalInputFilled,
+                  focusedAdditionalField === "genderCode" &&
+                    styles.additionalInputFocused,
+                ]}
+                onBlur={() => setFocusedAdditionalField(null)}
                 onChangeText={(value) =>
                   draft.setAdditionalInfo(
                     "genderCode",
                     value.replace(/\D/g, "").slice(0, 1),
                   )
                 }
+                onFocus={() => setFocusedAdditionalField("genderCode")}
               />
               <View style={styles.maskDots}>
                 {Array.from({ length: 6 }).map((_, index) => (
@@ -917,8 +936,8 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     lineHeight: 20,
   },
   frameContent: {
@@ -963,8 +982,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral300,
   },
   primaryButtonText: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 18,
-    fontWeight: "700",
     lineHeight: 20,
   },
   primaryButtonTextEnabled: {
@@ -980,8 +999,8 @@ const styles = StyleSheet.create({
   },
   agreementHeading: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-Bold",
     fontSize: 24,
-    fontWeight: "700",
     lineHeight: 38,
   },
   additionalField: {
@@ -989,8 +1008,8 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     lineHeight: 20,
     marginBottom: -8,
   },
@@ -999,21 +1018,30 @@ const styles = StyleSheet.create({
   },
   fieldDescription: {
     color: colors.neutral500,
+    fontFamily: "Pretendard-Medium",
     fontSize: 12,
-    fontWeight: "500",
     lineHeight: 18,
   },
   additionalInput: {
     height: 46,
     borderWidth: 1.5,
-    borderColor: colors.primary400,
+    borderColor: colors.neutral400,
     borderRadius: 8,
     backgroundColor: colors.white,
     color: colors.neutral900,
+    fontFamily: "Pretendard-Medium",
     fontSize: 15,
-    fontWeight: "500",
     lineHeight: 20,
+    outlineColor: "transparent",
+    outlineWidth: 0,
     paddingHorizontal: 16,
+  },
+  additionalInputFilled: {
+    borderColor: "#F04579",
+  },
+  additionalInputFocused: {
+    borderColor: "#F04579",
+    borderWidth: 2,
   },
   birthRow: {
     flexDirection: "row",
@@ -1022,18 +1050,23 @@ const styles = StyleSheet.create({
   },
   birthInput: {
     flex: 1,
+    minWidth: 0,
   },
   birthDash: {
     color: colors.neutral600,
+    fontFamily: "Pretendard-Bold",
     fontSize: 18,
-    fontWeight: "700",
     lineHeight: 20,
   },
   genderInput: {
     width: 44,
+    padding: 0,
     paddingHorizontal: 0,
+    textAlign: "center",
+    textAlignVertical: "center",
   },
   maskDots: {
+    flexShrink: 0,
     flexDirection: "row",
     gap: 8,
   },
@@ -1045,8 +1078,8 @@ const styles = StyleSheet.create({
   },
   termsHeading: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-Bold",
     fontSize: 24,
-    fontWeight: "700",
     lineHeight: 38,
     marginHorizontal: 5,
     marginTop: 38,
@@ -1063,8 +1096,8 @@ const styles = StyleSheet.create({
   },
   allAgreementText: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     lineHeight: 20,
   },
   agreementRows: {
@@ -1085,14 +1118,14 @@ const styles = StyleSheet.create({
   },
   agreementLabel: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
-    fontWeight: "500",
     lineHeight: 20,
   },
   viewLink: {
     color: colors.neutral500,
+    fontFamily: "Pretendard-Medium",
     fontSize: 12,
-    fontWeight: "500",
     lineHeight: 18,
   },
   modeList: {
