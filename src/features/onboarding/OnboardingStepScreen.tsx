@@ -521,9 +521,8 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
               {row.map((genre) => (
                 <Pill
                   key={genre.code}
-                  label={genre.name}
+                  label={genre.name === "etc" ? "etc." : genre.name}
                   selected={draft.genres.includes(genre.code)}
-                  compact
                   onPress={() => toggleGenre(genre.code)}
                 />
               ))}
@@ -836,12 +835,10 @@ function AgreementCheckIcon({
 function Pill({
   label,
   selected,
-  compact = false,
   onPress,
 }: {
   label: string;
   selected: boolean;
-  compact?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -849,7 +846,6 @@ function Pill({
       accessibilityRole="button"
       style={[
         styles.pill,
-        compact && styles.compactPill,
         selected ? styles.pillSelected : styles.pillIdle,
       ]}
       onPress={onPress}
@@ -858,7 +854,6 @@ function Pill({
         numberOfLines={1}
         style={[
           styles.pillText,
-          compact && styles.compactPillText,
           selected ? styles.pillTextSelected : styles.pillTextIdle,
         ]}
       >
@@ -1203,12 +1198,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   pillRows: {
-    gap: 8,
+    gap: 16,
     marginTop: 32,
   },
   pillRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 8,
   },
   regionRows: {
@@ -1224,12 +1220,9 @@ const styles = StyleSheet.create({
   },
   pill: {
     borderRadius: 100,
+    flexShrink: 0,
     paddingHorizontal: 15,
     paddingVertical: 4,
-  },
-  compactPill: {
-    flexShrink: 1,
-    paddingHorizontal: 15,
   },
   pillSelected: {
     backgroundColor: colors.primary400,
@@ -1238,12 +1231,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral200,
   },
   pillText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     lineHeight: 20,
-  },
-  compactPillText: {
-    fontSize: 15,
   },
   pillTextSelected: {
     color: colors.white,
