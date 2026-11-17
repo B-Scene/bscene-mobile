@@ -32,6 +32,9 @@ export type CheckFanNicknameResponse = {
 };
 
 export type SaveOnboardingRequest = {
+  name: string;
+  birthDatePrefix: string;
+  genderCode: string;
   selectedModes: ModeCode[];
   initialMode: ModeCode;
   fanNickname?: string;
