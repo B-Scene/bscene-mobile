@@ -2,6 +2,10 @@ import {
   Stack,
 } from "expo-router";
 
+import {
+  useFonts,
+} from "expo-font";
+
 import * as SplashScreen from "expo-splash-screen";
 
 import {
@@ -19,9 +23,21 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    "Pretendard-Medium": require("../../assets/fonts/Pretendard-Medium.otf"),
+    "Satoshi-BlackItalic": require("../../assets/fonts/Satoshi-BlackItalic.otf"),
+    "Satoshi-Medium": require("../../assets/fonts/Satoshi-Medium.otf"),
+  });
+
   useEffect(() => {
-    void SplashScreen.hideAsync();
-  }, []);
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontError, fontsLoaded]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <AppProviders>

@@ -22,6 +22,7 @@ import {
 } from "@/hooks/api/auth/useAuth";
 import { colors } from "@/shared/constants/theme";
 import { formatTime } from "@/shared/utils/formatTime";
+import { secureTokenStorage } from "@/shared/utils/secureTokenStorage";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
 
@@ -73,7 +74,8 @@ export function SignupScreen() {
   const signupMutation = useSignup();
   const oauthSignupMutation = useOAuthSignup();
   const setSession = useAuthStore((state) => state.setSession);
-  const { signupToken, socialEmail, clearOAuthSignup } = useOAuthSignupStore();
+  const { signupToken, socialEmail, provider, clearOAuthSignup } =
+    useOAuthSignupStore();
   const isSocialSignup = Boolean(signupToken);
   const displayEmail = isSocialSignup ? (socialEmail ?? "") : form.email;
 
@@ -216,6 +218,9 @@ export function SignupScreen() {
         {
           onSuccess: async (session) => {
             await setSession(session);
+            if (provider) {
+              await secureTokenStorage.setLastOAuthProvider(provider);
+            }
             clearOAuthSignup();
             router.replace("/onboarding/agreement");
           },

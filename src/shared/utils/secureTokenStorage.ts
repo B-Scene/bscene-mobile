@@ -12,6 +12,13 @@ const REFRESH_TOKEN_KEY =
 const AUTH_USER_KEY =
   "bscene.authUser";
 
+const LAST_OAUTH_PROVIDER_KEY =
+  "bscene.lastOAuthProvider";
+
+export type RecentOAuthProvider =
+  | "kakao"
+  | "apple";
+
 export type AuthTokens = {
   accessToken: string;
   refreshToken: string;
@@ -80,6 +87,25 @@ const removeItem = async (
 };
 
 export const secureTokenStorage = {
+  async getLastOAuthProvider(): Promise<RecentOAuthProvider | null> {
+    const provider = await getItem(
+      LAST_OAUTH_PROVIDER_KEY,
+    );
+
+    return provider === "kakao" || provider === "apple"
+      ? provider
+      : null;
+  },
+
+  async setLastOAuthProvider(
+    provider: RecentOAuthProvider,
+  ) {
+    await setItem(
+      LAST_OAUTH_PROVIDER_KEY,
+      provider,
+    );
+  },
+
   async getAccessToken() {
     return getItem(
       ACCESS_TOKEN_KEY,
