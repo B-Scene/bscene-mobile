@@ -145,6 +145,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
     useState<AgreementKey | null>(null);
   const [focusedAdditionalField, setFocusedAdditionalField] =
     useState<AdditionalInfoField | null>(null);
+  const [isNicknameFocused, setIsNicknameFocused] = useState(false);
   const [nicknameAvailable, setNicknameAvailable] = useState<boolean | null>(null);
   const checkNicknameMutation = useCheckFanNickname();
   const saveOnboardingMutation = useSaveOnboarding();
@@ -442,10 +443,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
 
   if (step === "fan-nickname") {
     const isDuplicate = nicknameAvailable === false;
-    const isValidNickname =
-      trimmedNickname.length > 0 &&
-      nicknameAvailable === true &&
-      !checkNicknameMutation.isPending;
+    const canContinue = trimmedNickname.length > 0 && !isDuplicate;
 
     const handleChangeNickname = (value: string) => {
       draft.setFanNickname(value.slice(0, 8));
@@ -457,8 +455,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
         footer={
           <PrimaryButton
             label="다음"
-            disabled={!isValidNickname}
-            loading={checkNicknameMutation.isPending}
+            disabled={!canContinue}
             onPress={() => router.push("/onboarding/genre")}
           />
         }
@@ -475,9 +472,12 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
             maxLength={8}
             style={[
               styles.nicknameInput,
-              isDuplicate ? styles.nicknameInputError : styles.nicknameInputActive,
+              isNicknameFocused && !isDuplicate && styles.nicknameInputFocused,
+              isDuplicate && styles.nicknameInputError,
             ]}
+            onBlur={() => setIsNicknameFocused(false)}
             onChangeText={handleChangeNickname}
+            onFocus={() => setIsNicknameFocused(true)}
           />
           {isDuplicate ? (
             <View style={styles.errorRow}>
@@ -1170,19 +1170,25 @@ const styles = StyleSheet.create({
   nicknameInput: {
     height: 72,
     borderWidth: 1.5,
+    borderColor: colors.primary400,
     borderRadius: 12,
     backgroundColor: colors.white,
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     lineHeight: 20,
+    outlineColor: "transparent",
+    outlineWidth: 0,
     paddingHorizontal: 24,
   },
-  nicknameInputActive: {
-    borderColor: colors.primary400,
+  nicknameInputFocused: {
+    borderColor: "#F04579",
+    borderWidth: 2,
+    boxShadow: "0 0 0 0.5px #F04579",
   },
   nicknameInputError: {
-    borderColor: colors.error,
+    borderColor: "#C62828",
+    boxShadow: "none",
   },
   errorRow: {
     flexDirection: "row",
