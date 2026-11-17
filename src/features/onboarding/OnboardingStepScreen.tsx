@@ -135,7 +135,7 @@ const getInitialMode = (mode: ModeOption): ModeCode => {
 };
 
 export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
-  const { height: viewportHeight } = useWindowDimensions();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const draft = useOnboardingDraftStore();
   const setMode = useModeStore((state) => state.setMode);
   const [acceptedAgreements, setAcceptedAgreements] = useState<
@@ -491,6 +491,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   }
 
   if (step === "genre") {
+    const genreScale = Math.min(1, Math.max(0.8, (viewportWidth - 40) / 352));
     const orderedRows = genreRows
       .map((row) =>
         row
@@ -515,7 +516,15 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
         }
       >
         <StepTitle title="관심 장르를 선택하세요" description="최대 3개" />
-        <View style={styles.pillRows}>
+        <View
+          style={[
+            styles.pillRows,
+            genreScale < 1 && {
+              transform: [{ scale: genreScale }],
+              transformOrigin: "top center",
+            },
+          ]}
+        >
           {orderedRows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.pillRow}>
               {row.map((genre) => (
@@ -1198,13 +1207,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   pillRows: {
+    width: 352,
+    alignSelf: "center",
     gap: 16,
     marginTop: 32,
   },
   pillRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
     gap: 8,
   },
   regionRows: {
@@ -1219,8 +1229,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pill: {
+    alignItems: "center",
     borderRadius: 100,
     flexShrink: 0,
+    justifyContent: "center",
     paddingHorizontal: 15,
     paddingVertical: 4,
   },
