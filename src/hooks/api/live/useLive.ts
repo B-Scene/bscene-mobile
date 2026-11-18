@@ -136,6 +136,7 @@ export const useLiveNowInfiniteQuery =
   (
     filter: LiveNowListFilter =
       "all",
+    enabled = true,
   ) => {
     return useInfiniteQuery({
       queryKey:
@@ -166,12 +167,15 @@ export const useLiveNowInfiniteQuery =
               .nextCursor ??
             undefined
           : undefined,
+
+      enabled,
     });
   };
 
 export const useScheduledLiveInfiniteQuery =
   (
     following = false,
+    enabled = true,
   ) => {
     return useInfiniteQuery({
       queryKey:
@@ -202,6 +206,8 @@ export const useScheduledLiveInfiniteQuery =
               .nextCursor ??
             undefined
           : undefined,
+
+      enabled,
     });
   };
 
@@ -211,6 +217,7 @@ export const useReplayListInfiniteQuery =
       "all",
     sort: ReplaySort =
       "LATEST",
+    enabled = true,
   ) => {
     return useInfiniteQuery({
       queryKey:
@@ -243,12 +250,15 @@ export const useReplayListInfiniteQuery =
               .nextCursor ??
             undefined
           : undefined,
+
+      enabled,
     });
   };
 
 export const useReplayPlaybackQuery =
   (
     liveId: number,
+    enabled = true,
   ) => {
     return useQuery({
       queryKey:
@@ -262,7 +272,8 @@ export const useReplayPlaybackQuery =
         ),
 
       enabled:
-        liveId > 0,
+        liveId > 0 &&
+        enabled,
     });
   };
 
