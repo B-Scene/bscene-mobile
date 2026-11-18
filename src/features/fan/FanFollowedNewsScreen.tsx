@@ -5,7 +5,8 @@ import { FollowedNewsCard } from "@/features/fan/explore/ExploreParts";
 import { useFollowingPostsInfiniteQuery } from "@/hooks/api/fan/useFanHome";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { Screen } from "@/shared/components/Screen";
-import { colors, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors } from "@/shared/constants/theme";
 
 import type { FollowingPostItem } from "@/types/fan/home";
 
@@ -116,7 +117,11 @@ export function FanFollowedNewsScreen() {
       scroll={false}
       contentStyle={styles.container}
     >
-      <AppHeader title="팔로우한 밴드 소식" style={styles.header} />
+      <AppHeader
+        title="팔로우한 밴드 소식"
+        style={styles.header}
+        titleStyle={textStyles.label2}
+      />
 
       <FlatList
         data={posts}
@@ -163,11 +168,12 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   header: {
+    marginTop: 10,
     paddingHorizontal: 15,
   },
   list: {
     gap: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 22,
     paddingTop: 24,
     paddingBottom: 24,
   },

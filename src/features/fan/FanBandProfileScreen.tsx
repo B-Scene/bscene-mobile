@@ -37,7 +37,8 @@ import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import { Toast } from "@/shared/components/Toast";
 import { getGenreLabel, getRegionLabel } from "@/shared/constants/bandLabels";
-import { colors, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors } from "@/shared/constants/theme";
 
 import type { MusicLinksResponse } from "@/types/band/musicLink";
 
@@ -153,6 +154,7 @@ export function FanBandProfileScreen() {
       <AppHeader
         title={`${band?.name ?? "밴드"}의 프로필`}
         style={styles.header}
+        titleStyle={textStyles.label2}
       />
 
       {query.isLoading ? (
@@ -338,6 +340,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   header: {
+    marginTop: 10,
     paddingHorizontal: 15,
   },
   scrollContent: {

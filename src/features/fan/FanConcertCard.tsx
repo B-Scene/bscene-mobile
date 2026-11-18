@@ -3,6 +3,7 @@ import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { FanDesignIcon } from "@/features/fan/FanDesignIcon";
 import { isAlreadyInterestedPerformanceError } from "@/api/fan/home";
 import type { ConcertListItem } from "@/features/fan/concertMappers";
 import {
@@ -11,7 +12,8 @@ import {
   useDeletePerformanceInterest,
 } from "@/hooks/api/fan/useFanHome";
 import { AppIcon } from "@/shared/components/AppIcon";
-import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors, shadows } from "@/shared/constants/theme";
 
 function ConcertLikeButton({ item }: { item: ConcertListItem }) {
   const queryClient = useQueryClient();
@@ -69,8 +71,13 @@ function ConcertLikeButton({ item }: { item: ConcertListItem }) {
   );
 }
 
-export function FanConcertCard({ item }: { item: ConcertListItem }) {
-  const isPending = item.status === "준비중";
+export function FanConcertCard({
+  item,
+  action = "interest",
+}: {
+  item: ConcertListItem;
+  action?: "details" | "interest";
+}) {
 
   return (
     <View style={styles.card}>
@@ -86,8 +93,12 @@ export function FanConcertCard({ item }: { item: ConcertListItem }) {
             resizeMode="cover"
             style={styles.thumbnail}
           />
+        ) : item.day === "--" || item.status === "준비중" ? (
+          <View style={[styles.thumbnail, styles.posterPlaceholder]}>
+            <FanDesignIcon name="poster" />
+          </View>
         ) : (
-          <View style={[styles.dateBadge, isPending && styles.dateBadgePending]}>
+          <View style={styles.dateBadge}>
             <Text style={styles.dateMonth}>{item.month}</Text>
             <Text style={styles.dateDay}>{item.day}</Text>
           </View>
@@ -99,7 +110,7 @@ export function FanConcertCard({ item }: { item: ConcertListItem }) {
               {item.title}
             </Text>
             <View style={styles.location}>
-              <AppIcon name="concertLocation" size={14} />
+              <FanDesignIcon name="location" />
               <Text numberOfLines={1} style={styles.venue}>
                 {item.location}
               </Text>
@@ -113,9 +124,10 @@ export function FanConcertCard({ item }: { item: ConcertListItem }) {
             <Text style={styles.status}>{item.status}</Text>
           </View>
         </View>
+        {action === "details" ? <FanDesignIcon name="concertArrow" /> : null}
       </Pressable>
 
-      <ConcertLikeButton item={item} />
+      {action === "interest" ? <ConcertLikeButton item={item} /> : null}
     </View>
   );
 }
@@ -154,8 +166,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.primary300,
   },
-  dateBadgePending: {
-    backgroundColor: colors.neutral300,
+  posterPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.neutral400,
   },
   dateMonth: {
     color: "#FFFDFB",

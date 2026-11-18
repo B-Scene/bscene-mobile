@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { fanDesignText } from "@/features/fan/fanDesignText";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
@@ -69,7 +70,7 @@ function NotificationCard({
 
       <View style={styles.cardText}>
         <View style={styles.titleRow}>
-          <Text numberOfLines={2} style={styles.title}>
+          <Text numberOfLines={2} style={[styles.title, tone === "fan" && fanDesignText.body1]}>
             {notification.title}
           </Text>
           {!notification.isRead ? (
@@ -84,7 +85,9 @@ function NotificationCard({
             {notification.body}
           </Text>
         ) : null}
-        {time ? <Text style={styles.time}>{time}</Text> : null}
+        {time ? (
+          <Text style={[styles.time, tone === "fan" && fanDesignText.caption2]}>{time}</Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -123,7 +126,12 @@ export function NotificationList({
       scroll={false}
       contentStyle={{ ...styles.container, backgroundColor: background }}
     >
-      <AppHeader title="알림" style={styles.header} onBack={onBack} />
+      <AppHeader
+        title="알림"
+        titleStyle={tone === "fan" ? fanDesignText.label2 : undefined}
+        style={tone === "fan" ? styles.fanHeader : styles.header}
+        onBack={onBack}
+      />
 
       {query.isLoading ? (
         <View style={styles.list}>
@@ -144,8 +152,8 @@ export function NotificationList({
         </View>
       ) : notifications.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.stateTitle}>밴드 알림이 없어요</Text>
-          <Text style={styles.emptyDescription}>
+          <Text style={[styles.stateTitle, tone === "fan" && fanDesignText.label1]}>밴드 알림이 없어요</Text>
+          <Text style={[styles.emptyDescription, tone === "fan" && fanDesignText.caption1]}>
             {"팔로우한 밴드가 없거나,\n밴드의 새로운 소식이 없어요"}
           </Text>
         </View>
@@ -191,6 +199,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 15,
+  },
+  fanHeader: {
+    paddingHorizontal: 15,
+    paddingTop: 16,
+    height: 64,
   },
   list: {
     gap: 12,

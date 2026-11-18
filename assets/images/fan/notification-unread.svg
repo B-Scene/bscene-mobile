@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="25" height="25" viewBox="0 0 25 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Fan_notification">
+<g id="Base">
+</g>
+<path id="Vector 166" d="M6 20V11C6 7.68629 8.68629 5 12 5C15.3137 5 18 7.68629 18 11V20M6 20H18M6 20H4M18 20H20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#141414"/>
+<path id="Vector 77" d="M11 23L13 23" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#141414"/>
+<circle id="Ellipse 79" cx="12" cy="4" r="1" stroke-width="2" stroke="#141414"/>
+<circle id="Ellipse 81" cx="23" cy="2" r="2" fill="#F04579"/>
+</g>
+</svg>

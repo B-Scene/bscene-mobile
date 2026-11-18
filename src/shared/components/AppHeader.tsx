@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type TextStyle,
   type ViewStyle,
 } from "react-native";
 
@@ -16,6 +17,7 @@ type AppHeaderProps = {
   rightContent?: React.ReactNode;
   onBack?: () => void;
   style?: ViewStyle;
+  titleStyle?: TextStyle;
 };
 
 export function AppHeader({
@@ -24,6 +26,7 @@ export function AppHeader({
   rightContent,
   onBack,
   style,
+  titleStyle,
 }: AppHeaderProps) {
   return (
     <View style={[styles.container, style]}>
@@ -48,7 +51,7 @@ export function AppHeader({
         ) : null}
       </View>
 
-      <Text numberOfLines={1} style={styles.title}>
+      <Text numberOfLines={1} style={[styles.title, titleStyle]}>
         {title}
       </Text>
 

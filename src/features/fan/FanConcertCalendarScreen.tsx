@@ -9,8 +9,10 @@ import {
   usePerformancesByDateInfiniteQuery,
 } from "@/hooks/api/fan/useFanHome";
 import { AppHeader } from "@/shared/components/AppHeader";
+import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 import { Screen } from "@/shared/components/Screen";
-import { colors, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors } from "@/shared/constants/theme";
 
 import type {
   PerformanceCalendarDateItem,
@@ -72,6 +74,7 @@ const getCalendarWeeks = (
   const startOffset = new Date(year, month, 1).getDay();
   const lastDate = new Date(year, month + 1, 0).getDate();
   const cellCount = Math.ceil((startOffset + lastDate) / 7) * 7;
+  const todayKey = formatDateKey(new Date());
   const days = Array.from({ length: cellCount }, (_, index) => {
     const date = new Date(year, month, index - startOffset + 1);
     const dateKey = formatDateKey(date);
@@ -79,6 +82,7 @@ const getCalendarWeeks = (
 
     return {
       dateKey,
+      today: dateKey === todayKey,
       label: String(date.getDate()),
       muted,
       sunday: !muted && date.getDay() === 0,
@@ -164,7 +168,7 @@ export function FanConcertCalendarScreen() {
       scroll={false}
       contentStyle={styles.container}
     >
-      <AppHeader title="공연 일정" style={styles.header} />
+      <AppHeader title="공연 일정" style={styles.header} titleStyle={textStyles.label2} />
 
       <View style={styles.calendar}>
         <View style={styles.monthRow}>
@@ -208,7 +212,11 @@ export function FanConcertCalendarScreen() {
                   key={day.dateKey}
                   accessibilityRole="button"
                   disabled={day.muted || !day.hasEvent}
-                  style={[styles.day, day.selected && styles.daySelected]}
+                  style={[
+                    styles.day,
+                    day.today && styles.today,
+                    day.selected && styles.daySelected,
+                  ]}
                   onPress={() =>
                     setSelectedDateKey((current) =>
                       current === day.dateKey ? null : day.dateKey,
@@ -254,14 +262,14 @@ export function FanConcertCalendarScreen() {
         ) : null}
       </View>
 
-      {selectedDate ? (
-        <>
-          <Pressable
-            accessibilityLabel="일정 목록 닫기"
-            style={StyleSheet.absoluteFill}
-            onPress={() => setSelectedDateKey(null)}
-          />
-
+      <BottomSheetModal
+        open={selectedDate !== null}
+        maxHeight="85%"
+        backdropColor="transparent"
+        closeLabel="일정 목록 닫기"
+        onClose={() => setSelectedDateKey(null)}
+      >
+        {selectedDate ? (
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
 
@@ -315,8 +323,8 @@ export function FanConcertCalendarScreen() {
               onEndReachedThreshold={0.35}
             />
           </View>
-        </>
-      ) : null}
+        ) : null}
+      </BottomSheetModal>
     </Screen>
   );
 }
@@ -327,6 +335,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   header: {
+    marginTop: 10,
     paddingHorizontal: 15,
   },
   calendar: {
@@ -345,28 +354,32 @@ const styles = StyleSheet.create({
   weekRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 24,
+    marginTop: 16,
   },
   weekday: {
     ...textStyles.caption3,
-    width: 28,
+    width: 30,
+    lineHeight: 30,
     color: colors.neutral900,
     textAlign: "center",
   },
   days: {
-    gap: 28,
-    marginTop: 24,
+    gap: 20,
+    marginTop: 20,
   },
   dayRow: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   day: {
-    width: 28,
-    height: 28,
+    width: 30,
+    height: 30,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
+    borderRadius: 15,
+  },
+  today: {
+    backgroundColor: colors.neutral300,
   },
   daySelected: {
     backgroundColor: colors.primary50,
@@ -420,16 +433,13 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   sheet: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
     height: 488,
+    flexShrink: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     backgroundColor: colors.white,
     paddingHorizontal: 22.5,
-    paddingTop: 12,
+    paddingTop: 8,
     boxShadow: "0px -5px 10px 0px rgba(0, 0, 0, 0.1)",
   },
   sheetHandle: {
@@ -443,7 +453,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 24,
+    marginTop: 20,
+    paddingHorizontal: 9,
   },
   sheetTitle: {
     ...textStyles.label1,

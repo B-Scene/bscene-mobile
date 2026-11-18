@@ -11,11 +11,12 @@ import {
   useDeleteFanExploreRecentSearch,
   useFanExploreRecentSearchesQuery,
 } from "@/hooks/api/fan/useFanExplore";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
 import { AppHeader } from "@/shared/components/AppHeader";
-import { AppIcon } from "@/shared/components/AppIcon";
+import { FanDesignIcon } from "@/features/fan/FanDesignIcon";
 import { Screen } from "@/shared/components/Screen";
 import { Toast } from "@/shared/components/Toast";
-import { colors, textStyles } from "@/shared/constants/theme";
+import { colors } from "@/shared/constants/theme";
 
 import type { NormalizedFanExploreRecentSearch } from "@/types/fan/explore";
 
@@ -69,12 +70,8 @@ export function FanExploreSearchScreen() {
 
       <View style={styles.body}>
         <View style={[styles.searchBar, isActive && styles.searchBarActive]}>
-          <AppIcon
-            name={isActive ? "exploreSearchActive" : "exploreSearch"}
-            size={16}
-          />
+          <FanDesignIcon name={isActive ? "searchFieldActive" : "searchField"} />
           <TextInput
-            autoFocus
             accessibilityLabel="검색어"
             value={keyword}
             placeholder="밴드명, 장르, 지역, 곡명 검색"
@@ -91,7 +88,7 @@ export function FanExploreSearchScreen() {
               hitSlop={8}
               onPress={() => setKeyword("")}
             >
-              <AppIcon name="timesCircle" size={16} />
+              <FanDesignIcon name="searchClear" />
             </Pressable>
           ) : null}
         </View>
@@ -133,7 +130,7 @@ export function FanExploreSearchScreen() {
                     hitSlop={8}
                     onPress={() => void remove(recentSearch)}
                   >
-                    <AppIcon name="hintClose" size={12} />
+                    <FanDesignIcon name="searchRecentRemove" />
                   </Pressable>
                 </View>
               ))}
@@ -160,6 +157,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   header: {
+    marginTop: 10,
     paddingHorizontal: 15,
   },
   body: {
@@ -190,8 +188,8 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   recent: {
-    marginTop: 16,
-    paddingHorizontal: 18,
+    marginTop: 22,
+    paddingHorizontal: 15,
   },
   recentHeader: {
     flexDirection: "row",
@@ -221,7 +219,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.neutral400,
     backgroundColor: colors.white,
-    paddingHorizontal: 6,
+    paddingHorizontal: 9,
   },
   recentKeyword: {
     maxWidth: 120,

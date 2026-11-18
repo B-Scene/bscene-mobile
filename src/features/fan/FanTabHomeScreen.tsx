@@ -11,7 +11,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import Svg, { Circle, Path } from "react-native-svg";
 
 import {
   useCompletePerformanceParticipation,
@@ -25,15 +24,17 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
+import { FanEntryGuide, useFanEntryGuide, useFanGuideAnchor, type FanGuideAnchor } from "@/features/fan/FanEntryGuide";
+import { FanDesignIcon } from "@/features/fan/FanDesignIcon";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
 import { BSceneLogo } from "@/features/onboarding/BSceneBrandAssets";
 import { ModeSwitchSheet } from "@/features/my/ModeSwitchSheet";
 import { PulseView } from "@/features/post/PostDetailParts";
-import { AppIcon } from "@/shared/components/AppIcon";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import { Toast } from "@/shared/components/Toast";
-import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { colors, shadows } from "@/shared/constants/theme";
 import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import type {
   FanHomeConcert,
@@ -77,6 +78,25 @@ type ConcertCardItem = {
 
 const NEWS_CARD_WIDTH = 200;
 const NEWS_CARD_GAP = 12;
+const HOME_GUTTER = 22;
+
+const previewHomeBands: BandCardItem[] = Array.from({ length: 4 }, (_, index) => ({
+  id: String(index),
+  bandId: null,
+  name: "밴드명",
+  meta: "장르 · 지역",
+  isFollowing: false,
+}));
+
+const previewHomeConcerts: ConcertCardItem[] = Array.from({ length: 3 }, (_, index) => ({
+  id: String(index),
+  title: "WAVY 단독 공연",
+  location: "홍대 롤링홀",
+  dateTime: "2026. 05. 17. 18:00",
+  status: "D-7",
+  month: "MAY",
+  day: "17",
+}));
 
 const MONTH_LABELS = [
   "JAN",
@@ -395,7 +415,16 @@ export function FanTabHomeScreen() {
     upcomingQuery.data?.pages
       .flatMap((page) => page.items)
       .map(mapConcertItem) ?? [];
-  const concerts = upcomingConcerts.length > 0 ? upcomingConcerts : home.performances;
+  const concerts = isDesignPreview
+    ? previewHomeConcerts
+    : upcomingConcerts.length > 0
+      ? upcomingConcerts
+      : home.performances;
+  const recommendedBands = isDesignPreview ? previewHomeBands : home.recommendedBands;
+  const isShowingRecommendedConcerts =
+    upcomingConcerts.length === 0 &&
+    concerts.length > 0 &&
+    fanHomeQuery.data?.performanceType === "RECOMMENDED";
   const isLoading =
     !isDesignPreview && (fanHomeQuery.isLoading || upcomingQuery.isLoading);
   const isError =
@@ -420,6 +449,41 @@ export function FanTabHomeScreen() {
   const isParticipationResponding =
     completeParticipationMutation.isPending ||
     deleteParticipationMutation.isPending;
+
+  const [guideTargetsLaidOut, setGuideTargetsLaidOut] = useState(false);
+  const swapAnchor = useFanGuideAnchor();
+  const calendarAnchor = useFanGuideAnchor();
+  const emptyFollowAnchor = useFanGuideAnchor();
+  const concertsAnchor = useFanGuideAnchor();
+  const guide = useFanEntryGuide(
+    "home",
+    guideTargetsLaidOut &&
+      !isLoading &&
+      !isError &&
+      !home.hasFollowingBands &&
+      !currentPendingPerformance &&
+      !isModeSwitchOpen,
+    isDesignPreview,
+  );
+  const guideSteps = useMemo(() => [[
+    {
+      anchor: swapAnchor, padding: 7, radius: 19, labelPosition: "below",
+      label: "팬 모드와 밴드 모드를\n전환할 수 있어요", labelWidth: 120, labelOffsetX: 32, circleIcon: "swap",
+    },
+    {
+      anchor: calendarAnchor, padding: 7, radius: 19, labelPosition: "below",
+      label: "달력으로\n공연 일정을 확인 할 수 있어요", labelWidth: 160, labelOffsetX: -8, circleIcon: "calendar",
+    },
+  ], [
+    {
+      anchor: emptyFollowAnchor, radius: 12, labelPosition: "above",
+      label: "관심 있는 밴드를 팔로우하고\n최신 소식을 받아보세요", labelWidth: 160, labelOffsetY: -2,
+    },
+    {
+      anchor: concertsAnchor, radius: 12, paddingX: 12, paddingY: 10.5, labelPosition: "above",
+      label: "내 취향에 맞는 공연을\n추천받아보세요", labelWidth: 120, arrowRatio: 323 / 373, labelOffsetX: -6, labelOffsetY: -2, concertArrow: true,
+    },
+  ]] as const, [calendarAnchor, concertsAnchor, emptyFollowAnchor, swapAnchor]);
 
   const retry = () => {
     void fanHomeQuery.refetch();
@@ -470,13 +534,16 @@ export function FanTabHomeScreen() {
   };
 
   return (
-    <Screen edges={["top"]} scroll={false} contentStyle={styles.screen}>
+    <Screen edges={["top", "left", "right"]} scroll={false} contentStyle={styles.screen}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!guide.open}
         contentContainerStyle={styles.container}
       >
         <HomeHeader
           hasUnreadNotification={hasUnreadNotification}
+          swapAnchor={swapAnchor}
+          calendarAnchor={calendarAnchor}
           onModeSwitch={() => setIsModeSwitchOpen(true)}
           onNotificationPress={handleNotificationPress}
         />
@@ -509,7 +576,7 @@ export function FanTabHomeScreen() {
                 }
               >
                 {!home.hasFollowingBands ? (
-                  <EmptyFollowCard />
+                  <EmptyFollowCard guideAnchor={emptyFollowAnchor} />
                 ) : home.news.length > 0 ? (
                   <NewsCarousel items={home.news} />
                 ) : (
@@ -517,7 +584,7 @@ export function FanTabHomeScreen() {
                 )}
               </Section>
 
-              {home.recommendedBands.length > 0 ? (
+              {!home.hasFollowingBands && recommendedBands.length > 0 ? (
                 <Section
                   title="이런 밴드는 어때요?"
                   description="관심사 장르 · 지역 기반 추천"
@@ -526,7 +593,7 @@ export function FanTabHomeScreen() {
                   }
                 >
                   <BandRecommendationStrip
-                    bands={home.recommendedBands}
+                    bands={recommendedBands}
                     onFollowChanged={() => {
                       void fanHomeQuery.refetch();
                     }}
@@ -536,13 +603,17 @@ export function FanTabHomeScreen() {
               ) : null}
 
               <Section
+                headingAnchor={concertsAnchor}
+                onHeadingLayout={() => setGuideTargetsLaidOut(true)}
                 title={
-                  home.hasFollowingBands ? "다가오는 공연" : "이런 공연은 어때요?"
+                  home.hasFollowingBands
+                    ? isShowingRecommendedConcerts ? "다가오는 공연이 없어요" : "다가오는 공연"
+                    : "이런 공연은 어때요?"
                 }
                 description={
-                  home.hasFollowingBands
-                    ? undefined
-                    : "지금 인기 있는 공연을 추천해드릴게요!"
+                  !home.hasFollowingBands || isShowingRecommendedConcerts
+                    ? "지금 인기 있는 공연을 추천해드릴게요!"
+                    : undefined
                 }
                 onMorePress={() =>
                   router.push(
@@ -553,7 +624,7 @@ export function FanTabHomeScreen() {
                 {concerts.length > 0 ? (
                   <View style={styles.concertList}>
                     {concerts.slice(0, 4).map((item) => (
-                      <ConcertCard key={item.id} item={item} />
+                      <ConcertCard key={item.id} item={item} preview={isDesignPreview} />
                     ))}
                   </View>
                 ) : (
@@ -564,6 +635,8 @@ export function FanTabHomeScreen() {
           )}
         </View>
       </ScrollView>
+
+      {guide.open ? <FanEntryGuide steps={guideSteps} onClose={guide.dismiss} /> : null}
 
       <ConfirmModal
         open={Boolean(currentPendingPerformance) && !isParticipationModalDismissed}
@@ -605,23 +678,28 @@ export function FanTabHomeScreen() {
 
 function HomeHeader({
   hasUnreadNotification,
+  swapAnchor,
+  calendarAnchor,
   onModeSwitch,
   onNotificationPress,
 }: {
   hasUnreadNotification: boolean;
+  swapAnchor: FanGuideAnchor;
+  calendarAnchor: FanGuideAnchor;
   onModeSwitch: () => void;
   onNotificationPress: () => void;
 }) {
   return (
     <View style={styles.header}>
       <Pressable
+        ref={swapAnchor}
         accessibilityRole="button"
         accessibilityLabel="모드 전환"
         hitSlop={12}
         style={styles.headerIconButton}
         onPress={onModeSwitch}
       >
-        <SwapIcon />
+        <FanDesignIcon name="swap" />
       </Pressable>
 
       <View pointerEvents="none" style={styles.headerLogo}>
@@ -630,6 +708,7 @@ function HomeHeader({
 
       <View style={styles.headerActions}>
         <Pressable
+          ref={calendarAnchor}
           accessibilityRole="button"
           accessibilityLabel="공연 캘린더"
           hitSlop={12}
@@ -640,7 +719,7 @@ function HomeHeader({
             )
           }
         >
-          <CalendarIcon />
+          <FanDesignIcon name="calendar" />
         </Pressable>
 
         <Pressable
@@ -650,7 +729,7 @@ function HomeHeader({
           style={styles.headerIconButton}
           onPress={onNotificationPress}
         >
-          <NotificationBellIcon hasUnread={hasUnreadNotification} />
+          <FanDesignIcon name={hasUnreadNotification ? "notificationUnread" : "notification"} />
         </Pressable>
       </View>
     </View>
@@ -661,16 +740,29 @@ function Section({
   title,
   description,
   onMorePress,
+  headingAnchor,
+  onHeadingLayout,
   children,
 }: {
   title: string;
   description?: string;
   onMorePress?: () => void;
+  headingAnchor?: FanGuideAnchor;
+  onHeadingLayout?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <View>
-      <View style={styles.sectionHeader}>
+      <View
+        ref={headingAnchor}
+        collapsable={false}
+        onLayout={onHeadingLayout}
+        style={[
+          styles.sectionHeader,
+          !onMorePress && styles.sectionHeaderWithoutAction,
+          description && styles.sectionHeaderWithDescription,
+        ]}
+      >
         <View style={styles.sectionTitleGroup}>
           <Text style={styles.sectionTitle}>{title}</Text>
           {description ? (
@@ -685,9 +777,7 @@ function Section({
             onPress={onMorePress}
           >
             <Text style={styles.moreText}>더보기</Text>
-            <View style={styles.moreIcon}>
-              <AppIcon name="concertArrow" size={24} />
-            </View>
+            <FanDesignIcon name="moreArrow" />
           </Pressable>
         ) : null}
       </View>
@@ -696,9 +786,9 @@ function Section({
   );
 }
 
-function EmptyFollowCard() {
+function EmptyFollowCard({ guideAnchor }: { guideAnchor: FanGuideAnchor }) {
   return (
-    <View style={styles.emptyFollowCard}>
+    <View ref={guideAnchor} collapsable={false} style={styles.emptyFollowCard}>
       <View style={styles.emptyFollowCopy}>
         <Text style={styles.emptyFollowTitle}>아직 팔로우한 밴드가 없어요</Text>
         <Text style={styles.emptyFollowDescription}>
@@ -755,7 +845,7 @@ function NewsCarousel({ items }: { items: NewsCardItem[] }) {
         scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
         snapToInterval={NEWS_CARD_WIDTH + NEWS_CARD_GAP}
-        style={styles.bleed}
+        style={[styles.bleed, styles.newsViewport]}
         contentContainerStyle={styles.newsScroll}
         onScroll={handleScroll}
       >
@@ -796,7 +886,13 @@ function NewsCard({ item }: { item: NewsCardItem }) {
       }}
     >
       <View style={styles.newsHeader}>
-        <ProfileImage imageUrl={item.profileImageUrl} size={36} variant="band" />
+        {item.profileImageUrl ? (
+          <ProfileImage imageUrl={item.profileImageUrl} size={32} variant="band" />
+        ) : (
+          <View style={styles.newsAvatar}>
+            <FanDesignIcon name="newsGuitar" />
+          </View>
+        )}
         <View style={styles.newsTitleGroup}>
           <Text numberOfLines={1} style={styles.newsBandName}>
             {item.bandName}
@@ -824,7 +920,7 @@ function NewsCard({ item }: { item: NewsCardItem }) {
           {item.tags.map((tag) => (
             <View
               key={tag}
-              style={[styles.tagChip, tag.trim().length === 2 && styles.tagChipShort]}
+              style={styles.tagChip}
             >
               <Text style={styles.tagText}>{tag}</Text>
             </View>
@@ -853,7 +949,7 @@ function BandRecommendationStrip({
   const [pendingBandId, setPendingBandId] = useState<number | null>(null);
   const [unfollowTarget, setUnfollowTarget] = useState<BandCardItem | null>(null);
   const isFollowPending = followMutation.isPending || unfollowMutation.isPending;
-  const itemWidth = (windowWidth - 40 - 36) / 4;
+  const itemWidth = (windowWidth - HOME_GUTTER * 2 - NEWS_CARD_GAP * 3) / 4;
 
   const runFollowChange = (band: BandCardItem, nextIsFollowing: boolean) => {
     const bandId = band.bandId;
@@ -932,7 +1028,11 @@ function BandRecommendationStrip({
                   );
                 }}
               >
-                <ProfileImage imageUrl={band.imageUrl} size={52} variant="band" />
+                {band.imageUrl ? (
+                  <ProfileImage imageUrl={band.imageUrl} size={52} variant="band" />
+                ) : (
+                  <View style={styles.recommendBandPlaceholder} />
+                )}
                 <Text numberOfLines={1} style={styles.recommendBandName}>
                   {band.name}
                 </Text>
@@ -946,8 +1046,8 @@ function BandRecommendationStrip({
                 disabled={band.bandId == null || isBandPending}
                 style={[
                   styles.followButton,
-                  (band.bandId == null || isBandPending) &&
-                    styles.followButtonDisabled,
+                  isFollowing && styles.followingButton,
+                  isBandPending && styles.followButtonDisabled,
                 ]}
                 onPress={() => toggleFollow(band)}
               >
@@ -974,12 +1074,13 @@ function BandRecommendationStrip({
   );
 }
 
-function ConcertCard({ item }: { item: ConcertCardItem }) {
+function ConcertCard({ item, preview }: { item: ConcertCardItem; preview: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${item.title} 상세보기`}
       style={styles.concertCard}
+      disabled={preview}
       onPress={() =>
         router.push(
           `/fan/home/concerts/${item.id}` as Parameters<typeof router.push>[0],
@@ -992,13 +1093,12 @@ function ConcertCard({ item }: { item: ConcertCardItem }) {
           resizeMode="cover"
           style={styles.concertThumbnail}
         />
+      ) : preview || item.day === "--" ? (
+        <View style={[styles.concertThumbnail, styles.posterPlaceholder]}>
+          <FanDesignIcon name="poster" />
+        </View>
       ) : (
-        <View
-          style={[
-            styles.dateBadge,
-            item.status === "준비중" && styles.dateBadgePending,
-          ]}
-        >
+        <View style={styles.dateBadge}>
           <Text style={styles.dateMonth}>{item.month}</Text>
           <Text style={styles.dateDay}>{item.day}</Text>
         </View>
@@ -1010,7 +1110,7 @@ function ConcertCard({ item }: { item: ConcertCardItem }) {
             {item.title}
           </Text>
           <View style={styles.concertLocation}>
-            <AppIcon name="concertLocation" size={14} />
+            <FanDesignIcon name="location" />
             <Text numberOfLines={1} style={styles.concertVenue}>
               {item.location}
             </Text>
@@ -1025,7 +1125,7 @@ function ConcertCard({ item }: { item: ConcertCardItem }) {
         </View>
       </View>
 
-      <AppIcon name="concertArrow" size={24} />
+      <FanDesignIcon name="concertArrow" />
     </Pressable>
   );
 }
@@ -1048,63 +1148,14 @@ function LoadingBlock() {
   );
 }
 
-function SwapIcon() {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M14.5 3L14.5 20L19.5 15M9.5 21V4L4.5 9"
-        stroke={colors.neutral900}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M19 4H17V3C17 2.735 16.895 2.48 16.707 2.293C16.52 2.105 16.265 2 16 2C15.735 2 15.48 2.105 15.293 2.293C15.105 2.48 15 2.735 15 3V4H9V3C9 2.735 8.895 2.48 8.707 2.293C8.52 2.105 8.265 2 8 2C7.735 2 7.48 2.105 7.293 2.293C7.105 2.48 7 2.735 7 3V4H5C4.204 4 3.441 4.316 2.879 4.879C2.316 5.441 2 6.204 2 7V19C2 19.796 2.316 20.559 2.879 21.121C3.441 21.684 4.204 22 5 22H19C19.796 22 20.559 21.684 21.121 21.121C21.684 20.559 22 19.796 22 19V7C22 6.204 21.684 5.441 21.121 4.879C20.559 4.316 19.796 4 19 4ZM20 19C20 19.265 19.895 19.52 19.707 19.707C19.52 19.895 19.265 20 19 20H5C4.735 20 4.48 19.895 4.293 19.707C4.105 19.52 4 19.265 4 19V12H20V19ZM20 10H4V7C4 6.735 4.105 6.48 4.293 6.293C4.48 6.105 4.735 6 5 6H7V7C7 7.265 7.105 7.52 7.293 7.707C7.48 7.895 7.735 8 8 8C8.265 8 8.52 7.895 8.707 7.707C8.895 7.52 9 7.265 9 7V6H15V7C15 7.265 15.105 7.52 15.293 7.707C15.48 7.895 15.735 8 16 8C16.265 8 16.52 7.895 16.707 7.707C16.895 7.52 17 7.265 17 7V6H19C19.265 6 19.52 6.105 19.707 6.293C19.895 6.48 20 6.735 20 7V10Z"
-        fill={colors.neutral900}
-      />
-    </Svg>
-  );
-}
-
-function NotificationBellIcon({ hasUnread }: { hasUnread: boolean }) {
-  return (
-    <View>
-      <Svg width={25} height={25} viewBox="0 0 25 25" fill="none">
-        <Path
-          d="M6 20V11C6 7.686 8.686 5 12 5C15.314 5 18 7.686 18 11V20M6 20H18M6 20H4M18 20H20"
-          stroke={colors.neutral900}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <Path
-          d="M11 23L13 23"
-          stroke={colors.neutral900}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <Circle cx={12} cy={4} r={1} stroke={colors.neutral900} strokeWidth={2} />
-        {hasUnread ? <Circle cx={23} cy={2} r={2} fill={colors.primary400} /> : null}
-      </Svg>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: {
     paddingHorizontal: 0,
     paddingVertical: 0,
+    paddingTop: 10,
   },
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: HOME_GUTTER,
     paddingBottom: 24,
     backgroundColor: colors.white,
   },
@@ -1113,7 +1164,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginHorizontal: -20,
+    marginHorizontal: -HOME_GUTTER,
     paddingHorizontal: 24,
     backgroundColor: colors.white,
   },
@@ -1136,14 +1187,21 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 32,
-    marginTop: 32,
+    marginTop: 24,
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    minHeight: 24,
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 16,
     marginBottom: 16,
+  },
+  sectionHeaderWithoutAction: {
+    minHeight: 20,
+  },
+  sectionHeaderWithDescription: {
+    minHeight: 42,
   },
   sectionTitleGroup: {
     flex: 1,
@@ -1161,14 +1219,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    paddingTop: 2,
   },
   moreText: {
     ...textStyles.body1,
     color: colors.neutral400,
-  },
-  moreIcon: {
-    opacity: 0.35,
   },
   emptyFollowCard: {
     ...shadows.card,
@@ -1176,11 +1230,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 18,
+    minHeight: 154,
+    marginHorizontal: 2,
     borderRadius: 12,
     backgroundColor: colors.primary0,
     paddingHorizontal: 19,
-    paddingTop: 25,
-    paddingBottom: 24,
+    paddingVertical: 24,
   },
   emptyFollowCopy: {
     flex: 1,
@@ -1200,8 +1255,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 8,
     backgroundColor: colors.primary400,
-    paddingHorizontal: 17,
-    paddingVertical: 7,
+    width: 100,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   exploreButtonText: {
     ...textStyles.caption3,
@@ -1210,14 +1267,18 @@ const styles = StyleSheet.create({
   speaker: {
     width: 87,
     height: 90,
+    opacity: 0.8,
   },
   bleed: {
-    marginHorizontal: -20,
+    marginHorizontal: -HOME_GUTTER,
+  },
+  newsViewport: {
+    marginTop: -6,
   },
   newsScroll: {
     gap: NEWS_CARD_GAP,
-    paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingHorizontal: HOME_GUTTER,
+    paddingTop: 6,
     paddingBottom: 12,
   },
   newsCard: {
@@ -1227,7 +1288,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: colors.white,
     padding: 12,
-    boxShadow: "0px 0px 10px 1px rgba(20, 20, 20, 0.12)",
+    ...shadows.card,
+  },
+  newsAvatar: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: colors.neutral400,
   },
   newsHeader: {
     flexDirection: "row",
@@ -1247,17 +1316,17 @@ const styles = StyleSheet.create({
     color: colors.neutral600,
   },
   newsImage: {
-    width: "100%",
-    height: 82,
-    borderRadius: 8,
-    backgroundColor: colors.neutral300,
+    width: 156,
+    height: 92,
+    alignSelf: "center",
+    backgroundColor: colors.neutral400,
   },
   newsText: {
     ...textStyles.caption2,
     color: colors.neutral900,
   },
   tagRow: {
-    height: 20,
+    height: 18,
     flexDirection: "row",
     gap: 4,
     overflow: "hidden",
@@ -1269,10 +1338,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.primary50,
     paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  tagChipShort: {
-    minWidth: 32,
+    paddingVertical: 3,
   },
   tagText: {
     ...textStyles.body5,
@@ -1290,12 +1356,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral400,
   },
   newsDotActive: {
-    backgroundColor: colors.primary300,
+    backgroundColor: colors.primary400,
   },
   bandStrip: {
     gap: 12,
-    paddingHorizontal: 20,
-    paddingBottom: 4,
+    paddingHorizontal: HOME_GUTTER,
   },
   recommendBand: {
     alignItems: "center",
@@ -1304,10 +1369,16 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
   },
+  recommendBandPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#d9d9d9",
+  },
   recommendBandName: {
     ...textStyles.body1,
     maxWidth: "100%",
-    marginTop: 8,
+    marginTop: 4,
     color: colors.neutral900,
   },
   recommendBandMeta: {
@@ -1319,11 +1390,15 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 4,
+    height: 26,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.primary400,
-    paddingVertical: 4,
+  },
+  followingButton: {
+    borderColor: colors.primary50,
+    backgroundColor: colors.primary50,
   },
   followButtonDisabled: {
     opacity: 0.6,
@@ -1350,7 +1425,11 @@ const styles = StyleSheet.create({
     width: 50,
     height: 62,
     borderRadius: 8,
-    backgroundColor: colors.neutral300,
+    backgroundColor: colors.neutral400,
+  },
+  posterPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   dateBadge: {
     width: 50,
@@ -1359,9 +1438,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
     backgroundColor: colors.primary300,
-  },
-  dateBadgePending: {
-    backgroundColor: colors.neutral300,
   },
   dateMonth: {
     color: "#FFFDFB",
