@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -25,7 +26,7 @@ import {
   loginWithAppleSdk,
   loginWithKakaoSdk,
 } from "@/features/auth/socialSdk";
-import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
+import { getSocialLoginErrorMessage } from "@/features/auth/socialLoginError";
 import {
   secureTokenStorage,
   type RecentOAuthProvider,
@@ -168,6 +169,14 @@ export function LoginScreen() {
       return;
     }
 
+    if (Constants.expoGoConfig) {
+      Alert.alert(
+        "Expo Go 디자인 확인",
+        "화면 디자인은 확인할 수 있지만 카카오 SDK 로그인은 개발 빌드에서만 동작합니다.",
+      );
+      return;
+    }
+
     if (!config.kakaoNativeAppKey.trim()) {
       Alert.alert(
         "카카오 로그인 설정 필요",
@@ -186,7 +195,7 @@ export function LoginScreen() {
       if (!isSocialSdkCancellation(error)) {
         Alert.alert(
           "카카오 로그인 실패",
-          getApiErrorMessage(error, "카카오 로그인 중 문제가 발생했어요."),
+          getSocialLoginErrorMessage(error, "카카오"),
         );
       }
     } finally {
@@ -202,6 +211,14 @@ export function LoginScreen() {
       return;
     }
 
+    if (Constants.expoGoConfig) {
+      Alert.alert(
+        "Expo Go 디자인 확인",
+        "화면 디자인은 확인할 수 있지만 Apple SDK 로그인은 B:Scene 개발 빌드에서 최종 확인해야 합니다.",
+      );
+      return;
+    }
+
     if (Platform.OS !== "ios") {
       Alert.alert(
         "Apple 로그인",
@@ -214,6 +231,11 @@ export function LoginScreen() {
 
     try {
       const challenge = await appleChallengeMutation.mutateAsync();
+
+      if (!challenge.challengeId || !challenge.nonce) {
+        throw new Error("Apple 로그인 요청 정보를 받지 못했습니다.");
+      }
+
       const credential = await loginWithAppleSdk(challenge.nonce);
       const data = await appleLoginMutation.mutateAsync({
         identityToken: credential.identityToken,
@@ -225,7 +247,7 @@ export function LoginScreen() {
       if (!isSocialSdkCancellation(error)) {
         Alert.alert(
           "Apple 로그인 실패",
-          getApiErrorMessage(error, "Apple 로그인 중 문제가 발생했어요."),
+          getSocialLoginErrorMessage(error, "Apple"),
         );
       }
     } finally {
@@ -299,13 +321,29 @@ export function LoginScreen() {
           onPress={() => void handleAppleLogin()}
         >
           <Image
-            source={require("../../../assets/images/auth/apple-login-button.svg")}
+            source={require("../../../assets/images/auth/apple-login-button.png")}
             style={styles.loginButtonImage}
           />
         </Pressable>
 
         {recentProvider === "apple" ? (
           <RecentLoginBubble provider="apple" />
+        ) : null}
+
+        {__DEV__ ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="온보딩 화면 확인하기"
+            style={({ pressed }) => [
+              styles.onboardingPreviewButton,
+              pressed && styles.pressed,
+            ]}
+            onPress={() => router.push("/onboarding/agreement")}
+          >
+            <Text style={styles.onboardingPreviewText}>
+              온보딩 화면 확인하기 (개발용)
+            </Text>
+          </Pressable>
         ) : null}
       </View>
     </ScrollView>
@@ -445,6 +483,25 @@ const styles = StyleSheet.create({
   loginButtonImage: {
     width: 345,
     height: 52,
+  },
+  onboardingPreviewButton: {
+    position: "absolute",
+    top: 742,
+    left: 24,
+    width: 345,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.primary400,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  onboardingPreviewText: {
+    color: colors.primary400,
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 14,
+    lineHeight: 20,
   },
   recentBubble: {
     position: "absolute",

@@ -1,11 +1,11 @@
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Platform } from "react-native";
-import { login as kakaoLogin } from "@react-native-kakao/user";
 
 import type { AppleSdkCredential } from "@/features/auth/socialSdk";
 
 export const loginWithKakaoSdk = async () => {
-  const token = await kakaoLogin();
+  const { login } = await import("@react-native-kakao/user");
+  const token = await login();
 
   if (!token.accessToken) {
     throw new Error("카카오 Access Token을 받지 못했습니다.");
