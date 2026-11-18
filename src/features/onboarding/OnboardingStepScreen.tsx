@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 
 import {
@@ -153,7 +154,12 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   const genresQuery = useGenres();
   const regionsQuery = useRegions();
   const genreOptions = genresQuery.data?.length ? genresQuery.data : fallbackGenres;
-  const regionOptions = regionsQuery.data?.length ? regionsQuery.data : fallbackRegions;
+  const regionOptions = (
+    regionsQuery.data?.length ? regionsQuery.data : fallbackRegions
+  ).filter(
+    (region) =>
+      region.name !== "지역 미상" && region.code.toUpperCase() !== "UNKNOWN",
+  );
   const trimmedNickname = draft.fanNickname.trim();
   const allAgreementsAccepted = AGREEMENTS.every(
     (agreement) => acceptedAgreements[agreement.key],
@@ -725,7 +731,7 @@ function OnboardingFrame({
   footer: React.ReactNode;
 }) {
   return (
-    <View style={styles.frameRoot}>
+    <SafeAreaView edges={["top"]} style={styles.frameRoot}>
       <View style={styles.topBar}>
         <Pressable
           accessibilityRole="button"
@@ -741,7 +747,7 @@ function OnboardingFrame({
       </View>
       <ScrollView contentContainerStyle={styles.frameContent}>{children}</ScrollView>
       <View style={styles.frameFooter}>{footer}</View>
-    </View>
+    </SafeAreaView>
   );
 }
 
