@@ -32,6 +32,7 @@ import {
   type RecentOAuthProvider,
 } from "@/shared/utils/secureTokenStorage";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import { getHomePathForMode } from "@/stores/useModeStore";
 import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
 import type { MobileOAuthResponse } from "@/types/auth/auth";
@@ -71,6 +72,7 @@ export function LoginScreen() {
   const appleChallengeMutation = useAppleLoginChallenge();
   const appleLoginMutation = useAppleMobileLogin();
   const setSession = useAuthStore((state) => state.setSession);
+  const enableDesignPreview = useDesignPreviewStore((state) => state.enable);
   const setOAuthSignup = useOAuthSignupStore(
     (state) => state.setOAuthSignup,
   );
@@ -331,19 +333,37 @@ export function LoginScreen() {
         ) : null}
 
         {__DEV__ ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="온보딩 화면 확인하기"
-            style={({ pressed }) => [
-              styles.onboardingPreviewButton,
-              pressed && styles.pressed,
-            ]}
-            onPress={() => router.push("/onboarding/agreement")}
-          >
-            <Text style={styles.onboardingPreviewText}>
-              온보딩 화면 확인하기 (개발용)
-            </Text>
-          </Pressable>
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="온보딩 화면 확인하기"
+              style={({ pressed }) => [
+                styles.onboardingPreviewButton,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => router.push("/onboarding/agreement")}
+            >
+              <Text style={styles.previewButtonText}>
+                온보딩 화면 확인하기 (개발용)
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="페이지 확인하기"
+              style={({ pressed }) => [
+                styles.homePreviewButton,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => {
+                enableDesignPreview();
+                router.push("/fan/home");
+              }}
+            >
+              <Text style={styles.previewButtonText}>
+                페이지 확인하기 (개발용)
+              </Text>
+            </Pressable>
+          </>
         ) : null}
       </View>
     </ScrollView>
@@ -497,7 +517,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.white,
   },
-  onboardingPreviewText: {
+  homePreviewButton: {
+    position: "absolute",
+    top: 798,
+    left: 24,
+    width: 345,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.primary400,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  previewButtonText: {
     color: colors.primary400,
     fontFamily: "Pretendard-SemiBold",
     fontSize: 14,

@@ -34,6 +34,7 @@ import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import { Toast } from "@/shared/components/Toast";
 import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import type {
   FanHomeConcert,
   FanHomeNewsItem,
@@ -361,10 +362,21 @@ const getPendingPerformanceTitle = (
 };
 
 export function FanTabHomeScreen() {
-  const fanHomeQuery = useFanHomeQuery();
-  const upcomingQuery = useUpcomingPerformancesInfiniteQuery("IMMINENT", 4);
-  const notificationsQuery = useNotificationsInfiniteQuery();
-  const pendingParticipationQuery = usePendingPerformanceParticipationQuery();
+  const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
+  const fanHomeQuery = useFanHomeQuery(!isDesignPreview);
+  const upcomingQuery = useUpcomingPerformancesInfiniteQuery(
+    "IMMINENT",
+    4,
+    !isDesignPreview,
+  );
+  const notificationsQuery = useNotificationsInfiniteQuery(
+    20,
+    !isDesignPreview,
+  );
+  const pendingParticipationQuery = usePendingPerformanceParticipationQuery(
+    !isDesignPreview,
+  );
   const completeParticipationMutation = useCompletePerformanceParticipation();
   const deleteParticipationMutation = useDeletePerformanceParticipation();
   const [answeredPendingIds, setAnsweredPendingIds] = useState<Set<number>>(
@@ -384,8 +396,10 @@ export function FanTabHomeScreen() {
       .flatMap((page) => page.items)
       .map(mapConcertItem) ?? [];
   const concerts = upcomingConcerts.length > 0 ? upcomingConcerts : home.performances;
-  const isLoading = fanHomeQuery.isLoading || upcomingQuery.isLoading;
-  const isError = fanHomeQuery.isError || upcomingQuery.isError;
+  const isLoading =
+    !isDesignPreview && (fanHomeQuery.isLoading || upcomingQuery.isLoading);
+  const isError =
+    !isDesignPreview && (fanHomeQuery.isError || upcomingQuery.isError);
   const notificationItems =
     notificationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const hasUnreadNotification =

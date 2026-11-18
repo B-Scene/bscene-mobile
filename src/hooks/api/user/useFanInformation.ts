@@ -28,13 +28,15 @@ export const fanInformationKeys = {
 };
 
 export const useFanInformationQuery =
-  () => {
+  (enabled = true) => {
     return useQuery({
       queryKey:
         fanInformationKeys.all,
 
       queryFn:
         getFanInformation,
+
+      enabled,
 
       staleTime:
         1000 * 30,

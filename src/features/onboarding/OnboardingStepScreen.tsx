@@ -662,10 +662,14 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                 {Platform.OS === "web" ? "iPhone 사용자 안내" : "모바일 알림 안내"}
               </Text>
             </View>
-            <Text style={styles.nativeNoticeText}>
+            <Text
+              lineBreakStrategyIOS="hangul-word"
+              textBreakStrategy="balanced"
+              style={styles.nativeNoticeText}
+            >
               {Platform.OS === "web"
                 ? "iPhone에서는 B:Scene을 홈 화면에 추가해야 알림을 받을 수 있어요.\nSafari 공유 버튼 → 홈 화면에 추가"
-                : "기기 알림 권한을 허용하면 B:Scene 앱에서 공연, 라이브, 세션 소식을 받을 수 있어요."}
+                : "기기 알림 권한을 허용하면 B:Scene 앱에서 공연, 라\u2060이\u2060브, 세션 소식을 받을 수 있어요."}
             </Text>
           </View>
         </View>

@@ -24,6 +24,7 @@ import { AppIcon } from "@/shared/components/AppIcon";
 import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import { colors, textStyles } from "@/shared/constants/theme";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import type {
   LiveNowItem,
   LiveReplayItem,
@@ -41,15 +42,25 @@ type LiveHomeScreenProps = {
 type BandLiveListKind = "now" | "scheduled";
 
 export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
-  const query = useLiveHomeQuery();
-  const data = query.data;
+  const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
+  const query = useLiveHomeQuery(!isDesignPreview);
+  const data = query.data ?? (isDesignPreview
+    ? {
+        liveNow: [],
+        replays: [],
+        scheduled: [],
+        myNickname: null,
+        myProfileImageUrl: null,
+      }
+    : undefined);
 
   if (mode === "band") {
     return (
       <BandLiveHome
         data={data}
         isLoading={query.isLoading}
-        isError={query.isError || !data}
+        isError={!isDesignPreview && (query.isError || !data)}
         onRetry={() => void query.refetch()}
       />
     );
@@ -59,7 +70,7 @@ export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
     <FanLiveHome
       data={data}
       isLoading={query.isLoading}
-      isError={query.isError || !data}
+      isError={!isDesignPreview && (query.isError || !data)}
       onRetry={() => void query.refetch()}
     />
   );

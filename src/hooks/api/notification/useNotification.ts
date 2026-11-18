@@ -46,7 +46,7 @@ export const useNotificationSettingsQuery = (
   });
 };
 
-export const useNotificationsInfiniteQuery = (size = 20) => {
+export const useNotificationsInfiniteQuery = (size = 20, enabled = true) => {
   return useInfiniteQuery({
     queryKey: notificationKeys.list(size),
     queryFn: ({ pageParam }) =>
@@ -57,6 +57,7 @@ export const useNotificationsInfiniteQuery = (size = 20) => {
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+    enabled,
     staleTime: 1000 * 30,
   });
 };

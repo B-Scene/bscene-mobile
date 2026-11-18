@@ -18,11 +18,14 @@ import { AppIcon } from "@/shared/components/AppIcon";
 import { Screen } from "@/shared/components/Screen";
 import { getGenreLabel, getRegionLabel } from "@/shared/constants/bandLabels";
 import { colors, textStyles } from "@/shared/constants/theme";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 
 const SORT_OPTIONS = ["추천순", "정확도순", "인기순"] as const;
 type ExploreSortOption = (typeof SORT_OPTIONS)[number];
 
 export function FanExploreScreen() {
+  const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
   const [isSortSheetOpen, setIsSortSheetOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [selectedSort, setSelectedSort] = useState<ExploreSortOption>("추천순");
@@ -34,7 +37,7 @@ export function FanExploreScreen() {
   const query = useRecommendedExploreBandsInfiniteQuery({
     size: 20,
     withDummy: registeredOnly ? false : undefined,
-  });
+  }, !isDesignPreview);
   const { toggleFollow, followLayer } = useExploreFollow();
 
   const bands = useMemo(() => {
