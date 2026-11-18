@@ -250,6 +250,8 @@ export type LiveRtcHandle = {
   close: () => Promise<void>;
 
   setMicEnabled: (enabled: boolean) => void;
+
+  setPlaybackEnabled: (enabled: boolean) => void;
 };
 
 export const startWhipBroadcast = async (
@@ -317,6 +319,8 @@ export const startWhipBroadcast = async (
         track.enabled = enabled;
       });
     },
+
+    setPlaybackEnabled: () => {},
   };
 };
 
@@ -370,5 +374,13 @@ export const startWhepPlayback = async (
     },
 
     setMicEnabled: () => {},
+
+    setPlaybackEnabled: (enabled) => {
+      peer.getReceivers().forEach((receiver) => {
+        if (receiver.track?.kind === "audio") {
+          receiver.track.enabled = enabled;
+        }
+      });
+    },
   };
 };

@@ -4,7 +4,6 @@ import Svg, { G, Circle, Defs, Pattern, Use, Image } from "react-native-svg";
 import type { SvgProps } from "react-native-svg";
 const SvgLiveActiveIcon = (props: SvgProps) => (
   <Svg
-    xmlns="http://www.w3.org/2000/svg"
     fill="none"
     viewBox="0 0 82 81"
     {...props}
@@ -36,4 +35,3 @@ const SvgLiveActiveIcon = (props: SvgProps) => (
   </Svg>
 );
 export default SvgLiveActiveIcon;
-

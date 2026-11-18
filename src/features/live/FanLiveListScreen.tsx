@@ -17,6 +17,7 @@ import {
   FanScheduledCard,
   formatReplayDuration,
 } from "@/features/live/LiveCards";
+import { liveDesignPreviewHome } from "@/features/live/liveDesignPreview";
 import {
   useLiveNowInfiniteQuery,
   useReplayListInfiniteQuery,
@@ -25,6 +26,7 @@ import {
 } from "@/hooks/api/live/useLive";
 import { AppIcon } from "@/shared/components/AppIcon";
 import { colors, textStyles } from "@/shared/constants/theme";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import type {
   LiveNowItem,
   LiveReplayItem,
@@ -62,10 +64,22 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
   const [sort, setSort] = useState<ReplaySort>("LATEST");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
 
-  const liveNowQuery = useLiveNowInfiniteQuery(filterToApi(filter));
-  const scheduledQuery = useScheduledLiveInfiniteQuery(filter === "followed");
-  const replayQuery = useReplayListInfiniteQuery(filterToApi(filter), sort);
+  const liveNowQuery = useLiveNowInfiniteQuery(
+    filterToApi(filter),
+    !isDesignPreview,
+  );
+  const scheduledQuery = useScheduledLiveInfiniteQuery(
+    filter === "followed",
+    !isDesignPreview,
+  );
+  const replayQuery = useReplayListInfiniteQuery(
+    filterToApi(filter),
+    sort,
+    !isDesignPreview,
+  );
 
   const query =
     kind === "now"
@@ -75,13 +89,15 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
         : replayQuery;
 
   const items = useMemo(() => {
-    const pages = query.data?.pages ?? [];
-
-    const allItems: FanLiveListItem[] = [];
-
-    pages.forEach((page) => {
-      allItems.push(...(page.items as FanLiveListItem[]));
-    });
+    const allItems: FanLiveListItem[] = isDesignPreview
+      ? kind === "now"
+        ? liveDesignPreviewHome.liveNow
+        : kind === "scheduled"
+          ? liveDesignPreviewHome.scheduled
+          : liveDesignPreviewHome.replays
+      : (query.data?.pages ?? []).flatMap(
+          (page) => page.items as FanLiveListItem[],
+        );
 
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
 
@@ -94,7 +110,7 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
         .toLocaleLowerCase()
         .includes(normalizedQuery),
     );
-  }, [query.data?.pages, searchQuery]);
+  }, [isDesignPreview, kind, query.data?.pages, searchQuery]);
 
   const title = TITLE_BY_KIND[kind];
 
@@ -150,11 +166,11 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
         <ReplaySortBar sort={sort} onChange={setSort} />
       ) : null}
 
-      {query.isLoading ? (
+      {!isDesignPreview && query.isLoading ? (
         <Text style={styles.statusText}>
           {STATUS_NOUN_BY_KIND[kind]} 불러오는 중이에요.
         </Text>
-      ) : query.isError ? (
+      ) : !isDesignPreview && query.isError ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>
             {STATUS_NOUN_BY_KIND[kind]} 불러오지 못했어요.
@@ -173,12 +189,19 @@ export function FanLiveListScreen({ kind }: FanLiveListScreenProps) {
           items={items}
           filter={filter}
           searchQuery={searchQuery}
+          isDesignPreview={isDesignPreview}
           onEndReached={() => {
-            if (query.hasNextPage && !query.isFetchingNextPage) {
+            if (
+              !isDesignPreview &&
+              query.hasNextPage &&
+              !query.isFetchingNextPage
+            ) {
               void query.fetchNextPage();
             }
           }}
-          isFetchingNextPage={query.isFetchingNextPage}
+          isFetchingNextPage={
+            !isDesignPreview && query.isFetchingNextPage
+          }
         />
       )}
     </SafeAreaView>
@@ -262,6 +285,7 @@ function LiveList({
   items,
   filter,
   searchQuery,
+  isDesignPreview,
   onEndReached,
   isFetchingNextPage,
 }: {
@@ -269,6 +293,7 @@ function LiveList({
   items: FanLiveListItem[];
   filter: FanLiveFilter;
   searchQuery: string;
+  isDesignPreview: boolean;
   onEndReached: () => void;
   isFetchingNextPage: boolean;
 }) {
@@ -316,6 +341,7 @@ function LiveList({
             <ScheduledLiveListCard
               live={item as ScheduledLiveItem}
               showNotificationButton={filter === "all"}
+              isDesignPreview={isDesignPreview}
             />
           );
         }
@@ -344,9 +370,11 @@ function LiveList({
 function ScheduledLiveListCard({
   live,
   showNotificationButton,
+  isDesignPreview,
 }: {
   live: ScheduledLiveItem;
   showNotificationButton: boolean;
+  isDesignPreview: boolean;
 }) {
   const mutation = useToggleLiveAlarmMutation();
   const [override, setOverride] = useState<boolean | null>(null);
@@ -364,6 +392,8 @@ function ScheduledLiveListCard({
 
     const previous = notified;
     setOverride(!previous);
+
+    if (isDesignPreview) return;
 
     try {
       const result = await mutation.mutateAsync(live.liveId);
@@ -563,7 +593,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     gap: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 23,
     paddingBottom: 24,
   },
   listContentTopGap: {

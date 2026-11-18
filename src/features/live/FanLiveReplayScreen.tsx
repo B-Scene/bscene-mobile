@@ -17,7 +17,12 @@ import Svg, {
 } from "react-native-svg";
 
 import { resolveLiveMediaUrl } from "@/api/live/live";
+import { liveDesignPreviewReplay } from "@/features/live/liveDesignPreview";
 import { LiveWaveform } from "@/features/live/LiveWaveform";
+import {
+  LiveReplayGuide,
+  useLiveReplayGuide,
+} from "@/features/live/LiveRoomGuide";
 import { useReplayPlaybackQuery } from "@/hooks/api/live/useLive";
 import { AppHeader } from "@/shared/components/AppHeader";
 import { AppIcon } from "@/shared/components/AppIcon";
@@ -26,6 +31,7 @@ import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import { colors, textStyles } from "@/shared/constants/theme";
 import { secureTokenStorage } from "@/shared/utils/secureTokenStorage";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 
 const SEEK_SECONDS = 10;
 const THUMB_SIZE = 14;
@@ -54,13 +60,16 @@ const goToReplayList = () => router.replace("/fan/live/replays" as Href);
 export function FanLiveReplayScreen() {
   const params = useLocalSearchParams<{ liveId?: string }>();
   const liveId = parseId(params.liveId);
-  const query = useReplayPlaybackQuery(liveId);
-  const replay = query.data;
+  const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
+  const query = useReplayPlaybackQuery(liveId, !isDesignPreview);
+  const replay = isDesignPreview ? liveDesignPreviewReplay : query.data;
   const audioPlayer = useAudioPlayer(null);
   const status = useAudioPlayerStatus(audioPlayer);
   const [playbackError, setPlaybackError] = useState("");
   const [dragSeconds, setDragSeconds] = useState<number | null>(null);
   const [trackWidth, setTrackWidth] = useState(0);
+  const replayGuide = useLiveReplayGuide(Boolean(replay), isDesignPreview);
 
   useEffect(() => {
     if (!replay?.playbackUrl) return;
@@ -98,7 +107,7 @@ export function FanLiveReplayScreen() {
     };
   }, [audioPlayer, replay?.playbackUrl]);
 
-  if (query.isLoading) {
+  if (!isDesignPreview && query.isLoading) {
     return (
       <Screen contentStyle={styles.stateContainer}>
         <AppHeader title="다시보기" style={styles.stateHeader} />
@@ -107,7 +116,7 @@ export function FanLiveReplayScreen() {
     );
   }
 
-  if (!replay || query.isError) {
+  if (!replay || (!isDesignPreview && query.isError)) {
     return (
       <Screen contentStyle={styles.stateContainer}>
         <AppHeader
@@ -312,6 +321,10 @@ export function FanLiveReplayScreen() {
           />
         </View>
       </View>
+
+      {replayGuide.open ? (
+        <LiveReplayGuide onClose={replayGuide.dismiss} />
+      ) : null}
     </Screen>
   );
 }

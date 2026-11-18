@@ -11,6 +11,10 @@ export type LiveRtcHandle = {
   setMicEnabled: (
     enabled: boolean,
   ) => void;
+
+  setPlaybackEnabled: (
+    enabled: boolean,
+  ) => void;
 };
 
 const createWebRtcUnsupportedError =

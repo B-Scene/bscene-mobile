@@ -1,102 +1,120 @@
 import {
-  router,
-  useLocalSearchParams,
+    router,
+    useLocalSearchParams,
 } from "expo-router";
 
 import {
-  isAxiosError,
+    isAxiosError,
 } from "axios";
 
 import {
-  useAudioPlayer,
+    useAudioPlayer,
 } from "expo-audio";
 
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useCallback,
 } from "react";
 
 import {
-  Alert,
-  BackHandler,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    BackHandler,
+    Keyboard,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 import {
-  enterLive,
-  resolveLiveMediaUrl,
+    enterLive,
+    resolveLiveMediaUrl,
 } from "@/api/live/live";
 
 import {
-  LiveRoomActionBar,
-  LiveRoomBanner,
-  LiveRoomChatList,
-  LiveRoomComposer,
-  LiveRoomHeader,
-  LiveRoomMemberSheet,
-  LiveRoomMicButton,
-  LiveRoomPill,
-  LiveRoomSoundIndicator,
-  LiveRoomStage,
-} from "@/features/live/LiveRoomParts";
-import { LiveRoomStartGuide } from "@/features/live/LiveRoomStartGuide";
-
-import {
-  useAcceptCoHostUpgradeMutation,
-  useCloseLiveMutation,
-  useEnterLiveMutation,
-  useLeaveLiveMutation,
-  useRequestCoHostUpgradeMutation,
-  useRespondCoHostInvitationMutation,
+    useAcceptCoHostUpgradeMutation,
+    useCloseLiveMutation,
+    useEnterLiveMutation,
+    useLeaveLiveMutation,
+    useRequestCoHostUpgradeMutation,
+    useRespondCoHostInvitationMutation,
 } from "@/hooks/api/live/useLive";
 
 import {
-  useCoPublisherPlayback,
+    useCoPublisherPlayback,
 } from "@/hooks/api/live/useCoPublisherPlayback";
 
 import {
-  useLiveChatSocket,
+    useLiveChatSocket,
 } from "@/hooks/api/live/useLiveChatSocket";
 
 import {
-  useLiveEvents,
+    useLiveEvents,
 } from "@/hooks/api/live/useLiveEvents";
+
+import {
+    startWhepPlayback,
+    startWhipBroadcast,
+    type LiveRtcHandle,
+} from "@/shared/services/liveRtc";
+
+import {
+    secureTokenStorage,
+} from "@/shared/utils/secureTokenStorage";
+
+import {
+    LiveRoomActionBar,
+    LiveRoomBanner,
+    LiveRoomChatList,
+    LiveRoomComposer,
+    LiveRoomHeader,
+    LiveRoomMemberSheet,
+    LiveRoomMessageActions,
+    LiveRoomMicButton,
+    LiveRoomPill,
+    LiveRoomReportModal,
+    LiveRoomSoundIndicator,
+    LiveRoomStage,
+} from "@/features/live/LiveRoomParts";
+
+import {
+    LiveRoomGuide,
+    useLiveRoomGuide,
+} from "@/features/live/LiveRoomGuide";
+
+import { LiveRoomStartGuide } from "@/features/live/LiveRoomStartGuide";
+
+import {
+    liveDesignPreviewMessages,
+    liveDesignPreviewRoom,
+} from "@/features/live/liveDesignPreview";
 
 import { AppHeader } from "@/shared/components/AppHeader";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
 
 import {
-  colors,
-  shadows,
-  textStyles,
+    colors,
+    shadows,
+    textStyles,
 } from "@/shared/constants/theme";
 
 import {
-  startWhepPlayback,
-  startWhipBroadcast,
-  type LiveRtcHandle,
-} from "@/shared/services/liveRtc";
-
-import {
-  secureTokenStorage,
-} from "@/shared/utils/secureTokenStorage";
-
-import {
-  useAuthStore,
+    useAuthStore,
 } from "@/stores/useAuthStore";
 
+import {
+    useDesignPreviewStore,
+} from "@/stores/useDesignPreviewStore";
+
 import type {
-  EnterLiveResponse,
-  LiveChatMessage,
-  LiveCoHostRequester,
-  LiveCoPublisher,
+    EnterLiveResponse,
+    LiveChatMessage,
+    LiveCoHostRequester,
+    LiveCoPublisher,
 } from "@/types/live/live";
 
 const RTC_RETRY_DELAY_MS =
@@ -108,13 +126,21 @@ const MAX_RTC_RETRY_ATTEMPTS =
 const CO_HOST_APPROVAL_POLL_MS =
   3000;
 
+const setPlayerVolume = (
+  player: ReturnType<typeof useAudioPlayer>,
+  volume: number,
+) => {
+  player.volume = volume;
+};
+
 const getApiErrorCode = (
   error: unknown,
 ) =>
   isAxiosError<{
     code?: string;
   }>(error)
-    ? error.response?.data?.code
+    ? error.response?.data
+        ?.code
     : undefined;
 
 const parseId = (
@@ -149,7 +175,9 @@ export function LiveRoomScreen({
   const params =
     useLocalSearchParams<{
       liveId?: string;
+
       requesterUserId?: string;
+
       coHostInvite?: string;
     }>();
 
@@ -157,6 +185,15 @@ export function LiveRoomScreen({
     parseId(
       params.liveId,
     );
+
+  const designPreviewEnabled =
+    useDesignPreviewStore(
+      (state) => state.enabled,
+    );
+
+  const isDesignPreview =
+    __DEV__ &&
+    designPreviewEnabled;
 
   const requesterUserId =
     parseId(
@@ -290,6 +327,11 @@ export function LiveRoomScreen({
   ] = useState(true);
 
   const [
+    isPlaybackMuted,
+    setIsPlaybackMuted,
+  ] = useState(false);
+
+  const [
     isStartGuideVisible,
     setIsStartGuideVisible,
   ] = useState(true);
@@ -304,6 +346,11 @@ export function LiveRoomScreen({
 
   const audioPlayer =
     useAudioPlayer(null);
+
+  useEffect(() => {
+    setPlayerVolume(audioPlayer, isPlaybackMuted ? 0 : 1);
+    rtcRef.current?.setPlaybackEnabled(!isPlaybackMuted);
+  }, [audioPlayer, isPlaybackMuted]);
 
   const hasEnteredRef =
     useRef(false);
@@ -320,6 +367,43 @@ export function LiveRoomScreen({
     hasEnteredRef.current =
       true;
 
+    if (isDesignPreview) {
+      let active = true;
+
+      void Promise.resolve().then(
+        () => {
+          if (!active) {
+            return;
+          }
+
+          applyLive({
+            ...liveDesignPreviewRoom,
+            liveId,
+          });
+
+          setMessages(
+            liveDesignPreviewMessages.map(
+              (message) => ({
+                ...message,
+                liveId,
+              }),
+            ),
+          );
+
+          setViewerCount(
+            liveDesignPreviewRoom.viewerCount ??
+              null,
+          );
+
+          setMediaConnected(true);
+        },
+      );
+
+      return () => {
+        active = false;
+      };
+    }
+
     void (async () => {
       try {
         const result =
@@ -335,6 +419,7 @@ export function LiveRoomScreen({
           [
             {
               text: "확인",
+
               onPress: () =>
                 router.back(),
             },
@@ -346,11 +431,12 @@ export function LiveRoomScreen({
     applyLive,
     enterMutation,
     isInvitePending,
+    isDesignPreview,
     liveId,
   ]);
 
   useEffect(() => {
-    if (!live) {
+    if (!live || isDesignPreview) {
       return;
     }
 
@@ -597,6 +683,7 @@ export function LiveRoomScreen({
     };
   }, [
     audioPlayer,
+    isDesignPreview,
     live,
   ]);
 
@@ -607,6 +694,7 @@ export function LiveRoomScreen({
         null,
 
       enabled:
+        !isDesignPreview &&
         Boolean(
           live?.liveId,
         ),
@@ -771,6 +859,7 @@ export function LiveRoomScreen({
       null,
 
     enabled:
+      !isDesignPreview &&
       Boolean(
         live?.liveId,
       ),
@@ -798,6 +887,7 @@ export function LiveRoomScreen({
 
   useCoPublisherPlayback({
     enabled:
+      !isDesignPreview &&
       canBroadcast &&
       mediaConnected,
 
@@ -929,6 +1019,55 @@ export function LiveRoomScreen({
 
   const sendMessage =
     () => {
+      const content =
+        messageText.trim();
+
+      if (
+        isDesignPreview &&
+        content
+      ) {
+        setMessages(
+          (previous) => {
+            const latestMessageTime =
+              previous.reduce(
+                (latest, message) =>
+                  Math.max(
+                    latest,
+                    new Date(message.sentAt).getTime(),
+                  ),
+                0,
+              );
+            const sentAt = new Date(
+              Math.max(Date.now(), latestMessageTime + 1),
+            ).toISOString();
+
+            return [
+              ...previous,
+              {
+                messageId:
+                  `preview-${Date.now()}`,
+                liveId,
+                senderId:
+                  currentUserId ??
+                  99999,
+                senderName:
+                  live?.myNickname ??
+                  "디자인 확인",
+                senderProfileImageUrl:
+                  live?.myProfileImageUrl ??
+                  null,
+                content,
+                sentAt,
+              },
+            ].slice(-100);
+          },
+        );
+
+        setMessageText("");
+
+        return;
+      }
+
       if (
         chat.sendMessage(
           messageText,
@@ -940,6 +1079,16 @@ export function LiveRoomScreen({
 
   const exitLive =
     useCallback(async () => {
+      if (isDesignPreview) {
+        router.replace(
+          `/${mode}/live` as Parameters<
+            typeof router.replace
+          >[0],
+        );
+
+        return;
+      }
+
       if (!liveId) {
         router.back();
 
@@ -981,6 +1130,7 @@ export function LiveRoomScreen({
       audioPlayer,
       closeMutation,
       isOwner,
+      isDesignPreview,
       leaveMutation,
       liveId,
       mode,
@@ -1002,9 +1152,35 @@ export function LiveRoomScreen({
   ] = useState(false);
 
   const [
+    isChatExpanded,
+    setIsChatExpanded,
+  ] = useState(false);
+
+  const [
+    isComposerFocused,
+    setIsComposerFocused,
+  ] = useState(false);
+
+  const [
+    selectedMessage,
+    setSelectedMessage,
+  ] = useState<LiveChatMessage | null>(null);
+
+  const [
+    isReportOpen,
+    setIsReportOpen,
+  ] = useState(false);
+
+  const [
     isMemberSheetOpen,
     setIsMemberSheetOpen,
   ] = useState(false);
+
+  const liveRoomGuide =
+    useLiveRoomGuide(
+      mode === "fan" && Boolean(live),
+      isDesignPreview,
+    );
 
   const confirmExitLive =
     useCallback(() => {
@@ -1143,6 +1319,7 @@ export function LiveRoomScreen({
               ? [
                   {
                     text: "확인",
+
                     onPress: () =>
                       router.back(),
                   },
@@ -1181,6 +1358,7 @@ export function LiveRoomScreen({
           [
             {
               text: "확인",
+
               onPress: () =>
                 router.back(),
             },
@@ -1232,9 +1410,7 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={
-            styles.stateHeader
-          }
+          style={styles.stateHeader}
         />
       </Screen>
     );
@@ -1249,38 +1425,20 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={
-            styles.stateHeader
-          }
+          style={styles.stateHeader}
         />
 
-        <View
-          style={
-            styles.inviteCard
-          }
-        >
-          <Text
-            style={
-              styles.inviteTitle
-            }
-          >
+        <View style={styles.inviteCard}>
+          <Text style={styles.inviteTitle}>
             공동 진행 초대
           </Text>
 
-          <Text
-            style={
-              styles.inviteDescription
-            }
-          >
+          <Text style={styles.inviteDescription}>
             이 라이브의 공동 진행자로
             초대받았어요.
           </Text>
 
-          <View
-            style={
-              styles.inviteActions
-            }
-          >
+          <View style={styles.inviteActions}>
             <Pressable
               accessibilityRole="button"
               style={[
@@ -1293,11 +1451,7 @@ export function LiveRoomScreen({
                 )
               }
             >
-              <Text
-                style={
-                  styles.inviteRejectText
-                }
-              >
+              <Text style={styles.inviteRejectText}>
                 거절
               </Text>
             </Pressable>
@@ -1318,11 +1472,7 @@ export function LiveRoomScreen({
                 )
               }
             >
-              <Text
-                style={
-                  styles.inviteAcceptText
-                }
-              >
+              <Text style={styles.inviteAcceptText}>
                 수락
               </Text>
             </Pressable>
@@ -1344,16 +1494,10 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={
-            styles.stateHeader
-          }
+          style={styles.stateHeader}
         />
 
-        <Text
-          style={
-            styles.stateText
-          }
-        >
+        <Text style={styles.stateText}>
           라이브 방에 입장하는 중이에요.
         </Text>
       </Screen>
@@ -1369,16 +1513,10 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={
-            styles.stateHeader
-          }
+          style={styles.stateHeader}
         />
 
-        <Text
-          style={
-            styles.stateText
-          }
-        >
+        <Text style={styles.stateText}>
           라이브 정보를 불러오지 못했어요.
         </Text>
       </Screen>
@@ -1402,6 +1540,10 @@ export function LiveRoomScreen({
     currentCoHostRequest?.nickname ??
     null;
 
+  const togglePlaybackSound = () => {
+    setIsPlaybackMuted((current) => !current);
+  };
+
   return (
     <Screen
       scroll={false}
@@ -1411,9 +1553,7 @@ export function LiveRoomScreen({
     >
       <LiveRoomHeader
         tone={tone}
-        startedAt={
-          live.startedAt
-        }
+        startedAt={live.startedAt}
         viewerCount={
           viewerCount ??
           live.viewerCount ??
@@ -1425,19 +1565,13 @@ export function LiveRoomScreen({
             ? "라이브 종료"
             : "나가기"
         }
-        exitDisabled={
-          isExitPending
-        }
-        onExit={
-          confirmExitLive
-        }
+        exitDisabled={isExitPending}
+        onExit={confirmExitLive}
       />
 
       {mediaError ? (
         <LiveRoomBanner
-          message={
-            mediaError
-          }
+          message={mediaError}
           backgroundColor={
             tone === "band"
               ? colors.error
@@ -1461,8 +1595,7 @@ export function LiveRoomScreen({
       {currentCoHostRequest ? (
         <LiveRoomPill
           label={
-            coHostRequests.length >
-            1
+            coHostRequests.length > 1
               ? `공동 진행 요청 ${coHostRequests.length}건 확인`
               : coHostNickname
                 ? `${coHostNickname}님의 요청 확인`
@@ -1501,24 +1634,44 @@ export function LiveRoomScreen({
         imageUrl={
           live.bandProfileImageUrl
         }
-        bandName={
-          live.bandName
-        }
-        title={
-          live.title
-        }
+        bandName={live.bandName}
+        title={live.title}
         description={
           live.description
         }
+        onPress={() => {
+          if (!isChatExpanded && !isComposerOpen) return;
+
+          Keyboard.dismiss();
+          setIsComposerFocused(false);
+          setIsComposerOpen(false);
+          setIsChatExpanded(false);
+        }}
       />
 
       <LiveRoomChatList
+        key={`${isChatExpanded ? "chat-expanded" : "chat-collapsed"}-${isComposerFocused ? "focused" : "idle"}`}
         tone={tone}
         messages={
           sortedMessages
         }
         composerOpen={
           isComposerOpen
+        }
+        expanded={isChatExpanded}
+        onToggleExpanded={() =>
+          setIsChatExpanded(
+            (current) => !current,
+          )
+        }
+        onMessageLongPress={
+          mode === "fan"
+            ? (message) => {
+                if (message.senderId !== currentUserId) {
+                  setSelectedMessage(message);
+                }
+              }
+            : undefined
         }
         isHighlighted={(message) =>
           message.senderName ===
@@ -1548,18 +1701,19 @@ export function LiveRoomScreen({
       {isComposerOpen ? (
         <LiveRoomComposer
           tone={tone}
-          value={
-            messageText
-          }
+          value={messageText}
           errorMessage={
             chat.lastError
           }
           onChangeText={
             setMessageText
           }
-          onSend={
-            sendMessage
-          }
+          onSend={sendMessage}
+          onFocus={() => {
+            setIsChatExpanded(true);
+            setIsComposerFocused(true);
+          }}
+          onBlur={() => setIsComposerFocused(false)}
         />
       ) : null}
 
@@ -1579,21 +1733,17 @@ export function LiveRoomScreen({
                 mediaConnected &&
                 !isMicMuted
               }
-              isMuted={
-                isMicMuted
-              }
+              isMuted={isMicMuted}
               disabled={
                 !mediaConnected
               }
-              onPress={
-                toggleMic
-              }
+              onPress={toggleMic}
             />
           ) : (
             <LiveRoomSoundIndicator
-              tone={
-                tone
-              }
+              tone={tone}
+              muted={isPlaybackMuted}
+              onPress={togglePlaybackSound}
             />
           )
         }
@@ -1604,20 +1754,29 @@ export function LiveRoomScreen({
         }
         onToggleChat={() =>
           setIsComposerOpen(
-            (current) =>
-              !current,
+            (current) => {
+              const next =
+                !current;
+
+              setIsChatExpanded(
+                next,
+              );
+
+              if (!next) {
+                setIsComposerFocused(false);
+              }
+
+              return next;
+            },
           )
         }
       />
 
       <LiveRoomMemberSheet
         tone={tone}
-        liveId={
-          live.liveId
-        }
-        open={
-          isMemberSheetOpen
-        }
+        liveId={live.liveId}
+        isDesignPreview={isDesignPreview}
+        open={isMemberSheetOpen}
         onClose={() =>
           setIsMemberSheetOpen(
             false,
@@ -1625,10 +1784,42 @@ export function LiveRoomScreen({
         }
       />
 
+      <LiveRoomMessageActions
+        open={Boolean(selectedMessage)}
+        onClose={() => setSelectedMessage(null)}
+        onReport={() => {
+          setSelectedMessage(null);
+          setTimeout(() => {
+            setIsReportOpen(true);
+          }, 350);
+        }}
+        onBlock={() => {
+          setSelectedMessage(null);
+          Alert.alert(
+            "사용자 차단",
+            "차단 화면 디자인은 반영됐어요. 실제 차단은 서버 차단 API 연결 후 사용할 수 있어요.",
+          );
+        }}
+      />
+
+      <LiveRoomReportModal
+        open={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        onSubmit={() => undefined}
+        onBlock={() => {
+          Alert.alert(
+            "사용자 차단",
+            "실제 차단은 서버 차단 API 연결 후 사용할 수 있어요.",
+          );
+        }}
+      />
+
+      {liveRoomGuide.open ? (
+        <LiveRoomGuide onClose={liveRoomGuide.dismiss} />
+      ) : null}
+
       <ConfirmModal
-        open={
-          isExitConfirmOpen
-        }
+        open={isExitConfirmOpen}
         tone={
           tone === "band"
             ? "orange"

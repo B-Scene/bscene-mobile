@@ -6,15 +6,11 @@ import {
     View,
 } from "react-native";
 
-<LiveIcon
-  width={62}
-  height={62}
-/>
-
 import {
     colors,
     textStyles,
 } from "@/shared/constants/theme";
+
 import LiveIcon from "./icons/LiveIcon";
 
 export function BandLiveStartCard() {

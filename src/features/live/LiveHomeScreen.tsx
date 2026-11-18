@@ -20,6 +20,7 @@ import {
   formatReplayDuration,
   formatScheduledAt,
 } from "@/features/live/LiveCards";
+import { liveDesignPreviewHome } from "@/features/live/liveDesignPreview";
 import {
   useLiveHomeQuery,
   useToggleLiveAlarmMutation,
@@ -48,23 +49,13 @@ export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
   const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
   const isDesignPreview = __DEV__ && designPreviewEnabled;
   const query = useLiveHomeQuery(!isDesignPreview);
-  const data =
-    query.data ??
-    (isDesignPreview
-      ? {
-          liveNow: [],
-          replays: [],
-          scheduled: [],
-          myNickname: null,
-          myProfileImageUrl: null,
-        }
-      : undefined);
+  const data = isDesignPreview ? liveDesignPreviewHome : query.data;
 
   if (mode === "band") {
     return (
       <BandLiveHome
         data={data}
-        isLoading={query.isLoading}
+        isLoading={!isDesignPreview && query.isLoading}
         isError={!isDesignPreview && (query.isError || !data)}
         onRetry={() => void query.refetch()}
       />
@@ -74,7 +65,7 @@ export function LiveHomeScreen({ mode }: LiveHomeScreenProps) {
   return (
     <FanLiveHome
       data={data}
-      isLoading={query.isLoading}
+      isLoading={!isDesignPreview && query.isLoading}
       isError={!isDesignPreview && (query.isError || !data)}
       onRetry={() => void query.refetch()}
     />
