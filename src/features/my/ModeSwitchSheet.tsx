@@ -17,6 +17,7 @@ import { Toast } from "@/shared/components/Toast";
 import { getGenreLabel, getRegionLabel } from "@/shared/constants/bandLabels";
 import { colors, shadows, textStyles } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import { useModeStore } from "@/stores/useModeStore";
 import { useOnboardingDraftStore } from "@/stores/useOnboardingDraftStore";
 import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
@@ -87,12 +88,22 @@ export function ModeSwitchSheet({
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const setMode = useModeStore((state) => state.setMode);
+  const designPreviewEnabled = useDesignPreviewStore(
+    (state) => state.enabled,
+  );
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
   const setCurrentMode = useAuthStore((state) => state.setCurrentMode);
   const setOnboardingModes = useOnboardingDraftStore((state) => state.setModes);
   const changeUserMode = useChangeUserMode();
   const toggleUserMode = useToggleUserMode();
-  const { data: profiles } = useMyProfilesQuery({ type: "all" });
-  const { data: bandProfiles } = useMyProfilesQuery({ type: "band" });
+  const { data: profiles } = useMyProfilesQuery(
+    { type: "all" },
+    { enabled: !isDesignPreview },
+  );
+  const { data: bandProfiles } = useMyProfilesQuery(
+    { type: "band" },
+    { enabled: !isDesignPreview },
+  );
 
   const fanProfile = profiles?.fanProfile ?? null;
   const fanAccountId = fanProfile
@@ -141,6 +152,13 @@ export function ModeSwitchSheet({
   };
 
   const openBandCreate = () => {
+    if (isDesignPreview) {
+      setMode("band");
+      close();
+      router.replace("/band/home");
+      return;
+    }
+
     if (!isFanMode) {
       close();
       router.push(BAND_CREATE_PATH);
@@ -173,6 +191,14 @@ export function ModeSwitchSheet({
   };
 
   const switchMode = () => {
+    if (isDesignPreview) {
+      const nextMode = isFanSelected ? "fan" : "band";
+      setMode(nextMode);
+      close();
+      router.replace(nextMode === "fan" ? "/fan/home" : "/band/home");
+      return;
+    }
+
     if (selectedId === FAN_START_ID) {
       setOnboardingModes(["FAN", "BAND"], "FAN");
       close();
@@ -233,7 +259,11 @@ export function ModeSwitchSheet({
                   </View>
                 )
               }
-              name={fanProfile?.nickname || "팬 모드 시작하기"}
+              name={
+                isDesignPreview
+                  ? "팬 모드"
+                  : (fanProfile?.nickname || "팬 모드 시작하기")
+              }
               subtitle={fanProfile?.email}
               selected={selectedId === fanAccountId}
               selectedTone="fan"
@@ -270,7 +300,7 @@ export function ModeSwitchSheet({
                     <AppIcon name="plus" />
                   </View>
                 }
-                name="밴드 모드 시작하기"
+                name={isDesignPreview ? "밴드 모드" : "밴드 모드 시작하기"}
                 selected={selectedId === BAND_START_ID}
                 selectedTone="band"
                 onSelect={() => setPickedId(BAND_START_ID)}

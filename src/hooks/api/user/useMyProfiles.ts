@@ -9,11 +9,15 @@ export const myProfilesKeys = {
     [...myProfilesKeys.all, params] as const,
 };
 
-export const useMyProfilesQuery = (params: GetMyProfilesParams = {}) => {
+export const useMyProfilesQuery = (
+  params: GetMyProfilesParams = {},
+  options: { enabled?: boolean } = {},
+) => {
   return useQuery({
     queryKey: myProfilesKeys.list(params),
     queryFn: () => getMyProfiles(params),
     staleTime: 1000 * 30,
+    enabled: options.enabled,
   });
 };
 

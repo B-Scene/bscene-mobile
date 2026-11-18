@@ -33,7 +33,7 @@ import {
 } from "@/shared/utils/secureTokenStorage";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
-import { getHomePathForMode } from "@/stores/useModeStore";
+import { getHomePathForMode, useModeStore } from "@/stores/useModeStore";
 import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
 import type { MobileOAuthResponse } from "@/types/auth/auth";
 
@@ -73,6 +73,7 @@ export function LoginScreen() {
   const appleLoginMutation = useAppleMobileLogin();
   const setSession = useAuthStore((state) => state.setSession);
   const enableDesignPreview = useDesignPreviewStore((state) => state.enable);
+  const setMode = useModeStore((state) => state.setMode);
   const setOAuthSignup = useOAuthSignupStore(
     (state) => state.setOAuthSignup,
   );
@@ -356,7 +357,8 @@ export function LoginScreen() {
               ]}
               onPress={() => {
                 enableDesignPreview();
-                router.push("/band/live");
+                setMode("fan");
+                router.replace("/fan/home");
               }}
             >
               <Text style={styles.previewButtonText}>
