@@ -11,11 +11,15 @@
     "ios": {
       "bundleIdentifier": "com.bscene.mobile",
       "supportsTablet": false,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "B:Scene 라이브 방송을 위해 마이크 접근 권한이 필요합니다.",
         "NSCameraUsageDescription": "프로필 및 콘텐츠 촬영을 위해 카메라 접근 권한이 필요합니다.",
         "NSPhotoLibraryUsageDescription": "프로필 및 콘텐츠 이미지를 선택하기 위해 사진 접근 권한이 필요합니다.",
-        "UIBackgroundModes": ["audio", "remote-notification"],
+        "UIBackgroundModes": [
+          "audio",
+          "remote-notification"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "bitcode": false
@@ -65,7 +69,8 @@
         }
       ],
       "@config-plugins/react-native-webrtc",
-      "expo-asset"
+      "expo-asset",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

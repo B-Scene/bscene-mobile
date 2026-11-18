@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 
 import {
@@ -153,7 +154,12 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   const genresQuery = useGenres();
   const regionsQuery = useRegions();
   const genreOptions = genresQuery.data?.length ? genresQuery.data : fallbackGenres;
-  const regionOptions = regionsQuery.data?.length ? regionsQuery.data : fallbackRegions;
+  const regionOptions = (
+    regionsQuery.data?.length ? regionsQuery.data : fallbackRegions
+  ).filter(
+    (region) =>
+      region.name !== "지역 미상" && region.code.toUpperCase() !== "UNKNOWN",
+  );
   const trimmedNickname = draft.fanNickname.trim();
   const allAgreementsAccepted = AGREEMENTS.every(
     (agreement) => acceptedAgreements[agreement.key],
@@ -656,10 +662,14 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
                 {Platform.OS === "web" ? "iPhone 사용자 안내" : "모바일 알림 안내"}
               </Text>
             </View>
-            <Text style={styles.nativeNoticeText}>
+            <Text
+              lineBreakStrategyIOS="hangul-word"
+              textBreakStrategy="balanced"
+              style={styles.nativeNoticeText}
+            >
               {Platform.OS === "web"
                 ? "iPhone에서는 B:Scene을 홈 화면에 추가해야 알림을 받을 수 있어요.\nSafari 공유 버튼 → 홈 화면에 추가"
-                : "기기 알림 권한을 허용하면 B:Scene 앱에서 공연, 라이브, 세션 소식을 받을 수 있어요."}
+                : "기기 알림 권한을 허용하면 B:Scene 앱에서 공연, 라\u2060이\u2060브, 세션 소식을 받을 수 있어요."}
             </Text>
           </View>
         </View>
@@ -725,7 +735,7 @@ function OnboardingFrame({
   footer: React.ReactNode;
 }) {
   return (
-    <View style={styles.frameRoot}>
+    <SafeAreaView edges={["top"]} style={styles.frameRoot}>
       <View style={styles.topBar}>
         <Pressable
           accessibilityRole="button"
@@ -741,7 +751,7 @@ function OnboardingFrame({
       </View>
       <ScrollView contentContainerStyle={styles.frameContent}>{children}</ScrollView>
       <View style={styles.frameFooter}>{footer}</View>
-    </View>
+    </SafeAreaView>
   );
 }
 

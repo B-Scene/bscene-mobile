@@ -94,13 +94,15 @@ export const liveKeys = {
 };
 
 export const useLiveHomeQuery =
-  () => {
+  (enabled = true) => {
     return useQuery({
       queryKey:
         liveKeys.home(),
 
       queryFn:
         getLiveHome,
+
+      enabled,
 
       staleTime:
         1000 * 10,

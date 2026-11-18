@@ -12,6 +12,7 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
 import { colors } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import type { CodeName } from "@/types/onboarding/onboarding";
 
 const getCodeName = (codeNames: CodeName[], code: string) =>
@@ -41,10 +42,12 @@ const buildSubtitle = (
 const go = (href: string) => () => router.push(href as Href);
 
 export function FanMyScreen() {
-  const myPageQuery = useFanMyPageQuery();
-  const fanInformationQuery = useFanInformationQuery();
-  const { data: genres = [] } = useGenres();
-  const { data: regions = [] } = useRegions();
+  const designPreviewEnabled = useDesignPreviewStore((state) => state.enabled);
+  const isDesignPreview = __DEV__ && designPreviewEnabled;
+  const myPageQuery = useFanMyPageQuery(!isDesignPreview);
+  const fanInformationQuery = useFanInformationQuery(!isDesignPreview);
+  const { data: genres = [] } = useGenres(!isDesignPreview);
+  const { data: regions = [] } = useRegions(!isDesignPreview);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const data = myPageQuery.data;

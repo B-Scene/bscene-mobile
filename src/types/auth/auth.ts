@@ -107,3 +107,21 @@ export type OAuthExchangeResponse = {
   email: string | null;
   token: LoginResponse | null;
 };
+
+export type MobileOAuthResponse = OAuthExchangeResponse;
+
+export type KakaoMobileLoginRequest = {
+  accessToken: string;
+};
+
+export type AppleLoginChallengeResponse = {
+  challengeId: string;
+  nonce: string;
+  expiresInSeconds?: number;
+};
+
+export type AppleMobileLoginRequest = {
+  identityToken: string;
+  authorizationCode: string;
+  challengeId: string;
+};

@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import Constants from "expo-constants";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -16,9 +17,25 @@ import {
 import { config } from "@/shared/constants/config";
 import { colors } from "@/shared/constants/theme";
 import {
+  useAppleLoginChallenge,
+  useAppleMobileLogin,
+  useKakaoMobileLogin,
+} from "@/hooks/api/auth/useAuth";
+import {
+  isSocialSdkCancellation,
+  loginWithAppleSdk,
+  loginWithKakaoSdk,
+} from "@/features/auth/socialSdk";
+import { getSocialLoginErrorMessage } from "@/features/auth/socialLoginError";
+import {
   secureTokenStorage,
   type RecentOAuthProvider,
 } from "@/shared/utils/secureTokenStorage";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
+import { getHomePathForMode } from "@/stores/useModeStore";
+import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
+import type { MobileOAuthResponse } from "@/types/auth/auth";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -49,6 +66,16 @@ const createOAuthUrls = (provider: OAuthProvider) => {
 export function LoginScreen() {
   const [recentProvider, setRecentProvider] =
     useState<RecentOAuthProvider | null>(null);
+  const [pendingProvider, setPendingProvider] =
+    useState<RecentOAuthProvider | null>(null);
+  const kakaoLoginMutation = useKakaoMobileLogin();
+  const appleChallengeMutation = useAppleLoginChallenge();
+  const appleLoginMutation = useAppleMobileLogin();
+  const setSession = useAuthStore((state) => state.setSession);
+  const enableDesignPreview = useDesignPreviewStore((state) => state.enable);
+  const setOAuthSignup = useOAuthSignupStore(
+    (state) => state.setOAuthSignup,
+  );
 
   useEffect(() => {
     void secureTokenStorage
@@ -103,6 +130,133 @@ export function LoginScreen() {
     }
   };
 
+  const completeMobileLogin = async (
+    data: MobileOAuthResponse,
+    provider: RecentOAuthProvider,
+  ) => {
+    if (data.isNewUser) {
+      if (!data.signupToken) {
+        throw new Error("신규 가입 토큰을 받지 못했습니다.");
+      }
+
+      setOAuthSignup({
+        signupToken: data.signupToken,
+        socialEmail: data.email,
+        provider,
+      });
+      router.replace("/signup");
+      return;
+    }
+
+    if (!data.token) {
+      throw new Error("로그인 토큰을 받지 못했습니다.");
+    }
+
+    await setSession(data.token);
+    await secureTokenStorage.setLastOAuthProvider(provider);
+    setRecentProvider(provider);
+
+    const nextPath = data.token.user.onboardingCompleted
+      ? getHomePathForMode(data.token.user.currentMode)
+      : "/onboarding/agreement";
+
+    router.replace(nextPath as Parameters<typeof router.replace>[0]);
+  };
+
+  const handleKakaoLogin = async () => {
+    if (pendingProvider) return;
+
+    if (Platform.OS === "web") {
+      await openOAuth("kakao");
+      return;
+    }
+
+    if (Constants.expoGoConfig) {
+      Alert.alert(
+        "Expo Go 디자인 확인",
+        "화면 디자인은 확인할 수 있지만 카카오 SDK 로그인은 개발 빌드에서만 동작합니다.",
+      );
+      return;
+    }
+
+    if (!config.kakaoNativeAppKey.trim()) {
+      Alert.alert(
+        "카카오 로그인 설정 필요",
+        "EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY를 설정한 뒤 개발 빌드를 다시 만들어 주세요.",
+      );
+      return;
+    }
+
+    setPendingProvider("kakao");
+
+    try {
+      const accessToken = await loginWithKakaoSdk();
+      const data = await kakaoLoginMutation.mutateAsync({ accessToken });
+      await completeMobileLogin(data, "kakao");
+    } catch (error) {
+      if (!isSocialSdkCancellation(error)) {
+        Alert.alert(
+          "카카오 로그인 실패",
+          getSocialLoginErrorMessage(error, "카카오"),
+        );
+      }
+    } finally {
+      setPendingProvider(null);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (pendingProvider) return;
+
+    if (Platform.OS === "web") {
+      await openOAuth("apple");
+      return;
+    }
+
+    if (Constants.expoGoConfig) {
+      Alert.alert(
+        "Expo Go 디자인 확인",
+        "화면 디자인은 확인할 수 있지만 Apple SDK 로그인은 B:Scene 개발 빌드에서 최종 확인해야 합니다.",
+      );
+      return;
+    }
+
+    if (Platform.OS !== "ios") {
+      Alert.alert(
+        "Apple 로그인",
+        "Apple SDK 로그인은 iOS에서만 지원합니다.",
+      );
+      return;
+    }
+
+    setPendingProvider("apple");
+
+    try {
+      const challenge = await appleChallengeMutation.mutateAsync();
+
+      if (!challenge.challengeId || !challenge.nonce) {
+        throw new Error("Apple 로그인 요청 정보를 받지 못했습니다.");
+      }
+
+      const credential = await loginWithAppleSdk(challenge.nonce);
+      const data = await appleLoginMutation.mutateAsync({
+        identityToken: credential.identityToken,
+        authorizationCode: credential.authorizationCode,
+        challengeId: challenge.challengeId,
+      });
+      await completeMobileLogin(data, "apple");
+    } catch (error) {
+      if (!isSocialSdkCancellation(error)) {
+        Alert.alert(
+          "Apple 로그인 실패",
+          getSocialLoginErrorMessage(error, "Apple"),
+        );
+      }
+    } finally {
+      setPendingProvider(null);
+    }
+  };
+
   return (
     <ScrollView
       style={styles.root}
@@ -143,8 +297,13 @@ export function LoginScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="카카오로 로그인"
-          style={({ pressed }) => [styles.kakaoButton, pressed && styles.pressed]}
-          onPress={() => void openOAuth("kakao")}
+          disabled={pendingProvider !== null}
+          style={({ pressed }) => [
+            styles.kakaoButton,
+            pressed && styles.pressed,
+            pendingProvider !== null && styles.disabled,
+          ]}
+          onPress={() => void handleKakaoLogin()}
         >
           <Image
             source={require("../../../assets/images/auth/kakao-login-button.svg")}
@@ -155,17 +314,56 @@ export function LoginScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Apple로 로그인"
-          style={({ pressed }) => [styles.appleButton, pressed && styles.pressed]}
-          onPress={() => void openOAuth("apple")}
+          disabled={pendingProvider !== null}
+          style={({ pressed }) => [
+            styles.appleButton,
+            pressed && styles.pressed,
+            pendingProvider !== null && styles.disabled,
+          ]}
+          onPress={() => void handleAppleLogin()}
         >
           <Image
-            source={require("../../../assets/images/auth/apple-login-button.svg")}
+            source={require("../../../assets/images/auth/apple-login-button.png")}
             style={styles.loginButtonImage}
           />
         </Pressable>
 
         {recentProvider === "apple" ? (
           <RecentLoginBubble provider="apple" />
+        ) : null}
+
+        {__DEV__ ? (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="온보딩 화면 확인하기"
+              style={({ pressed }) => [
+                styles.onboardingPreviewButton,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => router.push("/onboarding/agreement")}
+            >
+              <Text style={styles.previewButtonText}>
+                온보딩 화면 확인하기 (개발용)
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="페이지 확인하기"
+              style={({ pressed }) => [
+                styles.homePreviewButton,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => {
+                enableDesignPreview();
+                router.push("/fan/home");
+              }}
+            >
+              <Text style={styles.previewButtonText}>
+                페이지 확인하기 (개발용)
+              </Text>
+            </Pressable>
+          </>
         ) : null}
       </View>
     </ScrollView>
@@ -306,6 +504,38 @@ const styles = StyleSheet.create({
     width: 345,
     height: 52,
   },
+  onboardingPreviewButton: {
+    position: "absolute",
+    top: 742,
+    left: 24,
+    width: 345,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.primary400,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  homePreviewButton: {
+    position: "absolute",
+    top: 798,
+    left: 24,
+    width: 345,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.primary400,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.white,
+  },
+  previewButtonText: {
+    color: colors.primary400,
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 14,
+    lineHeight: 20,
+  },
   recentBubble: {
     position: "absolute",
     left: "50%",
@@ -343,5 +573,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.82,
+  },
+  disabled: {
+    opacity: 0.6,
   },
 });

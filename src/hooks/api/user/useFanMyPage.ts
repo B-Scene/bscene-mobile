@@ -6,10 +6,11 @@ export const fanMyPageKeys = {
   all: ["fanMyPage"] as const,
 };
 
-export const useFanMyPageQuery = () => {
+export const useFanMyPageQuery = (enabled = true) => {
   return useQuery({
     queryKey: fanMyPageKeys.all,
     queryFn: getFanMyPage,
+    enabled,
     staleTime: 1000 * 30,
   });
 };

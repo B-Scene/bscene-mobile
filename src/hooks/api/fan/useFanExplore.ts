@@ -46,6 +46,7 @@ export const fanExploreKeys = {
 
 export const useRecommendedExploreBandsInfiniteQuery = (
   params: FanExploreRecommendationParams = {},
+  enabled = true,
 ) => {
   return useInfiniteQuery({
     queryKey: fanExploreKeys.recommendedBands(params),
@@ -57,6 +58,7 @@ export const useRecommendedExploreBandsInfiniteQuery = (
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) =>
       lastPage.hasNext ? (lastPage.nextCursor ?? undefined) : undefined,
+    enabled,
     staleTime: 1000 * 30,
   });
 };

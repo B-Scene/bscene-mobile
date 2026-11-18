@@ -9,6 +9,7 @@ import {
 import { useOnboardingStatus } from "@/hooks/api/onboarding/useOnboarding";
 import { colors } from "@/shared/constants/theme";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useDesignPreviewStore } from "@/stores/useDesignPreviewStore";
 import {
   getHomePathForMode,
   type AppMode,
@@ -29,6 +30,15 @@ export function ProtectedModeRoute({
   children,
   mode,
 }: ProtectedModeRouteProps) {
+  const designPreviewEnabled =
+    useDesignPreviewStore(
+      (state) => state.enabled,
+    );
+
+  const isDesignPreview =
+    __DEV__ &&
+    designPreviewEnabled;
+
   const status =
     useAuthStore(
       (state) =>
@@ -50,22 +60,32 @@ export function ProtectedModeRoute({
   const onboardingStatus =
     useOnboardingStatus({
       enabled:
+        !isDesignPreview &&
         status ===
         "authenticated",
     });
 
   useEffect(() => {
+    if (isDesignPreview) {
+      return;
+    }
+
     if (
       status === "idle"
     ) {
       void restoreSession();
     }
   }, [
+    isDesignPreview,
     restoreSession,
     status,
   ]);
 
   useEffect(() => {
+    if (isDesignPreview) {
+      return;
+    }
+
     if (
       status === "idle" ||
       status === "loading"
@@ -125,11 +145,16 @@ export function ProtectedModeRoute({
       );
     }
   }, [
+    isDesignPreview,
     mode,
     onboardingStatus.data,
     status,
     user,
   ]);
+
+  if (isDesignPreview) {
+    return <>{children}</>;
+  }
 
   const isRestoring =
     status === "idle" ||

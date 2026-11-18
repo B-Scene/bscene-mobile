@@ -42,16 +42,18 @@ export const useSaveOnboarding = () => {
   });
 };
 
-export const useGenres = () => {
+export const useGenres = (enabled = true) => {
   return useQuery({
     queryKey: ["genres"],
     queryFn: getGenres,
+    enabled,
   });
 };
 
-export const useRegions = () => {
+export const useRegions = (enabled = true) => {
   return useQuery({
     queryKey: ["regions"],
     queryFn: getRegions,
+    enabled,
   });
 };

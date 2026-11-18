@@ -75,10 +75,11 @@ export const invalidatePerformanceInterestQueries = (
   ]);
 };
 
-export const useFanHomeQuery = () => {
+export const useFanHomeQuery = (enabled = true) => {
   return useQuery({
     queryKey: fanHomeKeys.main(),
     queryFn: getFanHome,
+    enabled,
     staleTime: 1000 * 30,
   });
 };
@@ -130,10 +131,11 @@ export const useFanPerformanceDetailQuery = (performanceId: number) => {
   });
 };
 
-export const usePendingPerformanceParticipationQuery = () => {
+export const usePendingPerformanceParticipationQuery = (enabled = true) => {
   return useQuery({
     queryKey: fanHomeKeys.pendingPerformanceParticipation(),
     queryFn: getPendingPerformanceParticipation,
+    enabled,
     refetchOnMount: "always",
     staleTime: 0,
     retry: false,
