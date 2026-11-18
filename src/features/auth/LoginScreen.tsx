@@ -1,5 +1,5 @@
-import { Image } from "expo-image";
 import Constants from "expo-constants";
+import { Image } from "expo-image";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -14,19 +14,19 @@ import {
   View,
 } from "react-native";
 
-import { config } from "@/shared/constants/config";
-import { colors } from "@/shared/constants/theme";
-import {
-  useAppleLoginChallenge,
-  useAppleMobileLogin,
-  useKakaoMobileLogin,
-} from "@/hooks/api/auth/useAuth";
+import { getSocialLoginErrorMessage } from "@/features/auth/socialLoginError";
 import {
   isSocialSdkCancellation,
   loginWithAppleSdk,
   loginWithKakaoSdk,
 } from "@/features/auth/socialSdk";
-import { getSocialLoginErrorMessage } from "@/features/auth/socialLoginError";
+import {
+  useAppleLoginChallenge,
+  useAppleMobileLogin,
+  useKakaoMobileLogin,
+} from "@/hooks/api/auth/useAuth";
+import { config } from "@/shared/constants/config";
+import { colors } from "@/shared/constants/theme";
 import {
   secureTokenStorage,
   type RecentOAuthProvider,
@@ -356,7 +356,7 @@ export function LoginScreen() {
               ]}
               onPress={() => {
                 enableDesignPreview();
-                router.push("/fan/home");
+                router.push("/band/live");
               }}
             >
               <Text style={styles.previewButtonText}>

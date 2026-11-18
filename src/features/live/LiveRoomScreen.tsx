@@ -1,101 +1,102 @@
 import {
-    router,
-    useLocalSearchParams,
+  router,
+  useLocalSearchParams,
 } from "expo-router";
 
 import {
-    isAxiosError,
+  isAxiosError,
 } from "axios";
 
 import {
-    useAudioPlayer,
+  useAudioPlayer,
 } from "expo-audio";
 
 import {
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    useCallback,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 
 import {
-    Alert,
-    BackHandler,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Alert,
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import {
-    enterLive,
-    resolveLiveMediaUrl,
+  enterLive,
+  resolveLiveMediaUrl,
 } from "@/api/live/live";
 
 import {
-    useAcceptCoHostUpgradeMutation,
-    useCloseLiveMutation,
-    useEnterLiveMutation,
-    useLeaveLiveMutation,
-    useRequestCoHostUpgradeMutation,
-    useRespondCoHostInvitationMutation,
+  LiveRoomActionBar,
+  LiveRoomBanner,
+  LiveRoomChatList,
+  LiveRoomComposer,
+  LiveRoomHeader,
+  LiveRoomMemberSheet,
+  LiveRoomMicButton,
+  LiveRoomPill,
+  LiveRoomSoundIndicator,
+  LiveRoomStage,
+} from "@/features/live/LiveRoomParts";
+import { LiveRoomStartGuide } from "@/features/live/LiveRoomStartGuide";
+
+import {
+  useAcceptCoHostUpgradeMutation,
+  useCloseLiveMutation,
+  useEnterLiveMutation,
+  useLeaveLiveMutation,
+  useRequestCoHostUpgradeMutation,
+  useRespondCoHostInvitationMutation,
 } from "@/hooks/api/live/useLive";
 
 import {
-    useCoPublisherPlayback,
+  useCoPublisherPlayback,
 } from "@/hooks/api/live/useCoPublisherPlayback";
 
 import {
-    useLiveChatSocket,
+  useLiveChatSocket,
 } from "@/hooks/api/live/useLiveChatSocket";
 
 import {
-    useLiveEvents,
+  useLiveEvents,
 } from "@/hooks/api/live/useLiveEvents";
-
-import {
-    startWhepPlayback,
-    startWhipBroadcast,
-    type LiveRtcHandle,
-} from "@/shared/services/liveRtc";
-
-import {
-    secureTokenStorage,
-} from "@/shared/utils/secureTokenStorage";
-
-import {
-    LiveRoomActionBar,
-    LiveRoomBanner,
-    LiveRoomChatList,
-    LiveRoomComposer,
-    LiveRoomHeader,
-    LiveRoomMemberSheet,
-    LiveRoomMicButton,
-    LiveRoomPill,
-    LiveRoomSoundIndicator,
-    LiveRoomStage,
-} from "@/features/live/LiveRoomParts";
 
 import { AppHeader } from "@/shared/components/AppHeader";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { Screen } from "@/shared/components/Screen";
 
 import {
-    colors,
-    shadows,
-    textStyles,
+  colors,
+  shadows,
+  textStyles,
 } from "@/shared/constants/theme";
 
 import {
-    useAuthStore,
+  startWhepPlayback,
+  startWhipBroadcast,
+  type LiveRtcHandle,
+} from "@/shared/services/liveRtc";
+
+import {
+  secureTokenStorage,
+} from "@/shared/utils/secureTokenStorage";
+
+import {
+  useAuthStore,
 } from "@/stores/useAuthStore";
 
 import type {
-    EnterLiveResponse,
-    LiveChatMessage,
-    LiveCoHostRequester,
-    LiveCoPublisher,
+  EnterLiveResponse,
+  LiveChatMessage,
+  LiveCoHostRequester,
+  LiveCoPublisher,
 } from "@/types/live/live";
 
 const RTC_RETRY_DELAY_MS =
@@ -113,8 +114,7 @@ const getApiErrorCode = (
   isAxiosError<{
     code?: string;
   }>(error)
-    ? error.response?.data
-        ?.code
+    ? error.response?.data?.code
     : undefined;
 
 const parseId = (
@@ -149,9 +149,7 @@ export function LiveRoomScreen({
   const params =
     useLocalSearchParams<{
       liveId?: string;
-
       requesterUserId?: string;
-
       coHostInvite?: string;
     }>();
 
@@ -291,6 +289,11 @@ export function LiveRoomScreen({
     setIsMicMuted,
   ] = useState(true);
 
+  const [
+    isStartGuideVisible,
+    setIsStartGuideVisible,
+  ] = useState(true);
+
   const isMicMutedRef =
     useRef(true);
 
@@ -332,7 +335,6 @@ export function LiveRoomScreen({
           [
             {
               text: "확인",
-
               onPress: () =>
                 router.back(),
             },
@@ -917,6 +919,12 @@ export function LiveRoomScreen({
     setIsMicMuted(
       nextMuted,
     );
+
+    if (!nextMuted) {
+      setIsStartGuideVisible(
+        false,
+      );
+    }
   };
 
   const sendMessage =
@@ -1135,7 +1143,6 @@ export function LiveRoomScreen({
               ? [
                   {
                     text: "확인",
-
                     onPress: () =>
                       router.back(),
                   },
@@ -1174,7 +1181,6 @@ export function LiveRoomScreen({
           [
             {
               text: "확인",
-
               onPress: () =>
                 router.back(),
             },
@@ -1226,7 +1232,9 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={styles.stateHeader}
+          style={
+            styles.stateHeader
+          }
         />
       </Screen>
     );
@@ -1241,20 +1249,38 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={styles.stateHeader}
+          style={
+            styles.stateHeader
+          }
         />
 
-        <View style={styles.inviteCard}>
-          <Text style={styles.inviteTitle}>
+        <View
+          style={
+            styles.inviteCard
+          }
+        >
+          <Text
+            style={
+              styles.inviteTitle
+            }
+          >
             공동 진행 초대
           </Text>
 
-          <Text style={styles.inviteDescription}>
+          <Text
+            style={
+              styles.inviteDescription
+            }
+          >
             이 라이브의 공동 진행자로
             초대받았어요.
           </Text>
 
-          <View style={styles.inviteActions}>
+          <View
+            style={
+              styles.inviteActions
+            }
+          >
             <Pressable
               accessibilityRole="button"
               style={[
@@ -1267,7 +1293,11 @@ export function LiveRoomScreen({
                 )
               }
             >
-              <Text style={styles.inviteRejectText}>
+              <Text
+                style={
+                  styles.inviteRejectText
+                }
+              >
                 거절
               </Text>
             </Pressable>
@@ -1288,7 +1318,11 @@ export function LiveRoomScreen({
                 )
               }
             >
-              <Text style={styles.inviteAcceptText}>
+              <Text
+                style={
+                  styles.inviteAcceptText
+                }
+              >
                 수락
               </Text>
             </Pressable>
@@ -1310,10 +1344,16 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={styles.stateHeader}
+          style={
+            styles.stateHeader
+          }
         />
 
-        <Text style={styles.stateText}>
+        <Text
+          style={
+            styles.stateText
+          }
+        >
           라이브 방에 입장하는 중이에요.
         </Text>
       </Screen>
@@ -1329,10 +1369,16 @@ export function LiveRoomScreen({
       >
         <AppHeader
           title="라이브"
-          style={styles.stateHeader}
+          style={
+            styles.stateHeader
+          }
         />
 
-        <Text style={styles.stateText}>
+        <Text
+          style={
+            styles.stateText
+          }
+        >
           라이브 정보를 불러오지 못했어요.
         </Text>
       </Screen>
@@ -1365,7 +1411,9 @@ export function LiveRoomScreen({
     >
       <LiveRoomHeader
         tone={tone}
-        startedAt={live.startedAt}
+        startedAt={
+          live.startedAt
+        }
         viewerCount={
           viewerCount ??
           live.viewerCount ??
@@ -1377,13 +1425,19 @@ export function LiveRoomScreen({
             ? "라이브 종료"
             : "나가기"
         }
-        exitDisabled={isExitPending}
-        onExit={confirmExitLive}
+        exitDisabled={
+          isExitPending
+        }
+        onExit={
+          confirmExitLive
+        }
       />
 
       {mediaError ? (
         <LiveRoomBanner
-          message={mediaError}
+          message={
+            mediaError
+          }
           backgroundColor={
             tone === "band"
               ? colors.error
@@ -1394,7 +1448,8 @@ export function LiveRoomScreen({
 
       {isBroadcastProtocol &&
       mediaConnected &&
-      isMicMuted ? (
+      isMicMuted &&
+      !isOwner ? (
         <LiveRoomBanner
           message="마이크가 음소거됐어요. 다시 누르면 송출돼요."
           backgroundColor={
@@ -1406,7 +1461,8 @@ export function LiveRoomScreen({
       {currentCoHostRequest ? (
         <LiveRoomPill
           label={
-            coHostRequests.length > 1
+            coHostRequests.length >
+            1
               ? `공동 진행 요청 ${coHostRequests.length}건 확인`
               : coHostNickname
                 ? `${coHostNickname}님의 요청 확인`
@@ -1445,8 +1501,12 @@ export function LiveRoomScreen({
         imageUrl={
           live.bandProfileImageUrl
         }
-        bandName={live.bandName}
-        title={live.title}
+        bandName={
+          live.bandName
+        }
+        title={
+          live.title
+        }
         description={
           live.description
         }
@@ -1471,17 +1531,35 @@ export function LiveRoomScreen({
         }
       />
 
+      {isOwner &&
+      isBroadcastProtocol &&
+      mediaConnected &&
+      isMicMuted &&
+      isStartGuideVisible ? (
+        <LiveRoomStartGuide
+          onClose={() =>
+            setIsStartGuideVisible(
+              false,
+            )
+          }
+        />
+      ) : null}
+
       {isComposerOpen ? (
         <LiveRoomComposer
           tone={tone}
-          value={messageText}
+          value={
+            messageText
+          }
           errorMessage={
             chat.lastError
           }
           onChangeText={
             setMessageText
           }
-          onSend={sendMessage}
+          onSend={
+            sendMessage
+          }
         />
       ) : null}
 
@@ -1501,15 +1579,21 @@ export function LiveRoomScreen({
                 mediaConnected &&
                 !isMicMuted
               }
-              isMuted={isMicMuted}
+              isMuted={
+                isMicMuted
+              }
               disabled={
                 !mediaConnected
               }
-              onPress={toggleMic}
+              onPress={
+                toggleMic
+              }
             />
           ) : (
             <LiveRoomSoundIndicator
-              tone={tone}
+              tone={
+                tone
+              }
             />
           )
         }
@@ -1528,8 +1612,12 @@ export function LiveRoomScreen({
 
       <LiveRoomMemberSheet
         tone={tone}
-        liveId={live.liveId}
-        open={isMemberSheetOpen}
+        liveId={
+          live.liveId
+        }
+        open={
+          isMemberSheetOpen
+        }
         onClose={() =>
           setIsMemberSheetOpen(
             false,
@@ -1538,7 +1626,9 @@ export function LiveRoomScreen({
       />
 
       <ConfirmModal
-        open={isExitConfirmOpen}
+        open={
+          isExitConfirmOpen
+        }
         tone={
           tone === "band"
             ? "orange"
