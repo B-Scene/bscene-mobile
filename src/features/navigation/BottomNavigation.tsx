@@ -16,6 +16,8 @@ import {
   MyNavIcon,
   SessionNavIcon,
 } from "@/features/navigation/BSceneNavigationIcons";
+import { FanDesignIcon } from "@/features/fan/FanDesignIcon";
+import { fanDesignText } from "@/features/fan/fanDesignText";
 import { colors } from "@/shared/constants/theme";
 import type { AppMode } from "@/stores/useModeStore";
 
@@ -100,6 +102,9 @@ const BAND_NAV_TABS: BottomNavTab[] = [
   },
 ];
 
+const FAN_TAB_CONTENT_BOTTOM = 15;
+const TAB_ICON_SIZE = 24;
+
 const ACTIVE_COLOR = {
   fan: colors.primary500,
   band: colors.secondary500,
@@ -143,8 +148,17 @@ export function BottomNavigation({
       ? FAN_NAV_TABS
       : BAND_NAV_TABS;
 
-  const activeColor =
-    ACTIVE_COLOR[mode];
+  const usesFanDesign =
+    pathname === "/fan/home" ||
+    pathname.startsWith("/fan/home/") ||
+    pathname === "/fan/explore" ||
+    pathname.startsWith("/fan/explore/") ||
+    pathname.startsWith("/fan/bands/");
+  const activeColor = usesFanDesign ? colors.primary400 : ACTIVE_COLOR[mode];
+  const isFanMode = mode === "fan";
+  const paddingBottom = Math.max(insets.bottom, isFanMode ? FAN_TAB_CONTENT_BOTTOM : 10);
+
+  if (pathname === "/fan/explore/search") return null;
 
   if (
     pathname !== "/fan/home/concerts/calendar" &&
@@ -159,13 +173,9 @@ export function BottomNavigation({
     <View
       style={[
         styles.container,
-        {
-          paddingBottom:
-            Math.max(
-              insets.bottom,
-              10,
-            ),
-        },
+        isFanMode && styles.fanContainer,
+        isFanMode && { paddingLeft: insets.left, paddingRight: insets.right },
+        { paddingBottom },
       ]}
     >
       {tabs.map((tab) => {
@@ -202,9 +212,7 @@ export function BottomNavigation({
               selected:
                 isActive,
             }}
-            style={
-              styles.tab
-            }
+            style={[styles.tab, isFanMode && styles.fanTab]}
             onPress={() =>
               router.push(
                 tab.path as Parameters<
@@ -213,17 +221,20 @@ export function BottomNavigation({
               )
             }
           >
-            <Icon
-              size={24}
-              color={color}
-              active={
-                isActive
-              }
-            />
+            <View style={styles.iconSlot} pointerEvents="none">
+              {usesFanDesign ? (
+                <FanNavigationIcon id={tab.id} active={isActive} />
+              ) : (
+                <Icon size={TAB_ICON_SIZE} color={color} active={isActive} />
+              )}
+            </View>
 
             <Text
+              numberOfLines={isFanMode ? 1 : undefined}
               style={[
                 styles.label,
+                isFanMode && styles.fanLabel,
+                usesFanDesign && fanDesignText.caption3,
                 {
                   color,
                 },
@@ -236,6 +247,26 @@ export function BottomNavigation({
       })}
     </View>
   );
+}
+
+function FanNavigationIcon({ id, active }: { id: string; active: boolean }) {
+  if (id === "home") {
+    return <FanDesignIcon name={active ? "tabHomeActive" : "tabHome"} />;
+  }
+
+  if (id === "explore") {
+    return (
+      <View>
+        <FanDesignIcon name={active ? "tabExploreActive" : "tabExplore"} />
+        <FanDesignIcon
+          name={active ? "tabMusicActive" : "tabMusic"}
+          style={styles.musicNote}
+        />
+      </View>
+    );
+  }
+
+  return <FanDesignIcon name={id === "live" ? "tabLive" : "tabMy"} />;
 }
 
 export const BOTTOM_NAV_HEIGHT =
@@ -272,6 +303,30 @@ const styles =
       elevation: 8,
     },
 
+    fanContainer: {
+      alignItems: "flex-start",
+    },
+    fanTab: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 44,
+      gap: 7,
+    },
+    iconSlot: {
+      width: TAB_ICON_SIZE,
+      height: TAB_ICON_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    fanLabel: {
+      alignSelf: "stretch",
+      textAlign: "center",
+    },
+    musicNote: {
+      position: "absolute",
+      top: 5,
+      left: 7,
+    },
     tab: {
       minWidth: 48,
       alignItems:

@@ -17,7 +17,9 @@ import {
   useFollowExploreBand,
   useUnfollowExploreBand,
 } from "@/hooks/api/fan/useFanExplore";
-import { AppHeader } from "@/shared/components/AppHeader";
+import type { FanGuideAnchor } from "@/features/fan/FanEntryGuide";
+import { FanDesignIcon } from "@/features/fan/FanDesignIcon";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
 import { AppIcon } from "@/shared/components/AppIcon";
 import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 import { ConfirmModal } from "@/shared/components/ConfirmModal";
@@ -29,7 +31,7 @@ import {
   getGenreLabel,
   getRegionLabel,
 } from "@/shared/constants/bandLabels";
-import { colors, textStyles } from "@/shared/constants/theme";
+import { colors, shadows } from "@/shared/constants/theme";
 
 import type {
   FanExploreContent,
@@ -116,7 +118,7 @@ const FILTER_OPTION_WIDTHS: Record<string, number> = {
 };
 
 const DEFAULT_OPTION_WIDTH = 51;
-const SHEET_BACKDROP = "rgba(20, 20, 20, 0.75)";
+const FILTER_BACKDROP = "rgba(20, 20, 20, 0.8)";
 
 const findCodeByLabel = (labels: Record<string, string>, label: string) =>
   Object.keys(labels).find((code) => labels[code] === label) ?? label;
@@ -171,8 +173,8 @@ export function ExploreFilterBar({
   appliedFilters,
   appliedSort,
   highlightSort = true,
-  disabledFilterIds = [],
-  requireFilterForSort = false,
+  contentLabel = "콘텐츠",
+  guideAnchors,
   registeredOnly,
   onRegisteredOnlyChange,
   onSortPress,
@@ -181,8 +183,8 @@ export function ExploreFilterBar({
   appliedFilters: AppliedExploreFilters;
   appliedSort?: string | null;
   highlightSort?: boolean;
-  disabledFilterIds?: string[];
-  requireFilterForSort?: boolean;
+  contentLabel?: string;
+  guideAnchors?: { bar: FanGuideAnchor; sort: FanGuideAnchor };
   registeredOnly?: boolean;
   onRegisteredOnlyChange?: (value: boolean) => void;
   onSortPress: () => void;
@@ -191,7 +193,7 @@ export function ExploreFilterBar({
   const filterChips = [
     { id: "genre", defaultLabel: "장르", value: appliedFilters.genre },
     { id: "region", defaultLabel: "지역", value: appliedFilters.region },
-    { id: "content", defaultLabel: "유형", value: appliedFilters.content },
+    { id: "content", defaultLabel: contentLabel, value: appliedFilters.content },
   ];
   const hasAppliedFilter = filterChips.some(
     (filter) => filter.value !== "전체",
@@ -200,118 +202,82 @@ export function ExploreFilterBar({
     ? filterChips.filter((filter) => filter.value !== "전체")
     : filterChips;
   const shouldHighlightSort = Boolean(appliedSort) && highlightSort;
-  const isSortDisabled = requireFilterForSort && !hasAppliedFilter;
 
   return (
-    <View style={styles.filterBar}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
-        contentContainerStyle={styles.filterScrollContent}
-      >
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSortDisabled}
-          style={[
-            styles.chip,
-            isSortDisabled
-              ? styles.chipDisabledSort
-              : shouldHighlightSort
-                ? styles.chipApplied
-                : styles.chipIdle,
-          ]}
-          onPress={onSortPress}
+    <>
+      <View ref={guideAnchors?.bar} collapsable={false} style={styles.filterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterScrollContent}
         >
-          <Text
+          <Pressable
+            ref={guideAnchors?.sort}
+            accessibilityRole="button"
             style={[
-              styles.chipText,
-              isSortDisabled
-                ? styles.chipTextMuted
-                : shouldHighlightSort && styles.chipTextApplied,
+              styles.chip,
+              styles.sortChip,
+              shouldHighlightSort ? styles.chipApplied : styles.chipIdle,
             ]}
+            onPress={onSortPress}
           >
-            {appliedSort ?? "추천순"}
-          </Text>
-          <Svg width={12} height={7} viewBox="0 0 12 7" fill="none">
-            <Path
-              d="M0.75 0.75L5.75 5.75L10.75 0.75"
-              stroke={
-                shouldHighlightSort && !isSortDisabled
-                  ? colors.primary400
-                  : colors.neutral600
-              }
-              strokeOpacity={isSortDisabled ? 0.4 : 1}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Text style={[styles.chipText, shouldHighlightSort && styles.chipTextApplied]}>
+              {appliedSort ?? "추천순"}
+            </Text>
+            <FanDesignIcon
+              name="sortArrow"
+              tintColor={shouldHighlightSort ? colors.primary400 : undefined}
             />
-          </Svg>
-        </Pressable>
+          </Pressable>
 
-        {visibleChips.map((filter) => {
-          const isApplied = filter.value !== "전체";
-          const isDisabled = disabledFilterIds.includes(filter.id);
+          <View style={styles.filterDivider} />
 
-          return (
-            <Pressable
-              key={filter.id}
-              accessibilityRole="button"
-              disabled={isDisabled}
-              style={[
-                styles.chip,
-                !isApplied && styles.chipFixed,
-                isDisabled
-                  ? styles.chipDisabled
-                  : isApplied
-                    ? styles.chipApplied
-                    : styles.chipIdle,
-              ]}
-              onPress={onFilterPress}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  isDisabled
-                    ? styles.chipTextDisabled
-                    : isApplied && styles.chipTextApplied,
-                ]}
-              >
-                {isApplied ? filter.value : filter.defaultLabel}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+          <View style={styles.filterChips}>
+            {visibleChips.map((filter) => {
+              const isApplied = filter.value !== "전체";
 
-      {onRegisteredOnlyChange ? (
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: Boolean(registeredOnly) }}
-          style={styles.registeredOnly}
-          onPress={() => onRegisteredOnlyChange(!registeredOnly)}
-        >
-          <AppIcon
-            name={registeredOnly ? "checkCircleActive" : "checkCircle"}
-            size={16}
-          />
-          <Text
-            style={[styles.chipText, registeredOnly && styles.chipTextApplied]}
-          >
-            등록 밴드만 보기
-          </Text>
-        </Pressable>
-      ) : (
+              return (
+                <Pressable
+                  key={filter.id}
+                  accessibilityRole="button"
+                  style={[styles.chip, isApplied ? styles.chipApplied : styles.chipIdle]}
+                  onPress={onFilterPress}
+                >
+                  <Text style={[styles.chipText, isApplied && styles.chipTextApplied]}>
+                    {isApplied ? filter.value : filter.defaultLabel}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="필터"
           hitSlop={10}
           onPress={onFilterPress}
         >
-          <AppIcon name="filterControl" size={19} />
+          <FanDesignIcon name="filter" style={styles.filterIcon} />
         </Pressable>
-      )}
-    </View>
+      </View>
+
+      {onRegisteredOnlyChange && !hasAppliedFilter ? (
+        <Pressable
+          accessibilityRole="switch"
+          aria-checked={registeredOnly}
+          accessibilityState={{ checked: Boolean(registeredOnly) }}
+          style={styles.registeredOnly}
+          onPress={() => onRegisteredOnlyChange(!registeredOnly)}
+        >
+          <Text style={styles.chipText}>등록 밴드만 보기</Text>
+          <View style={[styles.switchTrack, registeredOnly && styles.switchTrackOn]}>
+            <View style={styles.switchThumb} />
+          </View>
+        </Pressable>
+      ) : null}
+    </>
   );
 }
 
@@ -334,7 +300,7 @@ export function ExploreOptionSheet<T extends string>({
     <BottomSheetModal
       open={open}
       closeLabel="정렬 닫기"
-      backdropColor={SHEET_BACKDROP}
+      backdropColor="rgba(20, 20, 20, 0.5)"
       onClose={onClose}
     >
       <View style={styles.sortSheet}>
@@ -375,13 +341,13 @@ function FilterOptionGroup({
   title,
   options,
   selected,
-  selectable,
+  selectableOptions = options,
   onSelect,
 }: {
   title: string;
   options: string[];
   selected: string;
-  selectable: boolean;
+  selectableOptions?: readonly string[];
   onSelect: (value: string) => void;
 }) {
   return (
@@ -390,7 +356,7 @@ function FilterOptionGroup({
       <View style={styles.options}>
         {options.map((option) => {
           const isSelected = selected === option;
-          const isDisabled = !selectable && option !== "전체";
+          const isDisabled = !selectableOptions.includes(option);
 
           return (
             <Pressable
@@ -429,12 +395,12 @@ function FilterOptionGroup({
 
 function ExploreFilterSheetBody({
   appliedFilters,
-  contentSelectable,
+  selectableContent,
   onClose,
   onApply,
 }: {
   appliedFilters: AppliedExploreFilters;
-  contentSelectable: boolean;
+  selectableContent: readonly string[];
   onClose: () => void;
   onApply: (filters: AppliedExploreFilters) => void;
 }) {
@@ -442,24 +408,26 @@ function ExploreFilterSheetBody({
   const [genre, setGenre] = useState(appliedFilters.genre);
   const [region, setRegion] = useState(appliedFilters.region);
   const [content, setContent] = useState(
-    contentSelectable ? appliedFilters.content : "전체",
+    selectableContent.includes(appliedFilters.content) ? appliedFilters.content : "전체",
   );
 
   return (
-    <View style={[styles.filterSheet, { paddingBottom: insets.bottom + 16 }]}>
+    <View style={[styles.filterSheet, { paddingBottom: Math.max(insets.bottom, 32) }]}>
       <View style={styles.sheetHandle} />
       <Text style={styles.sheetTitle}>필터</Text>
 
-      <ScrollView contentContainerStyle={styles.filterGroups}>
+      <ScrollView
+        style={styles.filterGroupsScroll}
+        contentContainerStyle={styles.filterGroups}
+        showsVerticalScrollIndicator={false}
+      >
         <FilterOptionGroup
-          selectable
           title="장르"
           options={FILTER_OPTIONS.genre}
           selected={genre}
           onSelect={setGenre}
         />
         <FilterOptionGroup
-          selectable
           title="지역"
           options={FILTER_OPTIONS.region}
           selected={region}
@@ -469,7 +437,7 @@ function ExploreFilterSheetBody({
           title="유형"
           options={FILTER_OPTIONS.content}
           selected={content}
-          selectable={contentSelectable}
+          selectableOptions={selectableContent}
           onSelect={setContent}
         />
       </ScrollView>
@@ -492,12 +460,14 @@ export function ExploreFilterSheet({
   open,
   appliedFilters,
   contentSelectable = false,
+  selectableContent = contentSelectable ? FILTER_OPTIONS.content : ["전체"],
   onClose,
   onApply,
 }: {
   open: boolean;
   appliedFilters: AppliedExploreFilters;
   contentSelectable?: boolean;
+  selectableContent?: readonly string[];
   onClose: () => void;
   onApply: (filters: AppliedExploreFilters) => void;
 }) {
@@ -505,12 +475,12 @@ export function ExploreFilterSheet({
     <BottomSheetModal
       open={open}
       closeLabel="필터 닫기"
-      backdropColor={SHEET_BACKDROP}
+      backdropColor={FILTER_BACKDROP}
       onClose={onClose}
     >
       <ExploreFilterSheetBody
         appliedFilters={appliedFilters}
-        contentSelectable={contentSelectable}
+        selectableContent={selectableContent}
         onClose={onClose}
         onApply={onApply}
       />
@@ -522,39 +492,57 @@ export function ExploreBandCard({
   band,
   subtitle,
   onToggleFollow,
+  previewImage,
+  guideAnchor,
+  onGuideAnchorLayout,
 }: {
   band: ExploreBandItem;
   subtitle: string;
   onToggleFollow: () => void;
+  previewImage?: number;
+  guideAnchor?: FanGuideAnchor;
+  onGuideAnchorLayout?: () => void;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={band.bandId == null}
+    <View
+      ref={guideAnchor}
+      collapsable={false}
+      onLayout={onGuideAnchorLayout}
       style={styles.bandCard}
-      onPress={() => {
-        if (band.bandId == null) return;
-        router.push(`/fan/bands/${band.bandId}` as Href);
-      }}
     >
-      <ProfileImage imageUrl={band.imageUrl} size={62} variant="band" />
+      <Pressable
+        accessibilityRole="button"
+        disabled={band.bandId == null}
+        style={styles.bandDetails}
+        onPress={() => {
+          if (band.bandId == null) return;
+          router.push(`/fan/bands/${band.bandId}` as Href);
+        }}
+      >
+        {previewImage ? (
+          <Image source={previewImage} style={styles.previewBandImage} />
+        ) : (
+          <ProfileImage imageUrl={band.imageUrl} size={62} variant="band" />
+        )}
 
-      <View style={styles.flexText}>
-        <Text numberOfLines={1} style={styles.bandName}>
-          {band.name}
-        </Text>
-        <Text numberOfLines={1} style={styles.bandMeta}>
-          {subtitle}
-        </Text>
-        {band.description ? (
-          <Text numberOfLines={2} style={styles.bandDescription}>
-            {band.description}
+        <View style={styles.flexText}>
+          <Text numberOfLines={1} style={styles.bandName}>
+            {band.name}
           </Text>
-        ) : null}
-      </View>
+          <Text numberOfLines={1} style={styles.bandMeta}>
+            {subtitle}
+          </Text>
+          {band.description ? (
+            <Text numberOfLines={2} style={styles.bandDescription}>
+              {band.description}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
 
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${band.name} ${band.isFollowing ? "팔로우 취소" : "팔로우"}`}
         disabled={band.bandId == null}
         style={[styles.followButton, band.isFollowing && styles.following]}
         onPress={onToggleFollow}
@@ -563,7 +551,7 @@ export function ExploreBandCard({
           {band.isFollowing ? "팔로잉" : "팔로우"}
         </Text>
       </Pressable>
-    </Pressable>
+    </View>
   );
 }
 
@@ -731,14 +719,14 @@ export function ExploreConcertCard({
             style={styles.fill}
           />
         </View>
-      ) : (
+      ) : date ? (
         <View style={styles.dateBadge}>
-          <Text style={styles.dateMonth}>
-            {date ? MONTH_LABELS[date.getMonth()] : "TBD"}
-          </Text>
-          <Text style={styles.dateDay}>
-            {date ? String(date.getDate()).padStart(2, "0") : "--"}
-          </Text>
+          <Text style={styles.dateMonth}>{MONTH_LABELS[date.getMonth()]}</Text>
+          <Text style={styles.dateDay}>{String(date.getDate()).padStart(2, "0")}</Text>
+        </View>
+      ) : (
+        <View style={[styles.concertThumbnail, styles.posterPlaceholder]}>
+          <FanDesignIcon name="poster" />
         </View>
       )}
 
@@ -748,7 +736,7 @@ export function ExploreConcertCard({
             {title}
           </Text>
           <View style={styles.concertLocation}>
-            <AppIcon name="concertLocation" size={14} />
+            <FanDesignIcon name="location" />
             <Text numberOfLines={1} style={styles.concertVenue}>
               {location}
             </Text>
@@ -765,7 +753,7 @@ export function ExploreConcertCard({
         </View>
       </View>
 
-      <AppIcon name="concertArrow" size={24} />
+      <FanDesignIcon name="concertArrow" />
     </Pressable>
   );
 }
@@ -998,8 +986,15 @@ export function ExploreSearchBar({
   const [keyword, setKeyword] = useState(initialKeyword);
 
   return (
-    <>
-      <AppHeader title="" style={styles.searchHeader} />
+    <View style={styles.searchHeader}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="뒤로가기"
+        hitSlop={8}
+        onPress={() => router.back()}
+      >
+        <AppIcon name="arrowLeft" size={24} />
+      </Pressable>
 
       <View style={styles.searchBar}>
         <TextInput
@@ -1021,11 +1016,11 @@ export function ExploreSearchBar({
             hitSlop={8}
             onPress={() => setKeyword("")}
           >
-            <AppIcon name="timesCircle" size={16} />
+            <FanDesignIcon name="searchClear" />
           </Pressable>
         ) : null}
       </View>
-    </>
+    </View>
   );
 }
 
@@ -1052,9 +1047,7 @@ export function ExploreSectionTitle({
           onPress={onMorePress}
         >
           <Text style={styles.moreText}>더보기</Text>
-          <View style={styles.moreIcon}>
-            <AppIcon name="concertArrow" size={20} />
-          </View>
+          <FanDesignIcon name="moreArrow" />
         </Pressable>
       ) : null}
     </View>
@@ -1102,6 +1095,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.neutral400,
     backgroundColor: colors.white,
     paddingHorizontal: 22,
+    paddingRight: 26,
+  },
+  filterIcon: {
+    transform: [{ rotate: "90deg" }],
   },
   filterScroll: {
     flex: 1,
@@ -1109,7 +1106,16 @@ const styles = StyleSheet.create({
   filterScrollContent: {
     alignItems: "center",
     gap: 8,
-    paddingRight: 16,
+    paddingRight: 12,
+  },
+  filterChips: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  filterDivider: {
+    width: 1,
+    height: 26,
+    backgroundColor: colors.neutral400,
   },
   chip: {
     height: 22,
@@ -1119,11 +1125,11 @@ const styles = StyleSheet.create({
     gap: 4,
     borderRadius: 11,
     borderWidth: 1,
-    paddingHorizontal: 15,
+    minWidth: 48,
+    paddingHorizontal: 12,
   },
-  chipFixed: {
-    width: 48,
-    paddingHorizontal: 0,
+  sortChip: {
+    paddingHorizontal: 7,
   },
   chipIdle: {
     borderColor: colors.neutral400,
@@ -1133,14 +1139,6 @@ const styles = StyleSheet.create({
     borderColor: colors.primary400,
     backgroundColor: colors.primary0,
   },
-  chipDisabled: {
-    borderColor: colors.neutral300,
-    backgroundColor: colors.neutral200,
-  },
-  chipDisabledSort: {
-    borderColor: colors.neutral300,
-    backgroundColor: colors.white,
-  },
   chipText: {
     ...textStyles.caption3,
     color: colors.neutral600,
@@ -1148,33 +1146,53 @@ const styles = StyleSheet.create({
   chipTextApplied: {
     color: colors.primary400,
   },
-  chipTextMuted: {
-    color: colors.neutral400,
-  },
   chipTextDisabled: {
     color: colors.neutral500,
   },
   registeredOnly: {
+    height: 36,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingLeft: 8,
+    justifyContent: "space-between",
+    paddingLeft: 30,
+    paddingRight: 26,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral400,
+  },
+  switchTrack: {
+    width: 36,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "flex-start",
+    paddingHorizontal: 2,
+    borderRadius: 10,
+    backgroundColor: colors.neutral400,
+  },
+  switchTrackOn: {
+    alignItems: "flex-end",
+    backgroundColor: colors.primary400,
+  },
+  switchThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    boxShadow: "0px 2px 4px rgba(39, 39, 39, 0.1)",
   },
   sortSheet: {
-    gap: 10,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    gap: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     backgroundColor: colors.white,
-    paddingHorizontal: 15,
-    paddingTop: 32,
-    paddingBottom: 48,
+    paddingHorizontal: 32,
+    paddingTop: 28,
+    paddingBottom: 50,
   },
   sortOption: {
     height: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 12,
   },
   sortText: {
     ...textStyles.label2,
@@ -1194,24 +1212,27 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   sheetHandle: {
-    width: 42,
+    width: 44,
     height: 4,
     alignSelf: "center",
     borderRadius: 2,
-    backgroundColor: colors.neutral400,
+    backgroundColor: colors.neutral300,
   },
   sheetTitle: {
     ...textStyles.label1,
-    marginTop: 24,
+    marginTop: 20,
     color: colors.neutral900,
     textAlign: "center",
   },
+  filterGroupsScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    marginTop: 16,
+  },
   filterGroups: {
     gap: 16,
-    marginTop: 16,
     paddingLeft: 32,
-    paddingRight: 31,
-    paddingBottom: 8,
+    paddingRight: 26,
   },
   optionTitle: {
     ...textStyles.body1,
@@ -1221,8 +1242,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
-    columnGap: 4,
-    rowGap: 8,
+    columnGap: 5,
+    rowGap: 12,
     marginTop: 8,
   },
   option: {
@@ -1251,7 +1272,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 24,
-    marginHorizontal: 34,
+    marginHorizontal: 20,
     borderRadius: 12,
     backgroundColor: colors.primary400,
   },
@@ -1268,20 +1289,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    boxShadow: "0px 4px 8px rgba(20, 20, 20, 0.1)",
+    ...shadows.card,
+  },
+  bandDetails: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  previewBandImage: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
   },
   bandName: {
     ...textStyles.body1,
+    lineHeight: 18,
     color: colors.neutral900,
   },
   bandMeta: {
     ...textStyles.body5,
-    marginTop: 3,
     color: colors.neutral700,
   },
   bandDescription: {
     ...textStyles.body5,
-    marginTop: 3,
+    width: "100%",
+    maxWidth: 137,
+    marginTop: 4,
     color: colors.primary300,
   },
   followButton: {
@@ -1320,13 +1355,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: colors.neutral300,
   },
+  posterPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
   dateBadge: {
     width: 50,
     height: 62,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    backgroundColor: colors.secondary300,
+    backgroundColor: colors.primary300,
   },
   dateMonth: {
     color: "#FFFDFB",
@@ -1475,14 +1514,19 @@ const styles = StyleSheet.create({
     color: colors.primary400,
   },
   searchHeader: {
-    paddingHorizontal: 15,
+    height: 48,
+    marginTop: 10,
+    paddingLeft: 15,
+    paddingRight: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   searchBar: {
+    flex: 1,
     height: 36,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    marginHorizontal: 15,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.neutral500,
@@ -1524,9 +1568,6 @@ const styles = StyleSheet.create({
   moreText: {
     ...textStyles.body1,
     color: colors.neutral400,
-  },
-  moreIcon: {
-    opacity: 0.28,
   },
   message: {
     ...textStyles.caption2,

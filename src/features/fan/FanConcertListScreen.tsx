@@ -1,7 +1,8 @@
+import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
 
+import { FanDesignIcon } from "@/features/fan/FanDesignIcon";
 import { FanConcertCard } from "@/features/fan/FanConcertCard";
 import { mapPerformanceToConcert } from "@/features/fan/concertMappers";
 import {
@@ -13,7 +14,8 @@ import { AppHeader } from "@/shared/components/AppHeader";
 import { AppIcon } from "@/shared/components/AppIcon";
 import { BottomSheetModal } from "@/shared/components/BottomSheetModal";
 import { Screen } from "@/shared/components/Screen";
-import { colors, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors } from "@/shared/constants/theme";
 
 import type {
   RecommendedPerformanceSort,
@@ -78,6 +80,17 @@ export function FanConcertListScreen() {
       <AppHeader
         title={useRecommended ? "추천 공연" : "공연 일정"}
         style={styles.header}
+        titleStyle={textStyles.label2}
+        rightContent={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="공연 캘린더"
+            hitSlop={8}
+            onPress={() => router.push("/fan/home/concerts/calendar" as Href)}
+          >
+            <FanDesignIcon name="calendar" />
+          </Pressable>
+        }
       />
 
       <View style={styles.sortRow}>
@@ -94,15 +107,10 @@ export function FanConcertListScreen() {
           >
             {effectiveSort}
           </Text>
-          <Svg width={12} height={7} viewBox="0 0 12 7" fill="none">
-            <Path
-              d="M1 1L6 6L11 1"
-              stroke={selectedSort ? colors.primary400 : colors.neutral600}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
+          <FanDesignIcon
+            name="sortArrow"
+            tintColor={selectedSort ? colors.primary400 : undefined}
+          />
         </Pressable>
       </View>
 
@@ -134,7 +142,7 @@ export function FanConcertListScreen() {
             <Text style={styles.footerText}>더 불러오는 중이에요</Text>
           ) : undefined
         }
-        renderItem={({ item }) => <FanConcertCard item={item} />}
+        renderItem={({ item }) => <FanConcertCard item={item} action="details" />}
         onEndReached={() => {
           if (query.hasNextPage && !query.isFetchingNextPage) {
             void query.fetchNextPage();
@@ -183,15 +191,14 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   header: {
-    paddingHorizontal: 15,
+    marginTop: 10,
+    paddingHorizontal: 24,
   },
   sortRow: {
-    height: 40,
+    height: 42,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 11,
-    paddingLeft: 17,
-    paddingRight: 18,
+    paddingHorizontal: 22,
   },
   sortChip: {
     flexDirection: "row",
@@ -217,7 +224,7 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 12,
-    paddingHorizontal: 15,
+    paddingHorizontal: 22,
     paddingTop: 8,
     paddingBottom: 24,
   },

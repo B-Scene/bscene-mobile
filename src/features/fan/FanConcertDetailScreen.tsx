@@ -46,7 +46,8 @@ import { ConfirmModal } from "@/shared/components/ConfirmModal";
 import { ProfileImage } from "@/shared/components/ProfileImage";
 import { Screen } from "@/shared/components/Screen";
 import { Toast } from "@/shared/components/Toast";
-import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors, shadows } from "@/shared/constants/theme";
 import {
   formatDateTime,
   formatDday,

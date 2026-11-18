@@ -4,7 +4,8 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 
 import { AppIcon } from "@/shared/components/AppIcon";
 import { ProfileImage } from "@/shared/components/ProfileImage";
-import { colors, shadows, textStyles } from "@/shared/constants/theme";
+import { fanDesignText as textStyles } from "@/features/fan/fanDesignText";
+import { colors, shadows } from "@/shared/constants/theme";
 
 import type { PerformanceListItem } from "@/types/band/performance";
 import type { PostListItem } from "@/types/band/post";

@@ -39,7 +39,7 @@ import {
 import { Screen } from "@/shared/components/Screen";
 import { colors } from "@/shared/constants/theme";
 
-const PREVIEW_COUNT = 4;
+const PREVIEW_COUNT = 3;
 
 type PageQuery = {
   isLoading: boolean;
@@ -184,7 +184,7 @@ export function FanExploreResultScreen() {
           <ExploreSectionTitle
             title="밴드"
             count={getTotalCount(bandsQuery)}
-            onMorePress={() => openMore("bands")}
+            onMorePress={getTotalCount(bandsQuery) > PREVIEW_COUNT ? () => openMore("bands") : undefined}
           />
           <ResultSectionBody query={bandsQuery}>
             {bands.slice(0, PREVIEW_COUNT).map((band, index) => {
@@ -208,7 +208,7 @@ export function FanExploreResultScreen() {
           <ExploreSectionTitle
             title="공연"
             count={getTotalCount(performancesQuery)}
-            onMorePress={() => openMore("concerts")}
+            onMorePress={getTotalCount(performancesQuery) > PREVIEW_COUNT ? () => openMore("concerts") : undefined}
           />
           <ResultSectionBody query={performancesQuery}>
             {performances.slice(0, PREVIEW_COUNT).map((performance, index) => {
@@ -235,7 +235,7 @@ export function FanExploreResultScreen() {
           <ExploreSectionTitle
             title="콘텐츠"
             count={getTotalCount(contentsQuery)}
-            onMorePress={() => openMore("contents")}
+            onMorePress={getTotalCount(contentsQuery) > PREVIEW_COUNT ? () => openMore("contents") : undefined}
           />
           <ResultSectionBody query={contentsQuery}>
             {contents.slice(0, PREVIEW_COUNT).map((content, index) => {
