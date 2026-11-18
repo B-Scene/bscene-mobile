@@ -5,12 +5,19 @@ import { ActivityIndicator, StyleSheet, Text } from "react-native";
 import { useOAuthExchange } from "@/hooks/api/auth/useAuth";
 import { Screen } from "@/shared/components/Screen";
 import { colors, spacing } from "@/shared/constants/theme";
+import {
+  secureTokenStorage,
+  type RecentOAuthProvider,
+} from "@/shared/utils/secureTokenStorage";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { getHomePathForMode } from "@/stores/useModeStore";
 import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
 
 export function OAuthCallbackScreen() {
-  const params = useLocalSearchParams<{ code?: string }>();
+  const params = useLocalSearchParams<{
+    code?: string;
+    provider?: RecentOAuthProvider;
+  }>();
   const exchangeMutation = useOAuthExchange();
   const setSession = useAuthStore((state) => state.setSession);
   const setOAuthSignup = useOAuthSignupStore((state) => state.setOAuthSignup);
@@ -28,11 +35,16 @@ export function OAuthCallbackScreen() {
 
       try {
         const data = await exchangeMutation.mutateAsync(params.code);
+        const provider =
+          params.provider === "kakao" || params.provider === "apple"
+            ? params.provider
+            : null;
 
         if (data.isNewUser) {
           setOAuthSignup({
             signupToken: data.signupToken,
             socialEmail: data.email,
+            provider,
           });
           router.replace("/signup");
           return;
@@ -40,6 +52,9 @@ export function OAuthCallbackScreen() {
 
         if (data.token) {
           await setSession(data.token);
+          if (provider) {
+            await secureTokenStorage.setLastOAuthProvider(provider);
+          }
           const nextPath = data.token.user.onboardingCompleted
             ? getHomePathForMode(data.token.user.currentMode)
             : "/onboarding/agreement";
@@ -54,7 +69,13 @@ export function OAuthCallbackScreen() {
     };
 
     void exchange();
-  }, [exchangeMutation, params.code, setOAuthSignup, setSession]);
+  }, [
+    exchangeMutation,
+    params.code,
+    params.provider,
+    setOAuthSignup,
+    setSession,
+  ]);
 
   return (
     <Screen scroll={false} contentStyle={styles.container}>

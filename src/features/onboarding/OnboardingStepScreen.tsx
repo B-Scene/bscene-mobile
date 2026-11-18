@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { AlertCircle, ChevronLeft, Smartphone } from "lucide-react-native";
+import { Image } from "expo-image";
+import { AlertCircle, ChevronLeft } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -19,10 +20,6 @@ import {
   AGREEMENTS,
   type AgreementKey,
 } from "@/features/onboarding/agreementData";
-import {
-  BSceneLogo,
-  BSceneSymbol,
-} from "@/features/onboarding/BSceneBrandAssets";
 import {
   useCheckFanNickname,
   useGenres,
@@ -51,6 +48,8 @@ type OnboardingStepScreenProps = {
 };
 
 type ModeOption = "fan" | "band" | "both";
+
+type AdditionalInfoField = "name" | "birthDatePrefix" | "genderCode";
 
 const fallbackGenres = [
   { code: "INDIE", name: "인디" },
@@ -136,7 +135,7 @@ const getInitialMode = (mode: ModeOption): ModeCode => {
 };
 
 export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
-  const { height: viewportHeight } = useWindowDimensions();
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const draft = useOnboardingDraftStore();
   const setMode = useModeStore((state) => state.setMode);
   const [acceptedAgreements, setAcceptedAgreements] = useState<
@@ -144,6 +143,9 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   >({});
   const [selectedAgreementKey, setSelectedAgreementKey] =
     useState<AgreementKey | null>(null);
+  const [focusedAdditionalField, setFocusedAdditionalField] =
+    useState<AdditionalInfoField | null>(null);
+  const [isNicknameFocused, setIsNicknameFocused] = useState(false);
   const [nicknameAvailable, setNicknameAvailable] = useState<boolean | null>(null);
   const checkNicknameMutation = useCheckFanNickname();
   const saveOnboardingMutation = useSaveOnboarding();
@@ -158,6 +160,10 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   );
   const requiredAgreementAccepted = AGREEMENTS.filter((agreement) => agreement.required)
     .every((agreement) => acceptedAgreements[agreement.key]);
+  const additionalInfoComplete =
+    draft.name.trim().length > 0 &&
+    draft.birthDatePrefix.length === 6 &&
+    /^[1-4]$/.test(draft.genderCode);
 
   useEffect(() => {
     if (step !== "fan-nickname") return;
@@ -190,6 +196,9 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
 
     saveOnboardingMutation.mutate(
       {
+        name: draft.name.trim(),
+        birthDatePrefix: draft.birthDatePrefix,
+        genderCode: draft.genderCode,
         selectedModes: draft.selectedModes.length
           ? draft.selectedModes
           : [initialMode],
@@ -239,20 +248,99 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
 
     return (
       <OnboardingFrame
-        title="약관 동의"
+        title="회원 가입"
         showCenteredTitle
         footer={
           <PrimaryButton
             label="다음"
-            disabled={!requiredAgreementAccepted}
+            disabled={!additionalInfoComplete || !requiredAgreementAccepted}
             onPress={() => router.push("/onboarding/mode")}
           />
         }
       >
-        <View style={styles.agreementHero}>
-          <BSceneLogo width={119} height={22} />
-          <Text style={styles.agreementHeading}>서비스 이용약관</Text>
+        <View style={styles.additionalInfo}>
+          <Text style={styles.agreementHeading}>추가정보</Text>
+
+          <View style={styles.additionalField}>
+            <RequiredFieldLabel label="이름" />
+            <Text style={styles.fieldDescription}>
+              세션 지원 시 사용하는 이름으로 실명 작성을 권장해요.
+            </Text>
+            <TextInput
+              value={draft.name}
+              placeholder="이름을 입력해주세요"
+              placeholderTextColor={colors.neutral400}
+              style={[
+                styles.additionalInput,
+                draft.name.trim().length > 0 && styles.additionalInputFilled,
+                focusedAdditionalField === "name" && styles.additionalInputFocused,
+              ]}
+              onBlur={() => setFocusedAdditionalField(null)}
+              onChangeText={(value) => draft.setAdditionalInfo("name", value)}
+              onFocus={() => setFocusedAdditionalField("name")}
+            />
+          </View>
+
+          <View style={styles.additionalField}>
+            <RequiredFieldLabel label="생년월일/성별" />
+            <Text style={styles.fieldDescription}>
+              생년월일과 성별(주민번호 뒤 첫번째 숫자)을 입력해주세요.
+            </Text>
+            <View style={styles.birthRow}>
+              <TextInput
+                value={draft.birthDatePrefix}
+                placeholder="YYMMDD"
+                placeholderTextColor={colors.neutral400}
+                keyboardType="number-pad"
+                maxLength={6}
+                style={[
+                  styles.additionalInput,
+                  styles.birthInput,
+                  draft.birthDatePrefix.length > 0 && styles.additionalInputFilled,
+                  focusedAdditionalField === "birthDatePrefix" &&
+                    styles.additionalInputFocused,
+                ]}
+                onBlur={() => setFocusedAdditionalField(null)}
+                onChangeText={(value) =>
+                  draft.setAdditionalInfo(
+                    "birthDatePrefix",
+                    value.replace(/\D/g, "").slice(0, 6),
+                  )
+                }
+                onFocus={() => setFocusedAdditionalField("birthDatePrefix")}
+              />
+              <Text style={styles.birthDash}>-</Text>
+              <TextInput
+                value={draft.genderCode}
+                keyboardType="number-pad"
+                maxLength={1}
+                textAlign="center"
+                style={[
+                  styles.additionalInput,
+                  styles.genderInput,
+                  draft.genderCode.length > 0 && styles.additionalInputFilled,
+                  focusedAdditionalField === "genderCode" &&
+                    styles.additionalInputFocused,
+                ]}
+                onBlur={() => setFocusedAdditionalField(null)}
+                onChangeText={(value) =>
+                  draft.setAdditionalInfo(
+                    "genderCode",
+                    value.replace(/\D/g, "").slice(0, 1),
+                  )
+                }
+                onFocus={() => setFocusedAdditionalField("genderCode")}
+              />
+              <View style={styles.maskDots}>
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <View key={index} style={styles.maskDot} />
+                ))}
+              </View>
+            </View>
+          </View>
         </View>
+
+        <Text style={styles.termsHeading}>서비스 이용약관 동의</Text>
 
         <Pressable
           accessibilityRole="checkbox"
@@ -323,7 +411,6 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
       >
         <StepTitle
           title={"어떤 목적으로\n사용하시나요?"}
-          description="나중에 언제든 변경할 수 있어요"
         />
         <View style={styles.modeList}>
           {modeOptions.map((option) => {
@@ -356,10 +443,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
 
   if (step === "fan-nickname") {
     const isDuplicate = nicknameAvailable === false;
-    const isValidNickname =
-      trimmedNickname.length > 0 &&
-      nicknameAvailable === true &&
-      !checkNicknameMutation.isPending;
+    const canContinue = trimmedNickname.length > 0 && !isDuplicate;
 
     const handleChangeNickname = (value: string) => {
       draft.setFanNickname(value.slice(0, 8));
@@ -371,8 +455,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
         footer={
           <PrimaryButton
             label="다음"
-            disabled={!isValidNickname}
-            loading={checkNicknameMutation.isPending}
+            disabled={!canContinue}
             onPress={() => router.push("/onboarding/genre")}
           />
         }
@@ -389,9 +472,12 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
             maxLength={8}
             style={[
               styles.nicknameInput,
-              isDuplicate ? styles.nicknameInputError : styles.nicknameInputActive,
+              isNicknameFocused && !isDuplicate && styles.nicknameInputFocused,
+              isDuplicate && styles.nicknameInputError,
             ]}
+            onBlur={() => setIsNicknameFocused(false)}
             onChangeText={handleChangeNickname}
+            onFocus={() => setIsNicknameFocused(true)}
           />
           {isDuplicate ? (
             <View style={styles.errorRow}>
@@ -405,6 +491,7 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   }
 
   if (step === "genre") {
+    const genreScale = Math.min(1, Math.max(0.8, (viewportWidth - 40) / 352));
     const orderedRows = genreRows
       .map((row) =>
         row
@@ -429,15 +516,22 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
         }
       >
         <StepTitle title="관심 장르를 선택하세요" description="최대 3개" />
-        <View style={styles.pillRows}>
+        <View
+          style={[
+            styles.pillRows,
+            genreScale < 1 && {
+              transform: [{ scale: genreScale }],
+              transformOrigin: "top center",
+            },
+          ]}
+        >
           {orderedRows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.pillRow}>
               {row.map((genre) => (
                 <Pill
                   key={genre.code}
-                  label={genre.name}
+                  label={genre.name === "etc" ? "etc." : genre.name}
                   selected={draft.genres.includes(genre.code)}
-                  compact
                   onPress={() => toggleGenre(genre.code)}
                 />
               ))}
@@ -541,9 +635,10 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.notificationContent}>
-          <View style={styles.notificationIconCircle}>
-            <FilledNotificationBell />
-          </View>
+          <Image
+            source={require("../../../assets/images/onboarding/notification-bell.svg")}
+            style={styles.notificationGraphic}
+          />
           <Text style={styles.notificationTitle}>
             중요한 소식을{"\n"}놓치지 마세요
           </Text>
@@ -553,7 +648,10 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
           </Text>
           <View style={styles.nativeNoticeCard}>
             <View style={styles.nativeNoticeHeader}>
-              <Smartphone size={20} color={colors.primary400} />
+              <Image
+                source={require("../../../assets/images/onboarding/iphone.svg")}
+                style={styles.iphoneIcon}
+              />
               <Text style={styles.nativeNoticeTitle}>
                 {Platform.OS === "web" ? "iPhone 사용자 안내" : "모바일 알림 안내"}
               </Text>
@@ -593,7 +691,12 @@ export function OnboardingStepScreen({ step }: OnboardingStepScreenProps) {
   return (
     <View style={styles.completeRoot}>
       <View style={styles.completeBody}>
-        <BSceneSymbol width={94} height={104} />
+        <View style={styles.completeLogoFrame}>
+          <Image
+            source={require("../../../assets/images/onboarding/complete-logo.svg")}
+            style={styles.completeLogo}
+          />
+        </View>
         <Text style={styles.completeTitle}>설정이 완료됐어요</Text>
         <Text style={styles.completeDescription}>
           지금 바로 B:Scene을{"\n"}시작해보세요
@@ -647,12 +750,12 @@ function StepTitle({
   description,
 }: {
   title: string;
-  description: string;
+  description?: string;
 }) {
   return (
     <View style={styles.stepTitleBlock}>
       <Text style={styles.stepTitle}>{title}</Text>
-      <Text style={styles.stepDescription}>{description}</Text>
+      {description ? <Text style={styles.stepDescription}>{description}</Text> : null}
     </View>
   );
 }
@@ -741,12 +844,10 @@ function AgreementCheckIcon({
 function Pill({
   label,
   selected,
-  compact = false,
   onPress,
 }: {
   label: string;
   selected: boolean;
-  compact?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -754,7 +855,6 @@ function Pill({
       accessibilityRole="button"
       style={[
         styles.pill,
-        compact && styles.compactPill,
         selected ? styles.pillSelected : styles.pillIdle,
       ]}
       onPress={onPress}
@@ -763,7 +863,6 @@ function Pill({
         numberOfLines={1}
         style={[
           styles.pillText,
-          compact && styles.compactPillText,
           selected ? styles.pillTextSelected : styles.pillTextIdle,
         ]}
       >
@@ -773,14 +872,11 @@ function Pill({
   );
 }
 
-function FilledNotificationBell() {
+function RequiredFieldLabel({ label }: { label: string }) {
   return (
-    <Svg width={36} height={36} viewBox="0 0 24 24">
-      <Path
-        d="M13 21C13.5523 21 14 21.4477 14 22C14 22.5523 13.5523 23 13 23H11C10.4477 23 10 22.5523 10 22C10 21.4477 10.4477 21 11 21H13ZM12 1C13.1046 1 14 1.89543 14 3C14 3.09664 13.9898 3.1912 13.9766 3.28418C16.8799 4.13731 19 6.82054 19 10V18H20C20.5523 18 21 18.4477 21 19C21 19.5523 20.5523 20 20 20H4C3.44772 20 3 19.5523 3 19C3 18.4477 3.44772 18 4 18H5V10C5 6.82087 7.11957 4.1376 10.0225 3.28418C10.0092 3.19125 10 3.09659 10 3C10 1.89543 10.8954 1 12 1Z"
-        fill={colors.white}
-      />
-    </Svg>
+    <Text style={styles.fieldLabel}>
+      {label}<Text style={styles.requiredMark}>*</Text>
+    </Text>
   );
 }
 
@@ -844,8 +940,8 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     lineHeight: 20,
   },
   frameContent: {
@@ -860,7 +956,7 @@ const styles = StyleSheet.create({
     bottom: 36,
   },
   stepTitleBlock: {
-    marginTop: 0,
+    marginLeft: 8,
   },
   stepTitle: {
     color: colors.neutral900,
@@ -890,8 +986,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral300,
   },
   primaryButtonText: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 18,
-    fontWeight: "700",
     lineHeight: 20,
   },
   primaryButtonTextEnabled: {
@@ -900,16 +996,97 @@ const styles = StyleSheet.create({
   primaryButtonTextDisabled: {
     color: colors.neutral600,
   },
-  agreementHero: {
-    alignItems: "flex-start",
-    gap: 4,
-    paddingTop: 8,
+  additionalInfo: {
+    gap: 16,
+    marginHorizontal: 5,
+    paddingTop: 6,
   },
   agreementHeading: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-Bold",
     fontSize: 24,
-    fontWeight: "700",
     lineHeight: 38,
+  },
+  additionalField: {
+    gap: 8,
+  },
+  fieldLabel: {
+    color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
+    fontSize: 15,
+    lineHeight: 20,
+    marginBottom: -8,
+  },
+  requiredMark: {
+    color: colors.error,
+  },
+  fieldDescription: {
+    color: colors.neutral500,
+    fontFamily: "Pretendard-Medium",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  additionalInput: {
+    height: 46,
+    borderWidth: 1.5,
+    borderColor: colors.neutral400,
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    color: colors.neutral900,
+    fontFamily: "Pretendard-Medium",
+    fontSize: 15,
+    lineHeight: 20,
+    outlineColor: "transparent",
+    outlineWidth: 0,
+    paddingHorizontal: 16,
+  },
+  additionalInputFilled: {
+    borderColor: "#F04579",
+  },
+  additionalInputFocused: {
+    borderColor: "#F04579",
+    borderWidth: 2,
+  },
+  birthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  birthInput: {
+    flex: 1,
+    minWidth: 0,
+  },
+  birthDash: {
+    color: colors.neutral600,
+    fontFamily: "Pretendard-Bold",
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  genderInput: {
+    width: 44,
+    padding: 0,
+    paddingHorizontal: 0,
+    textAlign: "center",
+    textAlignVertical: "center",
+  },
+  maskDots: {
+    flexShrink: 0,
+    flexDirection: "row",
+    gap: 8,
+  },
+  maskDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.neutral600,
+  },
+  termsHeading: {
+    color: colors.neutral900,
+    fontFamily: "Pretendard-Bold",
+    fontSize: 24,
+    lineHeight: 38,
+    marginHorizontal: 5,
+    marginTop: 38,
   },
   allAgreementRow: {
     borderBottomWidth: 1,
@@ -917,17 +1094,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginTop: 28,
+    marginHorizontal: 5,
+    marginTop: 16,
     paddingBottom: 16,
   },
   allAgreementText: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     lineHeight: 20,
   },
   agreementRows: {
     gap: 12,
+    marginHorizontal: 5,
     marginTop: 16,
   },
   agreementRow: {
@@ -943,22 +1122,22 @@ const styles = StyleSheet.create({
   },
   agreementLabel: {
     color: colors.neutral900,
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
-    fontWeight: "500",
     lineHeight: 20,
   },
   viewLink: {
     color: colors.neutral500,
+    fontFamily: "Pretendard-Medium",
     fontSize: 12,
-    fontWeight: "500",
     lineHeight: 18,
   },
   modeList: {
-    gap: 10,
-    marginTop: 40,
+    gap: 20,
+    marginTop: 78,
   },
   modeCard: {
-    height: 72,
+    height: 79,
     borderWidth: 1,
     borderColor: colors.neutral400,
     borderRadius: 12,
@@ -990,24 +1169,30 @@ const styles = StyleSheet.create({
     color: colors.neutral600,
   },
   nicknameBlock: {
-    marginTop: 40,
+    marginTop: 48,
   },
   nicknameInput: {
     height: 72,
     borderWidth: 1.5,
+    borderColor: colors.primary400,
     borderRadius: 12,
     backgroundColor: colors.white,
     color: colors.neutral900,
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 18,
-    fontWeight: "600",
     lineHeight: 20,
+    outlineColor: "transparent",
+    outlineWidth: 0,
     paddingHorizontal: 24,
   },
-  nicknameInputActive: {
-    borderColor: colors.primary400,
+  nicknameInputFocused: {
+    borderColor: "#F04579",
+    borderWidth: 2,
+    boxShadow: "0 0 0 0.5px #F04579",
   },
   nicknameInputError: {
-    borderColor: colors.error,
+    borderColor: "#C62828",
+    boxShadow: "none",
   },
   errorRow: {
     flexDirection: "row",
@@ -1022,7 +1207,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   pillRows: {
-    gap: 8,
+    width: 352,
+    alignSelf: "center",
+    gap: 16,
     marginTop: 32,
   },
   pillRow: {
@@ -1042,13 +1229,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pill: {
+    alignItems: "center",
     borderRadius: 100,
+    flexShrink: 0,
+    justifyContent: "center",
     paddingHorizontal: 15,
     paddingVertical: 4,
-  },
-  compactPill: {
-    flexShrink: 1,
-    paddingHorizontal: 11,
   },
   pillSelected: {
     backgroundColor: colors.primary400,
@@ -1057,12 +1243,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral200,
   },
   pillText: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 15,
-    fontWeight: "600",
     lineHeight: 20,
-  },
-  compactPillText: {
-    fontSize: 13,
   },
   pillTextSelected: {
     color: colors.white,
@@ -1077,7 +1260,7 @@ const styles = StyleSheet.create({
   notificationContainer: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 136,
+    paddingTop: 142,
     paddingBottom: 84,
   },
   notificationContainerCompact: {
@@ -1087,25 +1270,16 @@ const styles = StyleSheet.create({
   notificationContent: {
     alignItems: "center",
   },
-  notificationIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.primary400,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.primary400,
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
+  notificationGraphic: {
+    width: 100,
+    height: 100,
   },
   notificationTitle: {
     color: colors.neutral900,
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: "700",
     lineHeight: 38,
-    marginTop: 28,
+    marginTop: 24,
     textAlign: "center",
   },
   notificationDescription: {
@@ -1117,19 +1291,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   nativeNoticeCard: {
-    width: "100%",
+    width: 330,
+    minHeight: 120,
     borderWidth: 1,
     borderColor: "#FCD7E2",
     borderRadius: 12,
     backgroundColor: "#FFF6F8",
     gap: 10,
-    marginTop: 44,
+    marginTop: 48,
     padding: 16,
   },
   nativeNoticeHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  iphoneIcon: {
+    width: 18,
+    height: 20,
   },
   nativeNoticeTitle: {
     color: colors.neutral900,
@@ -1181,12 +1360,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingBottom: 96,
   },
+  completeLogoFrame: {
+    width: 82,
+    height: 92,
+  },
+  completeLogo: {
+    position: "absolute",
+    top: -1.8,
+    left: -5.8,
+    width: 93.6,
+    height: 103.6,
+  },
   completeTitle: {
     color: colors.neutral900,
     fontSize: 28,
     fontWeight: "700",
     lineHeight: 38,
-    marginTop: 28,
+    marginTop: 32,
     textAlign: "center",
   },
   completeDescription: {

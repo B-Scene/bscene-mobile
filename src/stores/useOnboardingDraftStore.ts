@@ -3,11 +3,18 @@ import { create } from "zustand";
 import type { ModeCode } from "@/types/onboarding/onboarding";
 
 type OnboardingDraft = {
+  name: string;
+  birthDatePrefix: string;
+  genderCode: string;
   selectedModes: ModeCode[];
   initialMode: ModeCode | null;
   fanNickname: string;
   genres: string[];
   regions: string[];
+  setAdditionalInfo: (
+    field: "name" | "birthDatePrefix" | "genderCode",
+    value: string,
+  ) => void;
   setModes: (modes: ModeCode[], initialMode: ModeCode) => void;
   setFanNickname: (fanNickname: string) => void;
   toggleGenre: (genre: string) => void;
@@ -16,6 +23,9 @@ type OnboardingDraft = {
 };
 
 const initialState = {
+  name: "",
+  birthDatePrefix: "",
+  genderCode: "",
   selectedModes: [] as ModeCode[],
   initialMode: null as ModeCode | null,
   fanNickname: "",
@@ -31,6 +41,7 @@ const toggle = (items: string[], item: string) =>
 export const useOnboardingDraftStore = create<OnboardingDraft>((set) => ({
   ...initialState,
 
+  setAdditionalInfo: (field, value) => set({ [field]: value }),
   setModes: (selectedModes, initialMode) => set({ selectedModes, initialMode }),
   setFanNickname: (fanNickname) => set({ fanNickname }),
   toggleGenre: (genre) => set((state) => ({ genres: toggle(state.genres, genre) })),
