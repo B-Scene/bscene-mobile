@@ -85,6 +85,8 @@ import {
     useLiveRoomGuide,
 } from "@/features/live/LiveRoomGuide";
 
+import { LiveRoomStartGuide } from "@/features/live/LiveRoomStartGuide";
+
 import {
     liveDesignPreviewMessages,
     liveDesignPreviewRoom,
@@ -328,6 +330,11 @@ export function LiveRoomScreen({
     isPlaybackMuted,
     setIsPlaybackMuted,
   ] = useState(false);
+
+  const [
+    isStartGuideVisible,
+    setIsStartGuideVisible,
+  ] = useState(true);
 
   const isMicMutedRef =
     useRef(true);
@@ -1002,6 +1009,12 @@ export function LiveRoomScreen({
     setIsMicMuted(
       nextMuted,
     );
+
+    if (!nextMuted) {
+      setIsStartGuideVisible(
+        false,
+      );
+    }
   };
 
   const sendMessage =
@@ -1569,7 +1582,8 @@ export function LiveRoomScreen({
 
       {isBroadcastProtocol &&
       mediaConnected &&
-      isMicMuted ? (
+      isMicMuted &&
+      !isOwner ? (
         <LiveRoomBanner
           message="마이크가 음소거됐어요. 다시 누르면 송출돼요."
           backgroundColor={
@@ -1669,6 +1683,20 @@ export function LiveRoomScreen({
               live.bandProfileImageUrl)
         }
       />
+
+      {isOwner &&
+      isBroadcastProtocol &&
+      mediaConnected &&
+      isMicMuted &&
+      isStartGuideVisible ? (
+        <LiveRoomStartGuide
+          onClose={() =>
+            setIsStartGuideVisible(
+              false,
+            )
+          }
+        />
+      ) : null}
 
       {isComposerOpen ? (
         <LiveRoomComposer
