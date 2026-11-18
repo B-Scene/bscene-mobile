@@ -1,3 +1,5 @@
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import {
   router,
   useLocalSearchParams,
@@ -19,7 +21,9 @@ import {
 import type {
   BandMemberItem,
 } from "@/api/band/bandManagement";
+import { uploadMediaAsset } from "@/api/media/media";
 import { LiveCoHostSelector } from "@/features/live/LiveCoHostSelector";
+import { LiveMicTestScreen } from "@/features/live/LiveMicTestScreen";
 import { useBandMembersQuery } from "@/hooks/api/band/useBandManagement";
 import {
   useCancelLiveReservationMutation,
@@ -41,11 +45,18 @@ import {
 import { useAuthStore } from "@/stores/useAuthStore";
 import type {
   LiveReservationCoHostCandidate,
+  LiveReservationResponse,
 } from "@/types/live/live";
 
 type LiveCreateMode =
   | "instant"
   | "reserve";
+
+type ThumbnailAsset = {
+  uri: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+};
 
 const DATE_PATTERN =
   /^\d{4}-\d{2}-\d{2}$/;
@@ -134,10 +145,55 @@ const isSameIds = (
     .sort((a, b) => a - b)
     .join();
 
+const formatDateInput = (
+  date: Date,
+) => {
+  const year =
+    date.getFullYear();
+  const month =
+    String(
+      date.getMonth() + 1,
+    ).padStart(
+      2,
+      "0",
+    );
+  const day =
+    String(
+      date.getDate(),
+    ).padStart(
+      2,
+      "0",
+    );
+
+  return `${year}-${month}-${day}`;
+};
+
+const formatTimeInput = (
+  date: Date,
+) => {
+  const hours =
+    String(
+      date.getHours(),
+    ).padStart(
+      2,
+      "0",
+    );
+  const minutes =
+    String(
+      date.getMinutes(),
+    ).padStart(
+      2,
+      "0",
+    );
+
+  return `${hours}:${minutes}`;
+};
+
 const getTomorrowDateString =
   () => {
     const date =
       new Date();
+
     date.setDate(
       date.getDate() + 1,
     );
@@ -147,151 +203,117 @@ const getTomorrowDateString =
     );
   };
 
-const formatDateInput =
-  (
-    date: Date,
-  ) => {
-    const year =
-      date.getFullYear();
-    const month =
-      String(
-        date.getMonth() + 1,
-      ).padStart(
-        2,
-        "0",
+const splitScheduledAt = (
+  scheduledAt?:
+    | string
+    | null,
+) => {
+  if (!scheduledAt) {
+    return {
+      date:
+        getTomorrowDateString(),
+      time:
+        "20:00",
+    };
+  }
+
+  const normalizedValue =
+    scheduledAt.replace(
+      " ",
+      "T",
+    );
+
+  const date =
+    new Date(
+      normalizedValue,
+    );
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    const [
+      dateValue,
+      timeValue,
+    ] =
+      scheduledAt.split(
+        /[T ]/,
       );
-    const day =
-      String(
-        date.getDate(),
-      ).padStart(
-        2,
-        "0",
-      );
-
-    return `${year}-${month}-${day}`;
-  };
-
-const formatTimeInput =
-  (
-    date: Date,
-  ) => {
-    const hours =
-      String(
-        date.getHours(),
-      ).padStart(
-        2,
-        "0",
-      );
-    const minutes =
-      String(
-        date.getMinutes(),
-      ).padStart(
-        2,
-        "0",
-      );
-
-    return `${hours}:${minutes}`;
-  };
-
-const splitScheduledAt =
-  (
-    scheduledAt?:
-      | string
-      | null,
-  ) => {
-    if (!scheduledAt) {
-      return {
-        date:
-          getTomorrowDateString(),
-        time:
-          "20:00",
-      };
-    }
-
-    const normalizedValue =
-      scheduledAt.replace(
-        " ",
-        "T",
-      );
-    const date =
-      new Date(
-        normalizedValue,
-      );
-
-    if (
-      Number.isNaN(
-        date.getTime(),
-      )
-    ) {
-      const [
-        dateValue,
-        timeValue,
-      ] =
-        scheduledAt.split(
-          /[T ]/,
-        );
-
-      return {
-        date:
-          dateValue ||
-          getTomorrowDateString(),
-        time:
-          timeValue?.slice(
-            0,
-            5,
-          ) ?? "20:00",
-      };
-    }
 
     return {
       date:
-        formatDateInput(
-          date,
-        ),
+        dateValue ||
+        getTomorrowDateString(),
       time:
-        formatTimeInput(
-          date,
-        ),
+        timeValue?.slice(
+          0,
+          5,
+        ) ?? "20:00",
     };
+  }
+
+  return {
+    date:
+      formatDateInput(
+        date,
+      ),
+    time:
+      formatTimeInput(
+        date,
+      ),
   };
+};
 
-const toScheduledAt =
-  (
-    date: string,
-    time: string,
-  ) => `${date}T${time}:00`;
+const toScheduledAt = (
+  date: string,
+  time: string,
+) =>
+  `${date}T${time}:00`;
 
-const isFutureSchedule =
-  (
-    date: string,
-    time: string,
-  ) => {
-    const scheduledAt =
-      new Date(
-        toScheduledAt(
-          date,
-          time,
-        ),
-      );
-
-    return (
-      !Number.isNaN(
-        scheduledAt.getTime(),
-      ) &&
-      scheduledAt.getTime() >
-        Date.now()
+const isFutureSchedule = (
+  date: string,
+  time: string,
+) => {
+  const scheduledAt =
+    new Date(
+      toScheduledAt(
+        date,
+        time,
+      ),
     );
-  };
+
+  return (
+    !Number.isNaN(
+      scheduledAt.getTime(),
+    ) &&
+    scheduledAt.getTime() >
+      Date.now()
+  );
+};
+
+const getReservationThumbnailUrl = (
+  reservation:
+    LiveReservationResponse,
+) =>
+  reservation.thumbnailImageUrl ??
+  reservation.thumbnailUrl ??
+  reservation.liveThumbnailImageUrl ??
+  reservation.liveThumbnailUrl ??
+  reservation.imageUrl ??
+  "";
 
 export function LiveCreateScreen() {
   const params =
     useLocalSearchParams<{
       reservationLiveId?: string;
     }>();
+
   const reservationLiveId =
     Number(
       params.reservationLiveId,
     );
+
   const isEdit =
     Number.isFinite(
       reservationLiveId,
@@ -307,39 +329,84 @@ export function LiveCreateScreen() {
         ? "reserve"
         : "instant",
     );
+
   const [
     title,
     setTitle,
   ] = useState("");
+
   const [
     description,
     setDescription,
   ] = useState("");
+
   const [
     reservedDate,
     setReservedDate,
   ] = useState(
     getTomorrowDateString,
   );
+
   const [
     reservedTime,
     setReservedTime,
   ] = useState("20:00");
+
   const [
     selectedCoHostIds,
     setSelectedCoHostIds,
   ] = useState<number[]>([]);
+
   const [
     initialCoHostIds,
     setInitialCoHostIds,
   ] = useState<number[]>([]);
 
+  const [
+    thumbnailAsset,
+    setThumbnailAsset,
+  ] =
+    useState<ThumbnailAsset | null>(
+      null,
+    );
+
+  const [
+    thumbnailPreviewUrl,
+    setThumbnailPreviewUrl,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    savedThumbnailImageUrl,
+    setSavedThumbnailImageUrl,
+  ] = useState("");
+
+  const [
+    isUploadingThumbnail,
+    setIsUploadingThumbnail,
+  ] = useState(false);
+
+  const [
+    isMicTestOpen,
+    setIsMicTestOpen,
+  ] = useState(false);
+
+  const [
+    isCancelConfirmOpen,
+    setIsCancelConfirmOpen,
+  ] = useState(false);
+
   const createMutation =
     useCreateLiveMutation();
+
   const updateReservationMutation =
     useUpdateLiveReservationMutation();
+
   const cancelReservationMutation =
     useCancelLiveReservationMutation();
+
   const reservationQuery =
     useLiveReservationQuery(
       isEdit
@@ -353,8 +420,10 @@ export function LiveCreateScreen() {
         state.user?.userId ??
         null,
     );
+
   const activeBandQuery =
     useActiveBandId();
+
   const bandMembersQuery =
     useBandMembersQuery(
       activeBandQuery.activeBandId,
@@ -428,24 +497,25 @@ export function LiveCreateScreen() {
         },
       );
 
-  const toggleCoHost =
-    (bandMemberId: number) => {
-      setSelectedCoHostIds(
-        (previous) =>
-          previous.includes(
-            bandMemberId,
-          )
-            ? previous.filter(
-                (id) =>
-                  id !==
-                  bandMemberId,
-              )
-            : [
-                ...previous,
+  const toggleCoHost = (
+    bandMemberId: number,
+  ) => {
+    setSelectedCoHostIds(
+      (previous) =>
+        previous.includes(
+          bandMemberId,
+        )
+          ? previous.filter(
+              (id) =>
+                id !==
                 bandMemberId,
-              ],
-      );
-    };
+            )
+          : [
+              ...previous,
+              bandMemberId,
+            ],
+    );
+  };
 
   useEffect(() => {
     if (
@@ -456,6 +526,7 @@ export function LiveCreateScreen() {
 
     const reservation =
       reservationQuery.data;
+
     const schedule =
       splitScheduledAt(
         reservation.scheduledAt,
@@ -464,17 +535,40 @@ export function LiveCreateScreen() {
     const timer =
       setTimeout(() => {
         setMode("reserve");
+
         setTitle(
           reservation.title ?? "",
         );
+
         setDescription(
-          reservation.description ?? "",
+          reservation.description ??
+            "",
         );
+
         setReservedDate(
           schedule.date,
         );
+
         setReservedTime(
           schedule.time,
+        );
+
+        const thumbnailImageUrl =
+          getReservationThumbnailUrl(
+            reservation,
+          );
+
+        setSavedThumbnailImageUrl(
+          thumbnailImageUrl,
+        );
+
+        setThumbnailPreviewUrl(
+          thumbnailImageUrl ||
+            null,
+        );
+
+        setThumbnailAsset(
+          null,
         );
 
         const coHostIds =
@@ -486,6 +580,7 @@ export function LiveCreateScreen() {
         setSelectedCoHostIds(
           coHostIds,
         );
+
         setInitialCoHostIds(
           coHostIds,
         );
@@ -497,19 +592,106 @@ export function LiveCreateScreen() {
     reservationQuery.data,
   ]);
 
-  const [
-    isCancelConfirmOpen,
-    setIsCancelConfirmOpen,
-  ] = useState(false);
+  const pickThumbnail =
+    async () => {
+      try {
+        const result =
+          await ImagePicker.launchImageLibraryAsync(
+            {
+              mediaTypes: [
+                "images",
+              ],
+              allowsEditing: true,
+              aspect: [16, 9],
+              quality: 0.9,
+            },
+          );
+
+        if (
+          result.canceled ||
+          !result.assets[0]
+        ) {
+          return;
+        }
+
+        const asset =
+          result.assets[0];
+
+        setThumbnailAsset({
+          uri:
+            asset.uri,
+          fileName:
+            asset.fileName,
+          mimeType:
+            asset.mimeType,
+        });
+
+        setThumbnailPreviewUrl(
+          asset.uri,
+        );
+      } catch {
+        Alert.alert(
+          "썸네일 이미지",
+          "이미지를 불러오지 못했어요.",
+        );
+      }
+    };
+
+  const uploadThumbnailIfNeeded =
+    async () => {
+      if (!thumbnailAsset) {
+        return (
+          savedThumbnailImageUrl ||
+          null
+        );
+      }
+
+      setIsUploadingThumbnail(
+        true,
+      );
+
+      try {
+        const uploadedUrl =
+          await uploadMediaAsset({
+            category:
+              "STREAM_THUMBNAIL",
+            uri:
+              thumbnailAsset.uri,
+            fileName:
+              thumbnailAsset.fileName,
+            mimeType:
+              thumbnailAsset.mimeType,
+          });
+
+        setSavedThumbnailImageUrl(
+          uploadedUrl,
+        );
+
+        setThumbnailAsset(
+          null,
+        );
+
+        return uploadedUrl;
+      } finally {
+        setIsUploadingThumbnail(
+          false,
+        );
+      }
+    };
 
   const closeButton = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="닫기"
       hitSlop={12}
-      onPress={() => router.back()}
+      onPress={() =>
+        router.back()
+      }
     >
-      <AppIcon name="closeHeader" size={28} />
+      <AppIcon
+        name="closeHeader"
+        size={28}
+      />
     </Pressable>
   );
 
@@ -517,6 +699,7 @@ export function LiveCreateScreen() {
     isEdit
       ? "라이브 예약 수정"
       : "라이브 시작";
+
   const scheduleError =
     useMemo(() => {
       if (
@@ -558,9 +741,11 @@ export function LiveCreateScreen() {
     ]);
 
   const isPending =
+    isUploadingThumbnail ||
     createMutation.isPending ||
     updateReservationMutation.isPending ||
     cancelReservationMutation.isPending;
+
   const canSubmit =
     Boolean(
       title.trim(),
@@ -588,22 +773,26 @@ export function LiveCreateScreen() {
         return;
       }
 
-      const payload = {
-        title:
-          title.trim(),
-        description:
-          description.trim() ||
-          null,
-        scheduledAt:
-          mode === "reserve"
-            ? toScheduledAt(
-                reservedDate,
-                reservedTime,
-              )
-            : null,
-      };
-
       try {
+        const thumbnailImageUrl =
+          await uploadThumbnailIfNeeded();
+
+        const payload = {
+          title:
+            title.trim(),
+          description:
+            description.trim() ||
+            null,
+          thumbnailImageUrl,
+          scheduledAt:
+            mode === "reserve"
+              ? toScheduledAt(
+                  reservedDate,
+                  reservedTime,
+                )
+              : null,
+        };
+
         if (isEdit) {
           await updateReservationMutation.mutateAsync(
             {
@@ -616,10 +805,6 @@ export function LiveCreateScreen() {
                     reservedDate,
                     reservedTime,
                   ),
-                thumbnailImageUrl:
-                  reservationQuery.data
-                    ?.thumbnailImageUrl ??
-                  null,
                 coHost:
                   isSameIds(
                     selectedCoHostIds,
@@ -635,11 +820,13 @@ export function LiveCreateScreen() {
             "라이브 예약",
             "예약을 수정했어요.",
           );
+
           router.replace(
             "/band/live" as Parameters<
               typeof router.replace
             >[0],
           );
+
           return;
         }
 
@@ -659,11 +846,13 @@ export function LiveCreateScreen() {
             "라이브 예약",
             "라이브 예약이 완료됐어요.",
           );
+
           router.replace(
             "/band/live" as Parameters<
               typeof router.replace
             >[0],
           );
+
           return;
         }
 
@@ -694,7 +883,9 @@ export function LiveCreateScreen() {
         return;
       }
 
-      setIsCancelConfirmOpen(false);
+      setIsCancelConfirmOpen(
+        false,
+      );
 
       try {
         await cancelReservationMutation.mutateAsync(
@@ -705,6 +896,7 @@ export function LiveCreateScreen() {
           "라이브 예약",
           "예약을 취소했어요.",
         );
+
         router.replace(
           "/band/live" as Parameters<
             typeof router.replace
@@ -717,6 +909,28 @@ export function LiveCreateScreen() {
         );
       }
     };
+
+  if (isMicTestOpen) {
+    return (
+      <LiveMicTestScreen
+        onBack={() =>
+          setIsMicTestOpen(
+            false,
+          )
+        }
+        onClose={() =>
+          setIsMicTestOpen(
+            false,
+          )
+        }
+        onComplete={() =>
+          setIsMicTestOpen(
+            false,
+          )
+        }
+      />
+    );
+  }
 
   if (
     isEdit &&
@@ -731,6 +945,7 @@ export function LiveCreateScreen() {
         <AppHeader
           title={titleText}
         />
+
         <AppState
           loading
           title="예약 정보를 불러오는 중이에요"
@@ -752,6 +967,7 @@ export function LiveCreateScreen() {
         <AppHeader
           title={titleText}
         />
+
         <AppState
           title="예약 정보를 불러오지 못했어요"
           actionLabel="다시 시도"
@@ -772,53 +988,105 @@ export function LiveCreateScreen() {
     >
       <AppHeader
         title={titleText}
-        rightContent={closeButton}
-        style={styles.header}
+        rightContent={
+          closeButton
+        }
+        style={
+          styles.header
+        }
       />
 
-      <View style={styles.content}>
+      <View
+        style={
+          styles.content
+        }
+      >
         {!isEdit ? (
-          <View style={styles.formCard}>
-            <Text style={styles.cardTitle}>
+          <View
+            style={
+              styles.formCard
+            }
+          >
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
               라이브 시간 설정
             </Text>
 
-            <View style={styles.choiceList}>
+            <View
+              style={
+                styles.choiceList
+              }
+            >
               <ScheduleChoice
                 selected={
-                  mode === "instant"
+                  mode ===
+                  "instant"
                 }
                 title="지금 바로 시작"
                 description="즉시 라이브를 시작합니다"
                 onPress={() =>
-                  setMode("instant")
+                  setMode(
+                    "instant",
+                  )
                 }
               />
 
               <ScheduleChoice
                 selected={
-                  mode === "reserve"
+                  mode ===
+                  "reserve"
                 }
                 title="예약 설정"
-                description={"원하는 시간에\n라이브를 시작합니다"}
+                description={
+                  "원하는 시간에\n라이브를 시작합니다"
+                }
                 onPress={() =>
-                  setMode("reserve")
+                  setMode(
+                    "reserve",
+                  )
                 }
               />
             </View>
           </View>
         ) : null}
 
-        <View style={styles.formCard}>
-          <Text style={styles.cardTitle}>
+        <View
+          style={
+            styles.formCard
+          }
+        >
+          <Text
+            style={
+              styles.cardTitle
+            }
+          >
             라이브 정보
           </Text>
 
-          <View style={styles.fields}>
-            <View style={styles.fieldRow}>
-              <Text style={styles.fieldLabel}>
+          <View
+            style={
+              styles.fields
+            }
+          >
+            <View
+              style={
+                styles.fieldRow
+              }
+            >
+              <Text
+                style={
+                  styles.fieldLabel
+                }
+              >
                 라이브 제목
-                <Text style={styles.required}>
+                <Text
+                  style={
+                    styles.required
+                  }
+                >
                   {" "}*
                 </Text>
               </Text>
@@ -830,15 +1098,25 @@ export function LiveCreateScreen() {
                 placeholderTextColor={
                   colors.neutral400
                 }
-                style={styles.input}
+                style={
+                  styles.input
+                }
                 onChangeText={
                   setTitle
                 }
               />
             </View>
 
-            <View style={styles.fieldRow}>
-              <Text style={styles.fieldLabel}>
+            <View
+              style={
+                styles.fieldRow
+              }
+            >
+              <Text
+                style={
+                  styles.fieldLabel
+                }
+              >
                 라이브 소개
               </Text>
 
@@ -861,48 +1139,161 @@ export function LiveCreateScreen() {
                 }
               />
             </View>
+
+            <View
+              style={
+                styles.thumbnailRow
+              }
+            >
+              <Text
+                style={
+                  styles.thumbnailLabel
+                }
+              >
+                썸네일 이미지
+              </Text>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="썸네일 이미지 추가"
+                style={
+                  styles.thumbnailButton
+                }
+                onPress={() =>
+                  void pickThumbnail()
+                }
+              >
+                {thumbnailPreviewUrl ? (
+                  <Image
+                    source={{
+                      uri:
+                        thumbnailPreviewUrl,
+                    }}
+                    contentFit="cover"
+                    style={
+                      styles.thumbnailImage
+                    }
+                  />
+                ) : (
+                  <AppIcon
+                    name="imagePlaceholder"
+                    size={24}
+                  />
+                )}
+              </Pressable>
+
+              <View
+                style={
+                  styles.thumbnailDescriptionWrap
+                }
+              >
+                <Text
+                  style={
+                    styles.thumbnailDescription
+                  }
+                >
+                  라이브를 대표할 이미지에요.
+                </Text>
+
+                <Text
+                  style={
+                    styles.thumbnailHint
+                  }
+                >
+                  권장 사이즈 16:9 (1280*720)
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
         {mode === "reserve" ? (
-          <View style={styles.formCard}>
-            <Text style={styles.cardTitle}>
+          <View
+            style={
+              styles.formCard
+            }
+          >
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
               예약 일시 설정
             </Text>
 
-            <View style={styles.scheduleBox}>
-              <View style={styles.scheduleRow}>
-                <AppIcon name="calendarDark" />
-                <Text style={styles.scheduleLabel}>
+            <View
+              style={
+                styles.scheduleBox
+              }
+            >
+              <View
+                style={
+                  styles.scheduleRow
+                }
+              >
+                <AppIcon
+                  name="calendarDark"
+                />
+
+                <Text
+                  style={
+                    styles.scheduleLabel
+                  }
+                >
                   날짜 선택
                 </Text>
+
                 <TextInput
-                  value={reservedDate}
+                  value={
+                    reservedDate
+                  }
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor={
                     colors.neutral400
                   }
-                  style={styles.scheduleInput}
+                  style={
+                    styles.scheduleInput
+                  }
                   onChangeText={
                     setReservedDate
                   }
                 />
               </View>
 
-              <View style={styles.scheduleDivider} />
+              <View
+                style={
+                  styles.scheduleDivider
+                }
+              />
 
-              <View style={styles.scheduleRow}>
-                <AppIcon name="clockDark" />
-                <Text style={styles.scheduleLabel}>
+              <View
+                style={
+                  styles.scheduleRow
+                }
+              >
+                <AppIcon
+                  name="clockDark"
+                />
+
+                <Text
+                  style={
+                    styles.scheduleLabel
+                  }
+                >
                   시작 시간
                 </Text>
+
                 <TextInput
-                  value={reservedTime}
+                  value={
+                    reservedTime
+                  }
                   placeholder="HH:mm"
                   placeholderTextColor={
                     colors.neutral400
                   }
-                  style={styles.scheduleInput}
+                  style={
+                    styles.scheduleInput
+                  }
                   onChangeText={
                     setReservedTime
                   }
@@ -911,7 +1302,11 @@ export function LiveCreateScreen() {
             </View>
 
             {scheduleError ? (
-              <Text style={styles.errorText}>
+              <Text
+                style={
+                  styles.errorText
+                }
+              >
                 {scheduleError}
               </Text>
             ) : null}
@@ -933,22 +1328,78 @@ export function LiveCreateScreen() {
           errorMessage={
             coHostErrorMessage
           }
-          onToggle={toggleCoHost}
+          onToggle={
+            toggleCoHost
+          }
         />
+
+        <View
+          style={
+            styles.micTestCard
+          }
+        >
+          <View
+            style={
+              styles.micTestText
+            }
+          >
+            <Text
+              style={
+                styles.cardTitle
+              }
+            >
+              마이크 테스트
+            </Text>
+
+            <Text
+              style={
+                styles.micTestDescription
+              }
+            >
+              방송 전에 음질과 마이크를{"\n"}
+              테스트해보세요
+            </Text>
+          </View>
+
+          <Pressable
+            accessibilityRole="button"
+            style={
+              styles.micTestButton
+            }
+            onPress={() =>
+              setIsMicTestOpen(
+                true,
+              )
+            }
+          >
+            <Text
+              style={
+                styles.micTestButtonText
+              }
+            >
+              테스트 시작
+            </Text>
+          </Pressable>
+        </View>
 
         <View
           style={[
             styles.footer,
-            isEdit && styles.footerRow,
+            isEdit &&
+              styles.footerRow,
           ]}
         >
           <Pressable
             accessibilityRole="button"
-            disabled={!canSubmit}
+            disabled={
+              !canSubmit
+            }
             style={[
               styles.submitButton,
-              isEdit && styles.footerRowButton,
-              !canSubmit && styles.buttonDisabled,
+              isEdit &&
+                styles.footerRowButton,
+              !canSubmit &&
+                styles.buttonDisabled,
             ]}
             onPress={() =>
               void submit()
@@ -963,7 +1414,8 @@ export function LiveCreateScreen() {
             >
               {isPending
                 ? "저장 중"
-                : mode === "reserve"
+                : mode ===
+                    "reserve"
                   ? "저장"
                   : "라이브 시작하기"}
             </Text>
@@ -972,10 +1424,13 @@ export function LiveCreateScreen() {
           {isEdit ? (
             <Pressable
               accessibilityRole="button"
-              disabled={isPending}
+              disabled={
+                isPending
+              }
               style={[
                 styles.cancelButton,
-                isPending && styles.buttonDisabled,
+                isPending &&
+                  styles.buttonDisabled,
               ]}
               onPress={() =>
                 setIsCancelConfirmOpen(
@@ -983,7 +1438,11 @@ export function LiveCreateScreen() {
                 )
               }
             >
-              <Text style={styles.cancelButtonText}>
+              <Text
+                style={
+                  styles.cancelButtonText
+                }
+              >
                 예약 취소
               </Text>
             </Pressable>
@@ -992,10 +1451,14 @@ export function LiveCreateScreen() {
       </View>
 
       <ConfirmModal
-        open={isCancelConfirmOpen}
+        open={
+          isCancelConfirmOpen
+        }
         tone="orange"
         title="예약을 취소할까요?"
-        description={"취소된 라이브 예약은\n복구할 수 없어요"}
+        description={
+          "취소된 라이브 예약은\n복구할 수 없어요"
+        }
         onCancel={() =>
           setIsCancelConfirmOpen(
             false,
@@ -1023,7 +1486,9 @@ function ScheduleChoice({
   return (
     <Pressable
       accessibilityRole="button"
-      style={({ pressed }) => [
+      style={({
+        pressed,
+      }) => [
         styles.choiceCard,
         selected
           ? styles.choiceCardSelected
@@ -1043,14 +1508,32 @@ function ScheduleChoice({
         ]}
       >
         {selected ? (
-          <View style={styles.radioDot} />
+          <View
+            style={
+              styles.radioDot
+            }
+          />
         ) : null}
       </View>
-      <View style={styles.choiceTextWrap}>
-        <Text style={styles.choiceTitle}>
+
+      <View
+        style={
+          styles.choiceTextWrap
+        }
+      >
+        <Text
+          style={
+            styles.choiceTitle
+          }
+        >
           {title}
         </Text>
-        <Text style={styles.choiceDescription}>
+
+        <Text
+          style={
+            styles.choiceDescription
+          }
+        >
           {description}
         </Text>
       </View>
@@ -1279,6 +1762,100 @@ const styles =
         colors.neutral900,
       paddingHorizontal: 16,
       paddingVertical: 4,
+    },
+
+    thumbnailRow: {
+      minHeight: 56,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    thumbnailLabel: {
+      ...textStyles.caption3,
+      width: 76,
+      color:
+        colors.neutral900,
+    },
+
+    thumbnailButton: {
+      width: 56,
+      height: 56,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor:
+        colors.neutral300,
+      borderRadius: 4,
+      backgroundColor:
+        colors.white,
+    },
+
+    thumbnailImage: {
+      width: "100%",
+      height: "100%",
+    },
+
+    thumbnailDescriptionWrap: {
+      flex: 1,
+      minWidth: 0,
+      marginLeft: 12,
+    },
+
+    thumbnailDescription: {
+      ...textStyles.caption2,
+      color:
+        colors.neutral500,
+    },
+
+    thumbnailHint: {
+      ...textStyles.caption4,
+      color:
+        colors.neutral500,
+      marginTop: 2,
+    },
+
+    micTestCard: {
+      minHeight: 88,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      borderRadius: 14,
+      backgroundColor:
+        colors.white,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      boxShadow:
+        "0px 4px 15px 0px rgba(20, 20, 20, 0.08)",
+    },
+
+    micTestText: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    micTestDescription: {
+      ...textStyles.caption2,
+      color:
+        colors.neutral600,
+      marginTop: 8,
+    },
+
+    micTestButton: {
+      width: 82,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 8,
+      backgroundColor:
+        colors.secondary0,
+    },
+
+    micTestButtonText: {
+      ...textStyles.caption3,
+      color:
+        colors.secondary500,
     },
 
     footer: {
