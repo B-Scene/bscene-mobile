@@ -1,10 +1,17 @@
+import axios from "axios";
+
 import { axiosInstance } from "@/api/axiosInstance";
+import { config } from "@/shared/constants/config";
 import type {
+  AppleLoginChallengeResponse,
+  AppleMobileLoginRequest,
   ApiResponse,
   CheckLoginIdResponse,
+  KakaoMobileLoginRequest,
   LoginRequest,
   LoginResponse,
   LogoutRequest,
+  MobileOAuthResponse,
   OAuthExchangeResponse,
   OAuthSignupRequest,
   ReissueRequest,
@@ -15,6 +22,23 @@ import type {
   SignupResponse,
   VerifyPhoneRequest,
 } from "@/types/auth/auth";
+
+const postPublicAuth = async <TResult, TBody = Record<string, never>>(
+  path: string,
+  body: TBody,
+) => {
+  const { data } = await axios.post<ApiResponse<TResult>>(
+    `${config.apiBaseUrl.replace(/\/+$/, "")}${path}`,
+    body,
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  return data.result;
+};
 
 export const checkLoginId = async (loginId: string) => {
   const { data } = await axiosInstance.get<ApiResponse<CheckLoginIdResponse>>(
@@ -96,3 +120,25 @@ export const exchangeOAuthCode = async (code: string) => {
 
   return data.result;
 };
+
+export const loginWithKakaoMobile = async (
+  body: KakaoMobileLoginRequest,
+) =>
+  postPublicAuth<MobileOAuthResponse, KakaoMobileLoginRequest>(
+    "/auth/oauth/mobile/kakao",
+    body,
+  );
+
+export const issueAppleLoginChallenge = async () =>
+  postPublicAuth<AppleLoginChallengeResponse>(
+    "/auth/oauth/mobile/apple/challenge",
+    {},
+  );
+
+export const loginWithAppleMobile = async (
+  body: AppleMobileLoginRequest,
+) =>
+  postPublicAuth<MobileOAuthResponse, AppleMobileLoginRequest>(
+    "/auth/oauth/mobile/apple",
+    body,
+  );

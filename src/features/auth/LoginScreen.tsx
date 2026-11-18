@@ -16,9 +16,24 @@ import {
 import { config } from "@/shared/constants/config";
 import { colors } from "@/shared/constants/theme";
 import {
+  useAppleLoginChallenge,
+  useAppleMobileLogin,
+  useKakaoMobileLogin,
+} from "@/hooks/api/auth/useAuth";
+import {
+  isSocialSdkCancellation,
+  loginWithAppleSdk,
+  loginWithKakaoSdk,
+} from "@/features/auth/socialSdk";
+import { getApiErrorMessage } from "@/shared/utils/getApiErrorMessage";
+import {
   secureTokenStorage,
   type RecentOAuthProvider,
 } from "@/shared/utils/secureTokenStorage";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { getHomePathForMode } from "@/stores/useModeStore";
+import { useOAuthSignupStore } from "@/stores/useOAuthSignupStore";
+import type { MobileOAuthResponse } from "@/types/auth/auth";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -49,6 +64,15 @@ const createOAuthUrls = (provider: OAuthProvider) => {
 export function LoginScreen() {
   const [recentProvider, setRecentProvider] =
     useState<RecentOAuthProvider | null>(null);
+  const [pendingProvider, setPendingProvider] =
+    useState<RecentOAuthProvider | null>(null);
+  const kakaoLoginMutation = useKakaoMobileLogin();
+  const appleChallengeMutation = useAppleLoginChallenge();
+  const appleLoginMutation = useAppleMobileLogin();
+  const setSession = useAuthStore((state) => state.setSession);
+  const setOAuthSignup = useOAuthSignupStore(
+    (state) => state.setOAuthSignup,
+  );
 
   useEffect(() => {
     void secureTokenStorage
@@ -103,6 +127,112 @@ export function LoginScreen() {
     }
   };
 
+  const completeMobileLogin = async (
+    data: MobileOAuthResponse,
+    provider: RecentOAuthProvider,
+  ) => {
+    if (data.isNewUser) {
+      if (!data.signupToken) {
+        throw new Error("신규 가입 토큰을 받지 못했습니다.");
+      }
+
+      setOAuthSignup({
+        signupToken: data.signupToken,
+        socialEmail: data.email,
+        provider,
+      });
+      router.replace("/signup");
+      return;
+    }
+
+    if (!data.token) {
+      throw new Error("로그인 토큰을 받지 못했습니다.");
+    }
+
+    await setSession(data.token);
+    await secureTokenStorage.setLastOAuthProvider(provider);
+    setRecentProvider(provider);
+
+    const nextPath = data.token.user.onboardingCompleted
+      ? getHomePathForMode(data.token.user.currentMode)
+      : "/onboarding/agreement";
+
+    router.replace(nextPath as Parameters<typeof router.replace>[0]);
+  };
+
+  const handleKakaoLogin = async () => {
+    if (pendingProvider) return;
+
+    if (Platform.OS === "web") {
+      await openOAuth("kakao");
+      return;
+    }
+
+    if (!config.kakaoNativeAppKey.trim()) {
+      Alert.alert(
+        "카카오 로그인 설정 필요",
+        "EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY를 설정한 뒤 개발 빌드를 다시 만들어 주세요.",
+      );
+      return;
+    }
+
+    setPendingProvider("kakao");
+
+    try {
+      const accessToken = await loginWithKakaoSdk();
+      const data = await kakaoLoginMutation.mutateAsync({ accessToken });
+      await completeMobileLogin(data, "kakao");
+    } catch (error) {
+      if (!isSocialSdkCancellation(error)) {
+        Alert.alert(
+          "카카오 로그인 실패",
+          getApiErrorMessage(error, "카카오 로그인 중 문제가 발생했어요."),
+        );
+      }
+    } finally {
+      setPendingProvider(null);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (pendingProvider) return;
+
+    if (Platform.OS === "web") {
+      await openOAuth("apple");
+      return;
+    }
+
+    if (Platform.OS !== "ios") {
+      Alert.alert(
+        "Apple 로그인",
+        "Apple SDK 로그인은 iOS에서만 지원합니다.",
+      );
+      return;
+    }
+
+    setPendingProvider("apple");
+
+    try {
+      const challenge = await appleChallengeMutation.mutateAsync();
+      const credential = await loginWithAppleSdk(challenge.nonce);
+      const data = await appleLoginMutation.mutateAsync({
+        identityToken: credential.identityToken,
+        authorizationCode: credential.authorizationCode,
+        challengeId: challenge.challengeId,
+      });
+      await completeMobileLogin(data, "apple");
+    } catch (error) {
+      if (!isSocialSdkCancellation(error)) {
+        Alert.alert(
+          "Apple 로그인 실패",
+          getApiErrorMessage(error, "Apple 로그인 중 문제가 발생했어요."),
+        );
+      }
+    } finally {
+      setPendingProvider(null);
+    }
+  };
+
   return (
     <ScrollView
       style={styles.root}
@@ -143,8 +273,13 @@ export function LoginScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="카카오로 로그인"
-          style={({ pressed }) => [styles.kakaoButton, pressed && styles.pressed]}
-          onPress={() => void openOAuth("kakao")}
+          disabled={pendingProvider !== null}
+          style={({ pressed }) => [
+            styles.kakaoButton,
+            pressed && styles.pressed,
+            pendingProvider !== null && styles.disabled,
+          ]}
+          onPress={() => void handleKakaoLogin()}
         >
           <Image
             source={require("../../../assets/images/auth/kakao-login-button.svg")}
@@ -155,8 +290,13 @@ export function LoginScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Apple로 로그인"
-          style={({ pressed }) => [styles.appleButton, pressed && styles.pressed]}
-          onPress={() => void openOAuth("apple")}
+          disabled={pendingProvider !== null}
+          style={({ pressed }) => [
+            styles.appleButton,
+            pressed && styles.pressed,
+            pendingProvider !== null && styles.disabled,
+          ]}
+          onPress={() => void handleAppleLogin()}
         >
           <Image
             source={require("../../../assets/images/auth/apple-login-button.svg")}
@@ -343,5 +483,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.82,
+  },
+  disabled: {
+    opacity: 0.6,
   },
 });

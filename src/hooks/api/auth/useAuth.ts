@@ -3,7 +3,10 @@ import { useMutation } from "@tanstack/react-query";
 import {
   checkLoginId,
   exchangeOAuthCode,
+  issueAppleLoginChallenge,
   login,
+  loginWithAppleMobile,
+  loginWithKakaoMobile,
   logout,
   oauthSignup,
   reissueToken,
@@ -12,6 +15,8 @@ import {
   verifyPhone,
 } from "@/api/auth/auth";
 import type {
+  AppleMobileLoginRequest,
+  KakaoMobileLoginRequest,
   LoginRequest,
   LogoutRequest,
   OAuthSignupRequest,
@@ -73,5 +78,25 @@ export const useOAuthSignup = () => {
 export const useOAuthExchange = () => {
   return useMutation({
     mutationFn: exchangeOAuthCode,
+  });
+};
+
+export const useKakaoMobileLogin = () => {
+  return useMutation({
+    mutationFn: (body: KakaoMobileLoginRequest) =>
+      loginWithKakaoMobile(body),
+  });
+};
+
+export const useAppleLoginChallenge = () => {
+  return useMutation({
+    mutationFn: issueAppleLoginChallenge,
+  });
+};
+
+export const useAppleMobileLogin = () => {
+  return useMutation({
+    mutationFn: (body: AppleMobileLoginRequest) =>
+      loginWithAppleMobile(body),
   });
 };
