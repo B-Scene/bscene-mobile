@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
   },
   input: {
     ...textStyles.caption2,
-    height: 30,
+    height: 48,
     borderWidth: 1,
     borderColor: colors.neutral400,
     borderRadius: 5,
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   pickerButton: {
-    height: 30,
+    height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

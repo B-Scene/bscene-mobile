@@ -813,6 +813,7 @@ const styles = StyleSheet.create({
     color: colors.neutral500,
   },
   pickerButton: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
