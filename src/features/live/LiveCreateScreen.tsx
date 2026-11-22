@@ -1072,14 +1072,16 @@ export function LiveCreateScreen() {
             }
           >
             <View
-              style={
-                styles.fieldRow
-              }
+              style={[
+                styles.fieldRow,
+                styles.fieldRowCentered,
+              ]}
             >
               <Text
-                style={
-                  styles.fieldLabel
-                }
+                style={[
+                  styles.fieldLabel,
+                  styles.fieldLabelCentered,
+                ]}
               >
                 라이브 제목
                 <Text
@@ -1725,6 +1727,14 @@ const styles =
         colors.neutral900,
     },
 
+    fieldRowCentered: {
+      alignItems: "center",
+    },
+
+    fieldLabelCentered: {
+      paddingTop: 0,
+    },
+
     required: {
       color:
         colors.error,
@@ -1732,7 +1742,7 @@ const styles =
 
     input: {
       ...textStyles.caption2,
-      height: 28,
+      height: 48,
       flex: 1,
       minWidth: 0,
       borderWidth: 1,

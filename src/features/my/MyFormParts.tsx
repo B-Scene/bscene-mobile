@@ -312,6 +312,7 @@ const styles = StyleSheet.create({
     color: colors.error,
   },
   input: {
+    minHeight: 48,
     ...textStyles.caption2,
     width: "100%",
     borderWidth: 1,
@@ -354,6 +355,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   selectButton: {
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
